@@ -156,6 +156,7 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
   <button class="ntab" onclick="tab('files')">🗂 Files</button>
   <button class="ntab" onclick="tab('aegis')">🛡 Aegis</button>
   <button class="ntab" onclick="tab('cli')">⌨ CLI</button>
+  <button class="ntab" onclick="tab('pwnface')">🤖 Pwngotchi</button>
 </div>
 
 <div id="wrap">
@@ -203,6 +204,11 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 
   <div id="pg-hw" class="page">
     <div id="grid-hw" class="grid"></div>
+  </div>
+
+  <div id="pg-pwnface" class="page">
+    <div style="font-size:.7rem;color:var(--dim);margin-bottom:.8rem;letter-spacing:.1em">3D Pwnagotchi device — click the power button on the device or use START below.</div>
+    <iframe id="pw-iframe" src="" style="width:100%;border:none;height:calc(100vh - 160px);border-radius:6px;background:#0b0d12" loading="lazy"></iframe>
   </div>
 
   <div id="pg-files" class="page">
@@ -260,6 +266,8 @@ function tab(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='pg-'+id));
   if(id==='cli')setTimeout(()=>document.getElementById('cli-in').focus(),50);
   if(id==='files')loadFiles();
+  if(id==='pwnface'){const f=document.getElementById('pw-iframe');if(f&&(!f.src||f.src.endsWith('blank')))f.src='/pwnface';}
+  if(!g_built[id]&&['wifi','ble','passive','hw'].includes(id)){g_built[id]=true;const el=document.getElementById('grid-'+id);if(el&&g_cats)el.innerHTML=g_cats[id].map(s=>mkCard(s,s===g_active)).join('')||'<div class="empty">No tools in this category</div>';}
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -422,6 +430,7 @@ function toggleCard(s){
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
+let g_cats=null; const g_built={};
 let g_active='';
 function renderGrids(mods){
   const cats={wifi:[],ble:[],passive:[],hw:[]};
@@ -432,9 +441,9 @@ function renderGrids(mods){
     if(cats[cat])cats[cat].push(m.slug);
     else cats.wifi.push(m.slug);
   });
+  g_cats=cats;
   ['wifi','ble','passive','hw'].forEach(c=>{
-    const el=document.getElementById('grid-'+c);
-    if(el)el.innerHTML=cats[c].map(s=>mkCard(s,s===g_active)).join('')||'<div class="empty">No tools in this category</div>';
+    if(g_built[c]){const el=document.getElementById('grid-'+c);if(el)el.innerHTML=g_cats[c].map(s=>mkCard(s,s===g_active)).join('')||'<div class="empty">No tools in this category</div>';}
   });
   // Dash mini-cards
   const ds=document.getElementById('dash-status');
@@ -517,9 +526,12 @@ async function stopAll(){
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
+let g_pt=0;
 async function pollStatus(){
+  g_pt++;
   for(const m of g_mods){
     if(m.slug==='aegis')continue;
+    if(m.slug!==g_active&&g_pt%4!==0)continue;
     try{
       const d=await(await fetch('/api/'+m.slug+'/status')).json();
       const on=!!d.running,msg=d.msg||(on?'running':'idle');
@@ -823,7 +835,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   cliBanner();
   loadModules();
   loadBoard();
-  setTimeout(pollStatus,1000);
+  setTimeout(pollStatus,2000);
 });
 </script>
 </body></html>)HTML";

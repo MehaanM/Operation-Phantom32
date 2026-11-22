@@ -174,6 +174,7 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
       <button class="btn bs" onclick="quickStart('chanhop')">🌀 Chan Hop Deauth</button>
       <button class="btn bs" onclick="quickStart('blespam')">📱 BLE Spam</button>
       <button class="btn bs" onclick="quickStart('karma')">🎭 KARMA</button>
+      <button class="btn bs" onclick="window.open('/pwnface','_blank')">🤖 Pwngotchi</button>
       <button class="btn bd" onclick="stopAll()">⏹ Stop All</button>
     </div>
     <div class="sec-ttl">Tool Status</div>
@@ -327,6 +328,8 @@ const TOOLS={
     fields:[['bssid','Target BSSID','mac',''],['ch','Channel','ch','6'],
       ['broadcast','Broadcast','bool','1'],
       ['mode','Category','sel','random',[['random','Random (all cats)'],['spectrum','Spectrum Mgmt'],['blockack','Block ACK ADDBA'],['saquery','SA Query'],['wnm','WNM Sleep Mode']]]]},
+  pwnface:{name:'Pwngotchi',ico:'🤖',cat:'passive',desc:'Autonomous handshake hunter — UCB AI channel selection, deauths, EAPOL detection',
+    fields:[]},
   probeharvest:{name:'Probe Harvest',ico:'🕵️',cat:'passive',desc:'Passive sniffer — logs nearby devices + their saved network history (no TX)',
     fields:[]},
   stormdeauth:{name:'Deauth Storm',ico:'💥',cat:'wifi',desc:'Multi-vector WPA2+WPA3 deauth (deauth+disassoc+SAE+PMKID+BTM — 8 attack vectors)',
@@ -388,6 +391,7 @@ function extraBtns(slug){
   if(slug==='handshake'||slug==='pmkid')return `<button class="btn bx" onclick="dlPcap()">⬇ PCAP</button>`;
   if(slug==='eviltwin')return `<button class="btn bx" onclick="showCreds()">📋 Creds</button>`;
   if(slug==='chanhop')return `<button class="btn bx" onclick="showChHopAPs()">📋 APs found</button>`;
+  if(slug==='pwnface')return `<button class="btn bx" onclick="window.open('/pwnface','_blank')">👁 Face</button>`;
   if(slug==='probeharvest')return `<button class="btn bx" onclick="showProbeHarvest()">📋 Devices</button>`;
   return '';
 }

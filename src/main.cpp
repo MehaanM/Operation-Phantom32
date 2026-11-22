@@ -51,6 +51,7 @@ uint16_t g_seq = 0;
 #include "action_flood.h"
 #include "probe_harvest.h"
 #include "deauth_storm.h"
+#include "pwnface.h"
 
 static void doom_suspend(){
   esp_wifi_scan_stop();
@@ -149,6 +150,7 @@ static void register_tools(){
   tool_register({"mgtflood","Mgmt Spray","All-subtype management frame spray.",1,false,nullptr,nullptr,mgf_routes,mgf_start,mgf_stop});
   tool_register({"multideauth","Multi Deauth","Deauth up to 8 BSSIDs simultaneously.",1,false,nullptr,nullptr,dm_routes,dm_start,dm_stop});
   tool_register({"actionflood","Action Flood","802.11 action frame category spray.",1,false,nullptr,nullptr,acf_routes,acf_start,acf_stop});
+  tool_register({"pwnface","Pwngotchi","Autonomous UCB-guided handshake hunter (Pwnagotchi-inspired).",1,false,nullptr,nullptr,pw_routes,pw_start,pw_stop});
   tool_register({"probeharvest","Probe Harvest","Passive probe request sniffer — STA MAC + saved network history.",1,true,nullptr,nullptr,prh_routes,prh_start,prh_stop});
   tool_register({"stormdeauth","Deauth Storm","Multi-vector WPA2+WPA3 deauth storm (8 attack vectors).",1,false,nullptr,nullptr,ds_routes,ds_start,ds_stop});
 }

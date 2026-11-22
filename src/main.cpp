@@ -77,21 +77,29 @@ static void aegisSetupW(){ aegisSetup(); }
 static void aegisLoopW(){ aegisLoop(); }
 static void aegisRoutesW(){ aegisRoutes(); }
 
-// Scan nearby APs and return JSON: used by UI to auto-fill bssid/ch fields
+// Scan APs — returns Aegis passive cache by default (zero disruption).
+// ?live=1 forces a fresh WiFi scan only when no clients are connected.
 static void scanAPs(){
-  int n = WiFi.scanNetworks(false, true); // false=async, true=show hidden
-  String j = "[";
-  for (int i = 0; i < n; i++) {
-    if (i) j += ",";
-    j += "{\"ssid\":\"" + WiFi.SSID(i) + "\"";
-    j += ",\"bssid\":\"" + WiFi.BSSIDstr(i) + "\"";
-    j += ",\"ch\":" + String(WiFi.channel(i));
-    j += ",\"rssi\":" + String(WiFi.RSSI(i));
-    j += ",\"enc\":" + String(WiFi.encryptionType(i)) + "}";
+  extern String scanJson;          // Aegis passively-built cache
+  extern void buildScanJson(int);  // rebuild from scan results
+  if(server.hasArg("live") && server.arg("live")=="1"){
+    if(WiFi.softAPgetStationNum()>0){
+      // Clients connected — refuse disruptive scan, return cached data
+      server.send(200,"application/json",scanJson.length()>2?scanJson:"[]");
+      return;
+    }
+    esp_wifi_set_promiscuous(false);
+    int n = WiFi.scanNetworks(false, true);
+    buildScanJson(n);
+    WiFi.scanDelete();
+    // Restore promiscuous mode
+    esp_wifi_set_promiscuous_rx_cb(aegisSniff);
+    wifi_promiscuous_filter_t f={};
+    f.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT|WIFI_PROMIS_FILTER_MASK_DATA;
+    esp_wifi_set_promiscuous_filter(&f);
+    esp_wifi_set_promiscuous(true);
   }
-  j += "]";
-  WiFi.scanDelete();
-  server.send(200,"application/json",j);
+  server.send(200,"application/json",scanJson.length()>2?scanJson:"[]");
 }
 
 // Captive portal detection endpoints (iOS, Android, Windows, Chrome)

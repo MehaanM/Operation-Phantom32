@@ -202,74 +202,167 @@ static void pw_run_task(void*) {
 
 // ── Face HTML page ────────────────────────────────────────────────────────────
 static const char PW_HTML[] PROGMEM = R"html(<!DOCTYPE html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Pwngotchi</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0b0d12;color:#dde3ec;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;text-align:center}
-#face{font-size:clamp(2.8rem,12vw,5.5rem);letter-spacing:.05em;margin:.5rem 0;line-height:1.3;user-select:none}
-#moodtxt{color:#e8233a;font-size:.85rem;letter-spacing:.5em;text-transform:uppercase;min-height:1.4em;margin-bottom:1.4rem}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem 1.5rem;margin-bottom:1.5rem;font-size:.7rem;color:#687080;max-width:420px;width:100%}
-.sv{display:block;color:#dde3ec;font-size:1.3rem;font-weight:700;margin-top:.2rem}
-#ch-bar{display:flex;gap:3px;align-items:flex-end;height:52px;margin-bottom:1.4rem}
-.chb{width:14px;height:52px;background:#1e2535;border-radius:3px 3px 2px 2px;position:relative;display:flex;align-items:flex-end}
-.chbf{width:100%;background:#e8233a;border-radius:2px;min-height:3px;transition:height .5s}
+:root{--red:#e8233a;--dim:#687080;--bg:#0b0d12;--surf:#1a1c22;--eink:#cdd2c8;--einktxt:#0a0b08}
+body{background:var(--bg);color:#dde3ec;font-family:'Courier New',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:1.2rem 1rem 3rem;overflow-x:hidden}
+h2{font-size:.72rem;letter-spacing:.4em;color:var(--dim);margin-bottom:1rem;text-transform:uppercase}
+/* ── 3D Scene ── */
+.scene{perspective:1600px;width:100%;display:flex;justify-content:center;padding:1rem 2rem 3.5rem;position:relative}
+.device{position:relative;display:inline-block;transform:perspective(1400px) rotateX(12deg) rotateY(-20deg);animation:hvr 8s ease-in-out infinite;filter:drop-shadow(0 36px 52px rgba(0,0,0,.85)) drop-shadow(0 8px 12px rgba(0,0,0,.5))}
+@keyframes hvr{0%,100%{transform:perspective(1400px) rotateX(12deg) rotateY(-20deg) translateY(0)}50%{transform:perspective(1400px) rotateX(14deg) rotateY(-18deg) translateY(-10px)}}
+/* Device depth sides */
+.d-sl{position:absolute;left:-26px;top:12px;width:26px;bottom:12px;background:linear-gradient(to right,#050609,#0f1015);border-radius:10px 0 0 10px}
+.d-sb{position:absolute;left:12px;right:12px;bottom:-20px;height:20px;background:linear-gradient(to bottom,#0f1015,#050609);border-radius:0 0 10px 10px}
+/* Physical side buttons */
+.d-btns{position:absolute;left:-26px;top:0;bottom:0;width:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:5}
+.d-btn{width:14px;height:14px;border-radius:50%;background:#1e2130;border:1px solid #2a2d3e;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;font-size:6px;color:var(--dim);user-select:none}
+.d-btn:hover{background:#2a2d3e;transform:scale(1.1)}
+.d-btn:active{background:var(--red);box-shadow:0 0 8px var(--red)}
+.d-btn.on{background:var(--red);box-shadow:0 0 6px var(--red)}
+/* Front face */
+.d-front{position:relative;width:400px;background:var(--surf);border-radius:10px;border:1px solid #262930;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),-26px 14px 0 -2px #09090e}
+/* GPIO header pins (decorative) */
+.d-gpio{position:absolute;top:5px;left:50%;transform:translateX(-50%);display:flex;gap:2px}
+.d-pin{width:3px;height:7px;background:#b8882a;border-radius:1px 1px 0 0}
+/* Status LEDs */
+.d-leds{position:absolute;top:8px;right:12px;display:flex;gap:5px}
+.led{width:7px;height:7px;border-radius:50%;background:#1e2130;transition:all .3s}
+.led.r{background:var(--red);box-shadow:0 0 8px var(--red);animation:lp 1s infinite}
+.led.g{background:#27ae60;box-shadow:0 0 8px #27ae60;animation:lp 2.5s infinite}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.35}}
+/* Screen bezel */
+.d-bezel{margin:12px 48px 10px 10px;background:#0d0e12;border-radius:4px;padding:2px;border:1px solid #131519}
+/* E-ink display */
+.eink{background:var(--eink);color:var(--einktxt);font-family:'Courier New',monospace;font-size:11px;line-height:1.4;padding:6px 8px;display:flex;flex-direction:column;gap:4px;min-height:140px;position:relative;overflow:hidden}
+.eink::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.025) 3px,rgba(0,0,0,.025) 4px);pointer-events:none}
+.e-row{display:flex;justify-content:space-between;font-weight:700;letter-spacing:.02em;font-size:10.5px}
+.e-fw{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.5rem 0}
+.e-face{font-size:28px;line-height:1.3;letter-spacing:.08em;transition:transform .2s;user-select:none}
+.e-face.anim{transform:scale(1.12)}
+.e-moodtxt{font-size:9px;letter-spacing:.2em;margin-top:3px;color:#1e2a18;text-transform:uppercase}
+/* Branding + USB nub */
+.d-brand{position:absolute;bottom:7px;right:12px;font-size:9px;color:#22262e;letter-spacing:.2em}
+.d-brand span{color:#3a1a1f}
+.d-usb{position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:5px;height:28px;background:#0a0b0e;border-radius:0 3px 3px 0}
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;width:100%;max-width:470px;margin-top:.7rem}
+.scard{background:#14161c;border:1px solid #1e2130;border-radius:6px;padding:.6rem;text-align:center}
+.sv{font-size:1.4rem;font-weight:700;color:#dde3ec}
+.sl{font-size:.62rem;color:var(--dim);letter-spacing:.1em;margin-top:.2rem;text-transform:uppercase}
+.scard.act .sv{color:var(--red)}
+/* ── Controls ── */
+.ctrl{display:flex;gap:10px;margin:.8rem 0;justify-content:center}
+.cbtn{font-family:'Courier New',monospace;padding:.55rem 1.6rem;border-radius:4px;cursor:pointer;font-size:.8rem;letter-spacing:.15em;border:1px solid;transition:all .2s}
+.cbtn-s{background:transparent;border-color:var(--red);color:var(--red)}
+.cbtn-s:hover{background:var(--red);color:#0b0d12}
+.cbtn-s.on{background:#1a0608;border-color:#661219;color:#aa2233}
+.cbtn-h{background:transparent;border-color:#2a2d3e;color:var(--dim)}
+.cbtn-h:hover{border-color:#687080;color:#dde3ec}
+/* ── Channel bar ── */
+.ch-wrap{width:100%;max-width:470px;margin-top:.7rem}
+.ch-title{font-size:.62rem;color:var(--dim);letter-spacing:.2em;margin-bottom:.4rem}
+.ch-bar{display:flex;gap:3px;align-items:flex-end;height:52px;padding-bottom:16px}
+.chb{width:14px;background:#1e2130;border-radius:3px 3px 0 0;position:relative;display:flex;align-items:flex-end}
+.chbf{width:100%;background:var(--red);border-radius:2px 2px 0 0;min-height:3px;transition:height .5s}
 .chl{position:absolute;bottom:-14px;left:0;right:0;font-size:8px;color:#3a4555;text-align:center}
-#log{max-width:440px;width:100%;font-size:.68rem;color:#3a4555;border-top:1px solid #1e2535;padding-top:.6rem;text-align:left}
-.le{padding:.18rem 0;border-bottom:1px solid #111520;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ── Activity log ── */
+.log-wrap{width:100%;max-width:470px;margin-top:.7rem;border-top:1px solid #1e2130}
+.log-title{font-size:.62rem;color:var(--dim);letter-spacing:.2em;padding:.5rem 0 .3rem}
+.le{font-size:.7rem;color:#3a4555;padding:.18rem 0;border-bottom:1px solid #111520;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .le:first-child{color:#687080}
-#running{width:8px;height:8px;border-radius:50%;background:#3a4555;display:inline-block;margin-right:.4rem;vertical-align:middle}
-#running.on{background:#e8233a;animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-#back{position:fixed;top:.8rem;left:.8rem;color:#e8233a;text-decoration:none;font-size:.75rem}
-#corner{position:fixed;top:.8rem;right:.8rem;font-size:.65rem;color:#1e2535;letter-spacing:.1em}
 </style>
 </head><body>
-<a href="/" id="back">← hub</a>
-<div id="corner">PHANTOM32</div>
-<div id="face">(- _ -)</div>
-<div id="moodtxt"><span id="running"></span><span id="mt">offline</span></div>
-<div class="stats">
-<div>Handshakes<span class="sv" id="hs">0</span></div>
-<div>APs Seen<span class="sv" id="aps">0</span></div>
-<div>Epoch<span class="sv" id="ep">0</span></div>
-<div>Channel<span class="sv" id="ch">-</span></div>
+<h2>&#x2310;&#x25A0;_&#x25A0; Pwnagotchi</h2>
+<!-- 3D Device scene -->
+<div class="scene">
+<div class="device" id="dev">
+  <div class="d-sl"></div>
+  <div class="d-sb"></div>
+  <div class="d-btns">
+    <div class="d-btn" id="dbp" onclick="togglePwn()" title="Power">&#x23FB;</div>
+    <div class="d-btn" title="Info">&#x25B2;</div>
+    <div class="d-btn" title="Log">&#x25BC;</div>
+  </div>
+  <div class="d-front">
+    <div class="d-gpio"><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div><div class="d-pin"></div></div>
+    <div class="d-leds"><div class="led" id="l0"></div><div class="led" id="l1"></div></div>
+    <div class="d-bezel">
+      <div class="eink">
+        <div class="e-row"><span id="e-ch">ch:1</span><span id="e-aps">aps:0</span><span id="e-time">00:00:00</span></div>
+        <div class="e-fw">
+          <div class="e-face" id="eface">&#x28;&#xA8;_&#xA8; &#x29;</div>
+          <div class="e-moodtxt" id="emood">sleeping</div>
+        </div>
+        <div class="e-row"><span id="e-hs">hs:0</span><span id="e-ep">ep:0</span><span id="e-up">00:00:00</span></div>
+      </div>
+    </div>
+    <div class="d-brand">PHANTOM<span>32</span></div>
+    <div class="d-usb"></div>
+  </div>
 </div>
-<div id="ch-bar"></div>
-<div id="log"><div class="le" style="color:#3a4555;letter-spacing:.1em">ACTIVITY LOG</div></div>
+</div>
+<!-- Stats grid -->
+<div class="stats">
+  <div class="scard"><div class="sv" id="s-hs">0</div><div class="sl">Handshakes</div></div>
+  <div class="scard"><div class="sv" id="s-aps">0</div><div class="sl">APs Seen</div></div>
+  <div class="scard"><div class="sv" id="s-ep">0</div><div class="sl">Epoch</div></div>
+  <div class="scard act"><div class="sv" id="s-st">OFFLINE</div><div class="sl">State</div></div>
+</div>
+<!-- Controls -->
+<div class="ctrl">
+  <button class="cbtn cbtn-s" id="cbs" onclick="togglePwn()">&#x25B6; START</button>
+  <button class="cbtn cbtn-h" onclick="location.href='/'">&#x2190; Hub</button>
+</div>
+<!-- Channel bar -->
+<div class="ch-wrap">
+  <div class="ch-title">CHANNEL ACTIVITY</div>
+  <div class="ch-bar" id="ch-bar"></div>
+</div>
+<!-- Activity log -->
+<div class="log-wrap">
+  <div class="log-title">ACTIVITY LOG</div>
+  <div id="log"></div>
+</div>
 <script>
-const F={sleep:'(- _ -)',bored:'(-_-。)',scan:'(o . o)',excited:'(°∀°)',happy:'(◕‿◕)',pwning:'(⌐■_■)'};
-const M={sleep:'zzZzz',bored:'...',scan:'scanning...',excited:'EAPOL detected!',happy:'♥ handshake! ♥',pwning:'>>> PWNED <<<'};
-let last_mood='';
+const F={sleep:'(- _ -)',bored:'(-__-)',scan:'(. ._)',excited:'(^o^)',happy:'(:D)',pwning:'(>_<)'};
+const M={sleep:'sleeping',bored:'nothing here...',scan:'scanning...',excited:'eapol detected!',happy:'handshake!',pwning:'pwned.'};
+let g_run=false,g_t0=null,g_lm='';
+const $=id=>document.getElementById(id);
+function fmt(ms){if(!ms)return'00:00:00';const s=Math.floor((Date.now()-ms)/1000);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(n=>n.toString().padStart(2,'0')).join(':');}
 async function tick(){
   try{
     const d=await(await fetch('/api/pwnface/status')).json();
-    const face=F[d.mood]||F.sleep;
-    const fe=document.getElementById('face');
-    if(d.mood!==last_mood){fe.style.transform='scale(1.2)';setTimeout(()=>fe.style.transform='',300);last_mood=d.mood;}
-    fe.textContent=face;
-    document.getElementById('mt').textContent=M[d.mood]||d.mood;
-    document.getElementById('running').className=d.running?'on':'';
-    document.getElementById('hs').textContent=d.hs;
-    document.getElementById('aps').textContent=d.aps;
-    document.getElementById('ep').textContent=d.epoch;
-    document.getElementById('ch').textContent=d.chan||'-';
+    g_run=!!d.running;
+    $('e-ch').textContent='ch:'+d.chan;
+    $('e-aps').textContent='aps:'+d.aps;
+    $('e-time').textContent=new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const fe=$('eface');
+    if(d.mood!==g_lm){g_lm=d.mood;fe.classList.add('anim');setTimeout(()=>{fe.textContent=F[d.mood]||F.sleep;fe.classList.remove('anim');},150);}
+    $('emood').textContent=M[d.mood]||d.mood;
+    $('e-hs').textContent='hs:'+d.hs;
+    $('e-ep').textContent='ep:'+d.epoch;
+    $('e-up').textContent=g_t0?fmt(g_t0):'00:00:00';
+    $('l0').className='led'+(d.running?' r':'');
+    $('l1').className='led'+(d.running&&(d.mood==='happy'||d.mood==='pwning')?' g':'');
+    $('dbp').className='d-btn'+(d.running?' on':'');
+    const cb=$('cbs');cb.textContent=d.running?'■ STOP':'▶ START';cb.className='cbtn cbtn-s'+(d.running?' on':'');
+    $('s-hs').textContent=d.hs;$('s-aps').textContent=d.aps;$('s-ep').textContent=d.epoch;
+    $('s-st').textContent=d.running?(M[d.mood]||'running').toUpperCase():'OFFLINE';
     if(d.chans&&d.chans.length){
       const mx=Math.max(1,...d.chans.map(c=>c.e));
-      document.getElementById('ch-bar').innerHTML=d.chans.map(c=>{
-        const h=Math.round(c.e/mx*44)||4;
-        const active=c.c==d.chan;
-        return`<div class="chb" title="ch${c.c}: ${c.e} EAPOL"><div class="chbf" style="height:${h}px;background:${active?'#ff6680':'#e8233a'}"></div><span class="chl">${c.c}</span></div>`;
-      }).join('');
+      $('ch-bar').innerHTML=d.chans.map(c=>{const h=Math.round(c.e/mx*44)||4;const a=c.c==d.chan;return'<div class="chb" title="ch'+c.c+': '+c.e+' EAPOL"><div class="chbf" style="height:'+h+'px;background:'+(a?'#ff6680':'#e8233a')+'"></div><span class="chl">'+c.c+'</span></div>';}).join('');
     }
-    if(d.log&&d.log.length){
-      const el=document.getElementById('log');
-      el.innerHTML='<div class="le" style="color:#3a4555;letter-spacing:.1em">ACTIVITY LOG</div>'+
-        d.log.map(l=>`<div class="le">${l}</div>`).join('');
-    }
+    if(d.log&&d.log.length)$('log').innerHTML=d.log.map(l=>'<div class="le">'+l+'</div>').join('');
   }catch(e){}
   setTimeout(tick,2000);
 }
+async function startPwn(){await fetch('/api/pwnface/start',{method:'POST'}).catch(()=>{});g_t0=Date.now();tick();}
+async function stopPwn(){await fetch('/api/pwnface/stop',{method:'POST'}).catch(()=>{});g_t0=null;tick();}
+function togglePwn(){g_run?stopPwn():startPwn();}
+$('ch-bar').innerHTML=Array.from({length:13},function(_,i){return'<div class="chb"><div class="chbf" style="height:4px"></div><span class="chl">'+(i+1)+'</span></div>';}).join('');
 tick();
 </script>
 </body></html>)html";

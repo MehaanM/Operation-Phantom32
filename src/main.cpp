@@ -159,7 +159,7 @@ void setup(){
   Serial.printf("[doom] FS: %u/%u bytes used\n", LittleFS.usedBytes(), LittleFS.totalBytes());
   fsLockInit();
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP("ESP32-DOOM","doomdoom");
+  WiFi.softAP("Phantom32","phantom32");
   delay(150);
   Serial.printf("[doom] AP: %s\n", WiFi.softAPIP().toString().c_str());
   tool_wifi_suspend = doom_suspend;

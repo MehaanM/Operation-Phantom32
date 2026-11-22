@@ -1,4 +1,6 @@
-# ESP32-DOOM
+# Mission: Phantom32_Protocol
+
+![Mission: Phantom32_Protocol](logo.svg)
 
 A maxed-out WiFi/BLE security research toolkit for ESP32 family boards.  
 Connect to its AP, open a browser, and get a full offensive + defensive suite with no SD card required.

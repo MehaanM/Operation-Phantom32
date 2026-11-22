@@ -1,0 +1,45 @@
+<svg width="680" height="300" viewBox="0 0 680 300" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Mission: Phantom32_Protocol — ESP32 security toolkit logo</title>
+<desc>Dark tactical logo with ghost icon, red signal waves, and bold monospace text</desc>
+
+<rect width="680" height="300" fill="#0b0d12" rx="10"/>
+
+<path d="M 25 65 L 25 25 L 65 25" stroke="#e8233a" stroke-width="2" fill="none" stroke-linecap="square"/>
+<path d="M 615 25 L 655 25 L 655 65" stroke="#e8233a" stroke-width="2" fill="none" stroke-linecap="square"/>
+<path d="M 25 235 L 25 275 L 65 275" stroke="#e8233a" stroke-width="2" fill="none" stroke-linecap="square"/>
+<path d="M 615 275 L 655 275 L 655 235" stroke="#e8233a" stroke-width="2" fill="none" stroke-linecap="square"/>
+
+<line x1="25" y1="150" x2="80" y2="150" stroke="#e8233a" stroke-width="0.6" opacity="0.3"/>
+<line x1="600" y1="150" x2="655" y2="150" stroke="#e8233a" stroke-width="0.6" opacity="0.3"/>
+
+<path d="M 125 98 A 20 20 0 0 1 165 98" stroke="#e8233a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<path d="M 108 98 A 37 37 0 0 1 182 98" stroke="#e8233a" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+<path d="M 92 98 A 53 53 0 0 1 198 98" stroke="#e8233a" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+<path d="M 95 215 L 95 148 A 50 50 0 0 1 195 148 L 195 215 Q 183 232 170 215 Q 157 198 145 215 Q 132 232 120 215 Q 107 198 95 215 Z" fill="#161b25"/>
+<path d="M 95 215 L 95 148 A 50 50 0 0 1 195 148 L 195 215 Q 183 232 170 215 Q 157 198 145 215 Q 132 232 120 215 Q 107 198 95 215 Z" fill="none" stroke="#e8233a" stroke-width="0.8" opacity="0.25"/>
+
+<ellipse cx="122" cy="168" rx="10" ry="11" fill="#e8233a"/>
+<ellipse cx="168" cy="168" rx="10" ry="11" fill="#e8233a"/>
+<ellipse cx="124" cy="170" rx="5" ry="5.5" fill="#0b0d12"/>
+<ellipse cx="170" cy="170" rx="5" ry="5.5" fill="#0b0d12"/>
+<circle cx="120" cy="164" r="2" fill="#ff6680"/>
+<circle cx="166" cy="164" r="2" fill="#ff6680"/>
+
+<text x="240" y="128" font-family="'Courier New', Courier, monospace" font-size="12" fill="#687080" letter-spacing="5">MISSION:</text>
+<text x="236" y="187" font-family="'Courier New', Courier, monospace" font-size="52" font-weight="700" fill="#dde3ec" letter-spacing="2">PHANTOM32</text>
+<line x1="236" y1="197" x2="635" y2="197" stroke="#e8233a" stroke-width="1.5"/>
+<line x1="236" y1="200" x2="635" y2="200" stroke="#e8233a" stroke-width="0.4" opacity="0.4"/>
+<text x="240" y="224" font-family="'Courier New', Courier, monospace" font-size="17" fill="#e8233a" letter-spacing="6">_PROTOCOL</text>
+<text x="240" y="254" font-family="'Courier New', Courier, monospace" font-size="10" fill="#2a3545" letter-spacing="1">ESP32  //  802.11 RAW INJECTION</text>
+
+<circle cx="605" cy="238" r="1.5" fill="#1e2535"/>
+<circle cx="618" cy="238" r="1.5" fill="#1e2535"/>
+<circle cx="631" cy="238" r="1.5" fill="#1e2535"/>
+<circle cx="605" cy="251" r="1.5" fill="#1e2535"/>
+<circle cx="618" cy="251" r="1.5" fill="#1e2535"/>
+<circle cx="631" cy="251" r="1.5" fill="#1e2535"/>
+<circle cx="605" cy="264" r="1.5" fill="#1e2535"/>
+<circle cx="618" cy="264" r="1.5" fill="#1e2535"/>
+<circle cx="631" cy="264" r="1.5" fill="#1e2535"/>
+</svg>

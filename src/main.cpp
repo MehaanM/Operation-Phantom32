@@ -43,6 +43,12 @@ uint16_t g_seq = 0;
 #include "chan_hop_deauth.h"
 #include "pcap_mgr.h"
 #include "board.h"
+#include "btm_flood.h"
+#include "eap_flood.h"
+#include "null_flood.h"
+#include "mgt_flood.h"
+#include "deauth_multi.h"
+#include "action_flood.h"
 
 static void doom_suspend(){
   esp_wifi_scan_stop();
@@ -135,6 +141,12 @@ static void register_tools(){
   tool_register({"pmkid","PMKID Hunt","Active PMKID extraction→PCAP.",1,false,nullptr,nullptr,ph_routes,ph_start,ph_stop});
   tool_register({"wpa3flood","WPA3 Flood","SAE commit/confirm flood.",1,false,nullptr,nullptr,w3_routes,w3_start,w3_stop});
   tool_register({"chanhop","Chan Hop Deauth","All-channel deauth sweep.",1,false,nullptr,nullptr,chd_routes,chd_start,chd_stop});
+  tool_register({"btmflood","BTM Flood","802.11v BSS Transition — force STA roaming.",1,false,nullptr,nullptr,btm_routes,btm_start,btm_stop});
+  tool_register({"eapflood","EAP Flood","WPA Enterprise EAPOL state exhaustion.",1,false,nullptr,nullptr,eap_routes,eap_start,eap_stop});
+  tool_register({"nullflood","Null Flood","Power-save null/QoS-null/BAR confusion.",1,false,nullptr,nullptr,nf2_routes,nf2_start,nf2_stop});
+  tool_register({"mgtflood","Mgmt Spray","All-subtype management frame spray.",1,false,nullptr,nullptr,mgf_routes,mgf_start,mgf_stop});
+  tool_register({"multideauth","Multi Deauth","Deauth up to 8 BSSIDs simultaneously.",1,false,nullptr,nullptr,dm_routes,dm_start,dm_stop});
+  tool_register({"actionflood","Action Flood","802.11 action frame category spray.",1,false,nullptr,nullptr,acf_routes,acf_start,acf_stop});
 }
 
 void setup(){

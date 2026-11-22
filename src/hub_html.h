@@ -92,12 +92,33 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 .toast.e{border-left-color:var(--acc)}.toast.w{border-left-color:var(--orn)}
 @keyframes tIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
 /* ── CLI ── */
-.cli-wrap{display:flex;flex-direction:column;height:calc(100vh - 115px)}
-#cli-out{flex:1;background:#000;border:1px solid var(--bdr);border-radius:7px;padding:10px;overflow-y:auto;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:.78em;line-height:1.5;color:#0f0;word-break:break-all}
-#cli-out .err{color:#f55}#cli-out .info{color:#555}#cli-out .in{color:#3fc;font-weight:700}
-.cli-row{display:flex;background:#000;border:1px solid var(--bdr);border-radius:7px;padding:7px 12px;margin-top:8px;align-items:center}
-.cli-ps{color:#3fc;font-family:monospace;font-size:.85em;margin-right:8px;flex-shrink:0}
-#cli-in{flex:1;background:none;border:none;color:#0f0;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:.82em;outline:none}
+.cli-wrap{display:flex;gap:0;height:calc(100vh - 115px);overflow:hidden}
+.cli-sidebar{width:220px;min-width:160px;background:#0a0c10;border:1px solid var(--bdr);border-radius:8px 0 0 8px;overflow-y:auto;flex-shrink:0;scrollbar-width:thin;scrollbar-color:#1e2430 transparent}
+.cli-main{flex:1;display:flex;flex-direction:column;min-width:0}
+#cli-out{flex:1;background:#000;border:1px solid var(--bdr);border-left:none;border-radius:0 8px 0 0;padding:10px 14px;overflow-y:auto;font-family:'SF Mono','Fira Code',Menlo,Consolas,monospace;font-size:.78em;line-height:1.6;word-break:break-all}
+.co{display:block;white-space:pre-wrap}
+.co.in{color:#3fffd4;font-weight:700}
+.co.ok{color:#88ff88}
+.co.er{color:#ff5f5f}
+.co.hd{color:#ffb347;font-weight:700}
+.co.ex{color:#a8d8ff}
+.co.us{color:#c3f0ca}
+.co.dm{color:#4a5568}
+.co.sep{color:#1e3040;user-select:none}
+.cli-row{display:flex;background:#000;border:1px solid var(--bdr);border-left:none;border-top:none;border-radius:0 0 8px 0;padding:7px 12px;align-items:center}
+.cli-ps{color:#3fc;font-family:'SF Mono',Menlo,monospace;font-size:.85em;margin-right:6px;flex-shrink:0}
+#cli-in{flex:1;background:none;border:none;color:#88ff88;font-family:'SF Mono','Fira Code',Menlo,Consolas,monospace;font-size:.82em;outline:none}
+/* Sidebar */
+.csb-cat{padding:7px 12px 3px;font-size:.6em;text-transform:uppercase;letter-spacing:1px;color:#3a4a5a;font-weight:700;border-top:1px solid #0f1520}
+.csb-cmd{display:block;padding:4px 10px 4px 14px;font-size:.72em;color:#5a7a8a;cursor:pointer;text-decoration:none;transition:background .1s,color .1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.csb-cmd:hover{background:#0d1f2a;color:#3fffd4}
+.csb-cmd b{color:#7ec8e3;font-weight:600}
+/* Autocomplete */
+#ac-box{position:absolute;background:var(--bg2);border:1px solid var(--bdr);border-radius:6px;min-width:200px;max-height:160px;overflow-y:auto;z-index:200;display:none;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.ac-item{padding:5px 12px;font-size:.8em;font-family:monospace;cursor:pointer;color:var(--fg)}
+.ac-item:hover,.ac-item.sel{background:var(--bg3);color:var(--acc)}
+.cli-wrap-outer{position:relative}
+@media(max-width:620px){.cli-sidebar{display:none}}
 /* ── Misc ── */
 .mt8{margin-top:8px}.mb4{margin-bottom:4px}
 .empty{color:var(--dim);font-size:.82em;padding:24px;text-align:center}
@@ -162,7 +183,8 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
   <div id="pg-wifi" class="page">
     <div id="scanbar">
       <label>📡 Scan:</label>
-      <button class="btn bx" id="scan-btn" onclick="runScan()">Scan APs</button>
+      <button class="btn bs" id="scan-btn" onclick="runScan(false)">Scan APs</button>
+      <button class="btn bx" title="Force live WiFi scan (may briefly drop connection)" onclick="runScan(true)">⚡ Live</button>
       <select id="scan-sel" onchange="applyScan(this.value)">
         <option value="">— select AP to auto-fill —</option>
       </select>
@@ -195,13 +217,19 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
     <iframe id="iframe-aegis" src="/aegis" style="width:100%;height:100%;border:0;display:block"></iframe>
   </div>
 
-  <div id="pg-cli" class="page">
-    <div class="cli-wrap">
-      <div class="mb4" style="color:var(--dim);font-size:.75em;padding-bottom:8px">
-        <code style="background:var(--bg3);padding:2px 6px;border-radius:3px">help</code> · Tab=autocomplete · ↑↓=history
+  <div id="pg-cli" class="page" style="padding:10px 12px">
+    <div class="cli-wrap-outer">
+      <div id="ac-box"></div>
+      <div class="cli-wrap">
+        <div class="cli-sidebar" id="cli-sidebar"></div>
+        <div class="cli-main">
+          <div id="cli-out"></div>
+          <div class="cli-row">
+            <span class="cli-ps">doom&gt;</span>
+            <input id="cli-in" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="type a command, or click one →">
+          </div>
+        </div>
       </div>
-      <div id="cli-out"></div>
-      <div class="cli-row"><span class="cli-ps">doom&gt;</span><input id="cli-in" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="type command…"></div>
     </div>
   </div>
 </div>
@@ -479,20 +507,32 @@ async function pollStatus(){
 }
 
 // ── Scan APs ──────────────────────────────────────────────────────────────────
-async function runScan(){
+async function runScan(live){
   const btn=document.getElementById('scan-btn');
-  btn.textContent='Scanning…';btn.disabled=true;
+  btn.textContent='Loading…';btn.disabled=true;
   try{
-    const aps=await(await fetch('/api/scan')).json();
+    const url=live?'/api/scan?live=1':'/api/scan';
+    const aps=await(await fetch(url)).json();
     const sel=document.getElementById('scan-sel');
-    sel.innerHTML='<option value="">— tap AP to auto-fill all fields —</option>'+
-      aps.sort((a,b)=>b.rssi-a.rssi)
-         .map(a=>`<option value="${a.bssid}:${a.ch}:${encodeURIComponent(a.ssid)}">${a.ssid} [${a.bssid}] ch${a.ch} ${a.rssi}dBm</option>`)
-         .join('');
-    sel.style.display='inline';
-    toast('Found '+aps.length+' APs');
+    if(!aps.length&&!live){
+      // Cache empty on first boot — try live scan
+      btn.textContent='Scanning…';
+      const aps2=await(await fetch('/api/scan?live=1')).json();
+      populateScanSel(aps2);
+    } else {
+      populateScanSel(aps);
+    }
   }catch(e){toast('Scan failed: '+e,'e')}
-  btn.textContent='🔄 Rescan';btn.disabled=false;
+  btn.textContent='Scan APs';btn.disabled=false;
+}
+function populateScanSel(aps){
+  const sel=document.getElementById('scan-sel');
+  sel.innerHTML='<option value="">— select AP to auto-fill —</option>'+
+    aps.sort((a,b)=>b.rssi-a.rssi)
+       .map(a=>`<option value="${a.bssid}:${a.ch}:${encodeURIComponent(a.ssid)}">${a.ssid||'(hidden)'} [${a.bssid}] ch${a.ch} ${a.rssi}dBm${a.enc?' ('+a.enc+')':''}</option>`)
+       .join('');
+  sel.style.display='inline';
+  toast('Found '+aps.length+' APs'+(aps.length&&aps[0].pmf!==undefined?' (Aegis data)':''));
 }
 
 function applyScan(val){
@@ -586,34 +626,158 @@ async function delPcap(name){
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
-let cliHist=JSON.parse(localStorage.getItem('ch')||'[]'),cliIdx=cliHist.length;
-let cliCmds=[];
-function cliPrint(txt,cls=''){
-  const o=document.getElementById('cli-out'),d=document.createElement('div');
-  if(cls)d.className=cls;d.textContent=txt;o.appendChild(d);o.scrollTop=o.scrollHeight;
+let cliHist=JSON.parse(localStorage.getItem('ch')||'[]'),cliHistIdx=cliHist.length;
+let cliCmds=[],acIdx=-1;
+
+const CLI_SIDEBAR=[
+  {cat:'Core',cmds:[['help','show all commands'],['help <cmd>','detailed help'],['status','heap/uptime/active'],['modules','list tools'],['start <slug>','start a tool'],['stop','stop active tool'],['reboot','restart ESP32']]},
+  {cat:'WiFi',cmds:[['scan','show cached APs'],['deauth <bssid>','deauth clients'],['beacon <ssid>','beacon flood'],['probe <ssid>','probe flood'],['handshake <bssid>','capture EAPOL'],['portal <ssid>','evil portal']]},
+  {cat:'BLE',cmds:[['ble apple','Apple popups'],['ble android','Android FastPair'],['ble windows','Windows SwiftPair'],['ble rapidflood','random BLE flood']]},
+  {cat:'Defense',cmds:[['aegis','IDS summary'],['clients','nearby devices'],['events','IDS event log'],['attackers','deauth attackers'],['channels','channel heatmap'],['trust <ssid> <mac> <ch>','set trusted AP']]},
+  {cat:'Safety',cmds:[['safety','show limits'],['safety ast=30','auto-stop 30s'],['block <mac>','block BSSID'],['unblock','clear blocklist']]},
+  {cat:'Diag',cmds:[['diag channel','channel map'],['diag heatmap','RSSI histogram'],['diag clients','client inventory'],['diag ies <mac>','decode IE fields']]},
+];
+
+function cliRenderSidebar(){
+  const sb=document.getElementById('cli-sidebar');if(!sb)return;
+  sb.innerHTML=CLI_SIDEBAR.map(g=>`
+    <div class="csb-cat">${g.cat}</div>
+    ${g.cmds.map(([c,d])=>`<a class="csb-cmd" onclick="cliInsert('${c.replace(/'/g,"\\'")}')"><b>${c.split(' ')[0]}</b>${c.includes(' ')?' <span style="color:#2a3a4a">'+c.substring(c.indexOf(' '))+'</span>':''}</a>`).join('')}
+  `).join('');
 }
-async function cliRun(cmd){
-  cliPrint('doom> '+cmd,'in');if(!cmd.trim())return;
-  cliHist.push(cmd);cliIdx=cliHist.length;localStorage.setItem('ch',JSON.stringify(cliHist.slice(-100)));
-  if(cmd==='clear'){document.getElementById('cli-out').innerHTML='';return}
+
+function cliInsert(cmd){
+  const inp=document.getElementById('cli-in');inp.value=cmd;inp.focus();
+  inp.setSelectionRange(cmd.length,cmd.length);
+}
+
+function cliLine(txt,cls){
+  const o=document.getElementById('cli-out');
+  if(!txt)return;
+  txt.split('\n').forEach(line=>{
+    if(!line)return;
+    const s=document.createElement('span');
+    s.className='co '+(cls||autoClass(line));
+    s.textContent=line;
+    o.appendChild(s);
+  });
+  o.scrollTop=o.scrollHeight;
+}
+
+function autoClass(line){
+  if(line.startsWith('doom> '))return 'in';
+  if(line.startsWith('> =='))return 'hd';
+  if(line.startsWith('>  Examples'))return 'ex';
+  if(line.startsWith('>  Arguments'))return 'us';
+  if(line.startsWith('>  '))return 'us';
+  if(line.startsWith('> Usage:'))return 'us';
+  if(line.startsWith('> ==='))return 'sep';
+  if(line.startsWith('> ESP32 DOOM CLI')||line.startsWith('> Available'))return 'hd';
+  if(line.startsWith('>    '))return 'ex';
+  if(line.startsWith('> '))return 'ok';
+  if(line.includes('error')||line.includes('Error')||line.includes('could not')||line.includes('unknown'))return 'er';
+  return 'ok';
+}
+
+function cliBanner(){
+  const lines=[
+    '> ╔═══════════════════════════════╗',
+    '> ║      E S P 3 2 - D O O M     ║',
+    '> ╚═══════════════════════════════╝',
+    '>  WiFi/BLE Security Research Toolkit',
+    '>',
+    '>  Type  help          → all commands',
+    '>  Type  help deauth   → command detail',
+    '>  Type  help wifi     → WiFi category',
+    '>  Type  status        → system info',
+    '>  Click any command → to run it',
+    '>',
+  ];
+  lines.forEach(l=>cliLine(l,'hd'));
+}
+
+async function cliRun(raw){
+  const cmd=raw.trim();
+  cliLine('doom> '+raw,'in');
+  if(!cmd)return;
+  cliHist.push(cmd);cliHistIdx=cliHist.length;
+  try{localStorage.setItem('ch',JSON.stringify(cliHist.slice(-200)));}catch(e){}
+  if(cmd==='clear'){document.getElementById('cli-out').innerHTML='';cliBanner();return;}
+  hideAC();
   try{
     const r=await fetch('/api/cli',{method:'POST',body:cmd,headers:{'Content-Type':'text/plain'}});
     const d=await r.json();
-    if(d.ok){if(d.out)cliPrint(d.out)}else cliPrint(d.err||'error','err');
-  }catch(e){cliPrint('net: '+e,'err')}
+    if(d.ok){if(d.out)cliLine(d.out);}
+    else cliLine((d.err||'error'),'er');
+  }catch(e){cliLine('network error: '+e,'er');}
+}
+
+// ── Autocomplete ──────────────────────────────────────────────────────────────
+function showAC(matches,inp){
+  const box=document.getElementById('ac-box');
+  if(!matches.length){hideAC();return;}
+  box.innerHTML=matches.slice(0,10).map((m,i)=>`<div class="ac-item" data-i="${i}" onclick="pickAC('${m}')">${m}</div>`).join('');
+  const r=inp.getBoundingClientRect(),pr=inp.closest('.cli-wrap-outer').getBoundingClientRect();
+  box.style.left=(r.left-pr.left)+'px';
+  box.style.bottom=(pr.bottom-r.top+2)+'px';
+  box.style.display='block';acIdx=-1;
+}
+function hideAC(){document.getElementById('ac-box').style.display='none';acIdx=-1;}
+function pickAC(val){
+  const inp=document.getElementById('cli-in');
+  const p=inp.value.split(' ');p[p.length-1]=val;inp.value=p.join(' ')+' ';
+  inp.focus();hideAC();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   const inp=document.getElementById('cli-in');
-  if(inp){
-    inp.addEventListener('keydown',e=>{
-      if(e.key==='Enter'){const v=e.target.value;e.target.value='';cliRun(v)}
-      else if(e.key==='ArrowUp'){e.preventDefault();if(cliIdx>0){cliIdx--;inp.value=cliHist[cliIdx]||''}}
-      else if(e.key==='ArrowDown'){e.preventDefault();cliIdx=Math.min(cliIdx+1,cliHist.length);inp.value=cliHist[cliIdx]||''}
-      else if(e.key==='Tab'){e.preventDefault();const p=inp.value.split(' ');const last=p[p.length-1];const m=cliCmds.filter(x=>x.startsWith(last));if(m.length===1){p[p.length-1]=m[0];inp.value=p.join(' ')}else if(m.length>1)cliPrint(m.join('  '),'info')}
-    });
-  }
+  if(!inp)return;
+
+  inp.addEventListener('keydown',e=>{
+    const box=document.getElementById('ac-box');
+    const items=box.querySelectorAll('.ac-item');
+    if(e.key==='Tab'||e.key==='ArrowDown'&&box.style.display!=='none'){
+      e.preventDefault();
+      if(box.style.display!=='none'&&items.length){
+        acIdx=(acIdx+1)%items.length;
+        items.forEach((el,i)=>el.classList.toggle('sel',i===acIdx));
+        if(acIdx>=0)inp.value=items[acIdx].textContent+' ';
+      } else {
+        const p=inp.value.split(' '),last=p[p.length-1];
+        const m=cliCmds.filter(x=>x.startsWith(last));
+        showAC(m,inp);
+      }
+      return;
+    }
+    if(e.key==='ArrowUp'){
+      e.preventDefault();
+      if(box.style.display!=='none'&&items.length){
+        acIdx=(acIdx-1+items.length)%items.length;
+        items.forEach((el,i)=>el.classList.toggle('sel',i===acIdx));
+        if(acIdx>=0)inp.value=items[acIdx].textContent+' ';
+      } else {
+        if(cliHistIdx>0){cliHistIdx--;inp.value=cliHist[cliHistIdx]||'';}
+      }
+      return;
+    }
+    if(e.key==='Escape'){hideAC();return;}
+    if(e.key==='Enter'){
+      e.preventDefault();const v=inp.value;inp.value='';hideAC();cliRun(v);return;
+    }
+  });
+
+  inp.addEventListener('input',()=>{
+    const p=inp.value.split(' '),last=p[p.length-1];
+    if(!last){hideAC();return;}
+    const m=cliCmds.filter(x=>x.startsWith(last)&&x!==last);
+    showAC(m,inp);
+  });
+
+  inp.addEventListener('blur',()=>setTimeout(hideAC,150));
+
   fetch('/api/cli/complete?q=').then(r=>r.json()).then(d=>cliCmds=d).catch(()=>{});
+  cliRenderSidebar();
+  cliBanner();
   loadModules();
   loadBoard();
   setTimeout(pollStatus,1000);

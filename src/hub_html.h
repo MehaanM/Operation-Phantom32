@@ -1,7 +1,7 @@
 #pragma once
 static const char HUB_HTML[] = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ESP32-DOOM</title>
+<title>Mission: Phantom32_Protocol</title>
 <style>
 :root{--bg:#0b0d12;--bg2:#111318;--bg3:#181b22;--fg:#dde3ec;--dim:#687080;--acc:#e8233a;--ok:#00e676;--blu:#3f9eff;--orn:#ff9500;--bdr:#1e2430;--red2:#2a0a0e;--grn2:#0a1f12}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -137,7 +137,7 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 <body style="display:flex;flex-direction:column;height:100%">
 
 <div id="hdr">
-  <div id="hdr-logo">ESP32<sup>-DOOM</sup></div>
+  <div id="hdr-logo">PHANTOM<sup>32</sup></div>
   <div id="board-badge">—</div>
   <div id="active-pill">● ACTIVE</div>
   <div id="hdr-stats">

@@ -327,6 +327,10 @@ const TOOLS={
     fields:[['bssid','Target BSSID','mac',''],['ch','Channel','ch','6'],
       ['broadcast','Broadcast','bool','1'],
       ['mode','Category','sel','random',[['random','Random (all cats)'],['spectrum','Spectrum Mgmt'],['blockack','Block ACK ADDBA'],['saquery','SA Query'],['wnm','WNM Sleep Mode']]]]},
+  probeharvest:{name:'Probe Harvest',ico:'🕵️',cat:'passive',desc:'Passive sniffer — logs nearby devices + their saved network history (no TX)',
+    fields:[]},
+  stormdeauth:{name:'Deauth Storm',ico:'💥',cat:'wifi',desc:'Multi-vector WPA2+WPA3 deauth (deauth+disassoc+SAE+PMKID+BTM — 8 attack vectors)',
+    fields:[['bssid','Target BSSID','mac',''],['ch','Channel','ch','6'],['sta','Target STA','mac',''],['broadcast','Broadcast','bool','1']]},
   pmkid:{name:'PMKID Hunt',ico:'🔑',cat:'passive',desc:'Active PMKID extraction → PCAP (no client needed)',
     fields:[['bssid','Target BSSID','mac',''],['ch','Channel','ch','6']]},
   handshake:{name:'Handshake Grab',ico:'🤝',cat:'passive',desc:'EAPOL 4-way handshake capture → PCAP',
@@ -384,6 +388,7 @@ function extraBtns(slug){
   if(slug==='handshake'||slug==='pmkid')return `<button class="btn bx" onclick="dlPcap()">⬇ PCAP</button>`;
   if(slug==='eviltwin')return `<button class="btn bx" onclick="showCreds()">📋 Creds</button>`;
   if(slug==='chanhop')return `<button class="btn bx" onclick="showChHopAPs()">📋 APs found</button>`;
+  if(slug==='probeharvest')return `<button class="btn bx" onclick="showProbeHarvest()">📋 Devices</button>`;
   return '';
 }
 
@@ -585,6 +590,17 @@ async function showChHopAPs(){
   }catch(e){toast('Fetch failed: '+e,'e')}
 }
 
+async function showProbeHarvest(){
+  try{
+    const d=await(await fetch('/api/probeharvest/results')).json();
+    if(!d.length){showModal('Probe Harvest','No probe requests captured yet.');return;}
+    // Group by STA MAC
+    const map={};
+    d.forEach(e=>{if(!map[e.sta])map[e.sta]={rssi:e.rssi,ssids:[]};map[e.sta].ssids.push(e.ssid);});
+    const lines=Object.entries(map).map(([mac,v])=>`${mac}  (${v.rssi}dBm)\n  → ${v.ssids.join(', ')}`);
+    showModal('Probe Harvest — '+d.length+' entries, '+lines.length+' devices',lines.join('\n\n'));
+  }catch(e){toast('Fetch failed: '+e,'e')}
+}
 // ── Board detection ───────────────────────────────────────────────────────────
 let g_board={};
 async function loadBoard(){

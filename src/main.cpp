@@ -49,6 +49,8 @@ uint16_t g_seq = 0;
 #include "mgt_flood.h"
 #include "deauth_multi.h"
 #include "action_flood.h"
+#include "probe_harvest.h"
+#include "deauth_storm.h"
 
 static void doom_suspend(){
   esp_wifi_scan_stop();
@@ -147,6 +149,8 @@ static void register_tools(){
   tool_register({"mgtflood","Mgmt Spray","All-subtype management frame spray.",1,false,nullptr,nullptr,mgf_routes,mgf_start,mgf_stop});
   tool_register({"multideauth","Multi Deauth","Deauth up to 8 BSSIDs simultaneously.",1,false,nullptr,nullptr,dm_routes,dm_start,dm_stop});
   tool_register({"actionflood","Action Flood","802.11 action frame category spray.",1,false,nullptr,nullptr,acf_routes,acf_start,acf_stop});
+  tool_register({"probeharvest","Probe Harvest","Passive probe request sniffer — STA MAC + saved network history.",1,true,nullptr,nullptr,prh_routes,prh_start,prh_stop});
+  tool_register({"stormdeauth","Deauth Storm","Multi-vector WPA2+WPA3 deauth storm (8 attack vectors).",1,false,nullptr,nullptr,ds_routes,ds_start,ds_stop});
 }
 
 void setup(){
@@ -181,7 +185,7 @@ void setup(){
   server.onNotFound([](){server.send(404,"text/plain","nf");});
   cli_routes();
   server.begin();
-  Serial.println("[doom] ready — connect to ESP32-DOOM / doomdoom → http://192.168.4.1");
+  Serial.println("[doom] ready — connect to Phantom32 / phantom32 → http://192.168.4.1");
   for(int i=0;i<g_tool_count;i++) if(g_tools[i].setup) g_tools[i].setup();
 }
 

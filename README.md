@@ -5,6 +5,8 @@
 A maxed-out WiFi/BLE security research toolkit for ESP32 family boards.  
 Connect to its AP, open a browser, and get a full offensive + defensive suite with no SD card required.
 
+> **33 tools** · raw 802.11 injection · WPA2 + WPA3 coverage · BLE 5.0 · passive IDS
+
 ---
 
 ## Supported Boards
@@ -66,7 +68,7 @@ pio run -e doom_s3 -t uploadfs
 
 ### 4. Connect
 
-1. On your phone or laptop, connect to WiFi: **`ESP32-DOOM`** / password **`doomdoom`**
+1. On your phone or laptop, connect to WiFi: **`Phantom32`** / password **`phantom32`**
 2. Open **`http://192.168.4.1`** in a browser.
 3. If you don't see the UI, your device triggered a captive portal — tap "Sign in" / the notification.
 
@@ -81,7 +83,7 @@ The UI has eight tabs:
 | **Dashboard** | Live heap / uptime / active tool / board; quick-start buttons |
 | **WiFi Attacks** | All WiFi injection tools with scan bar |
 | **BLE** | Bluetooth Low Energy spam tools |
-| **Passive** | Handshake capture, PMKID, Evil Portal, Honeypot |
+| **Passive** | Handshake capture, PMKID, Evil Portal, Honeypot, Probe Harvest |
 | **Hardware** | I2C / SPI / UART sniffers |
 | **Files** | PCAP file manager (list / download / delete) |
 | **Aegis** | Passive IDS dashboard (embedded) |
@@ -111,16 +113,65 @@ Use Hashcat or Wireshark to crack / analyze the capture offline.
 ### WiFi Attacks
 
 #### Deauth
-Sends 802.11 deauthentication frames.
+Sends 802.11 deauthentication + disassociation frames in both directions (AP→STA and STA→AP spoofed reverse), 4 frames per burst at 5 ms intervals.
 
 | Field | Default | Description |
 |---|---|---|
-| Target BSSID | `FF:FF:FF:FF:FF:FF` | AP to deauthenticate from. BC = all APs |
+| Target BSSID | `FF:FF:FF:FF:FF:FF` | AP to deauthenticate from |
 | Channel | 6 | Operating channel |
-| Reason | 7 (Class 3) | Deauth reason code |
+| Reason | 7 (Class 3) | Deauth reason code (1–24) |
 | Broadcast | ✓ | Send to broadcast — deauths all clients |
 
 CLI: `deauth AA:BB:CC:DD:EE:FF ch=6 reason=7 broadcast=1`
+
+---
+
+#### Deauth Storm ⚡ *(new)*
+Nuclear multi-vector deauth that cycles 8 attack vectors in rapid rotation.  
+Covers both **WPA2** and **WPA3** APs — no need to know which you're targeting.
+
+| Vector | Frame type | Purpose |
+|---|---|---|
+| 1 | Deauth AP→STA | Standard WPA2 deauth |
+| 2 | Disassoc AP→STA | Association table eviction |
+| 3 | Deauth STA→AP (spoofed) | PMF bypass for transition mode |
+| 4 | Disassoc STA→AP (spoofed) | PMF bypass for transition mode |
+| 5–6 | SAE Commit flood | WPA3 state machine exhaustion |
+| 7 | PMKID Assoc flood | WPA3 AP CPU drain |
+| 8 | BTM Request | Force roam (iOS/Android/Windows) |
+
+CLI: `stormdeauth AA:BB:CC:DD:EE:FF ch=6`
+
+---
+
+#### WPA3 Flood
+SAE (Dragonfly) handshake flood against WPA3-Personal APs.
+
+| Mode | Description |
+|---|---|
+| `commit` | SAE Commit flood — exhausts AP SAE state machine |
+| `confirm` | SAE Confirm flood |
+| `both` | Alternate Commit + Confirm |
+| `eapstart` | EAP-Start flood |
+| `transition` | Unprotected deauth BC + SAE commit — **best for WPA3-Transition APs** |
+| `pmkid` | PMKID assoc flood — drains AP CPU regardless of PMF |
+
+> **WPA3 deauth guide:** For WPA3-Transition (mixed WPA2/WPA3), use `transition` mode — it hits WPA2 clients with unprotected deauths while simultaneously exhausting the SAE state machine. For WPA3-only with PMF Required, use `both` or `pmkid`. For maximum coverage use **Deauth Storm** which applies all vectors automatically.
+
+CLI: `wpa3flood AA:BB:CC:DD:EE:FF ch=6 mode=transition`
+
+---
+
+#### Multi Deauth *(new)*
+Deauths up to 8 BSSIDs simultaneously, channel-hopping between them in round-robin.
+
+| Parameter | Description |
+|---|---|
+| `bssid0=…&ch0=6` | Target 1 BSSID + channel |
+| `bssid1=…&ch1=11` | Target 2 BSSID + channel |
+| … up to `bssid7` / `ch7` | Up to 8 targets |
+
+CLI: `multideauth bssid0=AA:BB:CC:DD:EE:FF ch0=6 bssid1=11:22:33:44:55:66 ch1=11`
 
 ---
 
@@ -191,6 +242,77 @@ Sends Channel Switch Announcement (CSA) + BTM Request + Neighbor Report action f
 
 ---
 
+#### BTM Flood *(new)*
+802.11v BSS Transition Management (BTM) flood — forces modern STAs (iOS, Android, Windows) to roam away from the target AP.
+
+| Mode | Description |
+|---|---|
+| 0 – BTM Request | BSS Transition Request flood |
+| 1 – Neighbor Report | Neighbor Report flood |
+| 2 – Both | Alternate both |
+
+| Field | Description |
+|---|---|
+| `bssid` | Target AP BSSID |
+| `ch` | AP channel |
+| `redirect_ch` | Channel to redirect clients to (default 13) |
+| `broadcast` | 1 = send to broadcast DA |
+
+---
+
+#### EAP Flood *(new)*
+WPA Enterprise (802.1X) EAPOL state machine exhaustion. Sends EAPOL frames from random locally-administered MACs to drain the AP's RADIUS thread pool.
+
+| Mode | Description |
+|---|---|
+| 0 – EAPOL Start | Trigger RADIUS EAP negotiation |
+| 1 – EAP Identity | Flood EAP Identity responses |
+| 2 – EAPOL M1 | EAPOL handshake message 1 flood |
+| 3 – All | Rotate through all types |
+
+---
+
+#### Null Flood *(new)*
+Power-save state machine confusion. Alternates the Power Management (PM) bit in null data / QoS-null / PS-Poll / BAR frames to confuse AP buffering state machines.
+
+| Mode | Description |
+|---|---|
+| 0 – Null+QoS-Null | PM bit toggle on every frame |
+| 1 – PS-Poll | PS-Poll flood |
+| 2 – BAR | Block ACK Request flood |
+| 3 – All | Rotate through all |
+
+---
+
+#### Mgmt Spray *(new)*
+Sprays all 8 management frame subtypes in rapid rotation from random locally-administered MACs.
+
+| Phase | Frame type |
+|---|---|
+| 0 | Probe Request |
+| 1 | Authentication |
+| 2 | Association Request |
+| 3 | Reassociation Request |
+| 4 | Deauth STA→AP |
+| 5 | Disassoc STA→AP |
+| 6 | Action BTM |
+| 7 | ATIM |
+
+---
+
+#### Action Flood *(new)*
+Sprays 802.11 action frames across all major categories with random payloads.
+
+| Mode | Category | Description |
+|---|---|---|
+| `random` | All (0,1,2,3,5,7,8,9,10,17) | Random category rotation |
+| `spectrum` | 0 | Spectrum Management |
+| `blockack` | 3 | ADDBA (Block ACK) |
+| `saquery` | 8 | SA Query |
+| `wnm` | 10 | WNM Sleep Mode (action 7) |
+
+---
+
 #### ESP-NOW Flood
 Sends ESP-NOW broadcast frames to the target MAC.  
 Useful for flooding ESP-NOW mesh networks or discovering ESP-NOW receivers.
@@ -212,18 +334,6 @@ Injects specialty management frames:
 | `dupSeq` | Duplicate sequence number |
 | `quiet` | Quiet IE (STA silence) |
 | `wds` | WDS/4-address frame |
-
----
-
-#### WPA3 Flood
-SAE (Dragonfly) handshake flood against WPA3-Personal APs.
-
-| Mode | Description |
-|---|---|
-| `commit` | SAE Commit flood |
-| `confirm` | SAE Confirm flood |
-| `both` | Alternate Commit + Confirm |
-| `eapstart` | EAP-Start flood |
 
 ---
 
@@ -264,6 +374,20 @@ CLI: `ble apple` / `ble windows` / `ble rapidflood`
 ---
 
 ### Passive / Monitor
+
+#### Probe Harvest *(new)*
+Passively sniffs the air for 802.11 probe requests and builds a map of:
+- **Device MAC addresses** — who is nearby
+- **SSID history** — what networks they've previously connected to (their saved network list)
+- **Signal strength (RSSI)** — how close they are
+
+No frames transmitted — completely passive.  
+Stored in RAM (up to 128 entries). View results via **📋 Devices** button.  
+Also available at `/api/probeharvest/results`.
+
+This is the first step before an Evil Twin or KARMA attack — you can see which SSID a device is probing for and clone it precisely.
+
+---
 
 #### Handshake Grab
 Listens for EAPOL 4-way handshake frames and saves them to a `.pcap` on LittleFS.  
@@ -369,6 +493,7 @@ b "Free WiFi" random=1        → beacon
 p TestNet                     → probe
 hs AA:BB:CC:DD:EE:FF force=1  → handshake
 bt apple                      → ble spam
+stormdeauth AA:BB:.. ch=6    → multi-vector WPA2+WPA3 deauth
 ```
 
 ### Defence (Aegis IDS)
@@ -447,11 +572,15 @@ src/
   diag.h            — diagnostics (channel map, IEs)
   capture.h         — PCAP writer (LittleFS, fsLock semaphore)
   pcap_mgr.h        — /api/pcaps, /api/pcap/dl, /api/pcap/del, /api/fs
-  frames.h          — raw 802.11 frame builders
+  frames.h          — raw 802.11 frame builders (f_deauth, f_disassoc,
+                       f_deauth_r, f_disassoc_r, f_actionBTM, etc.)
   bypass.cpp        — ieee80211_raw_frame_sanity_check override (enables injection)
-  deauth.h          — Deauth tool
+  deauth.h          — Deauth tool (bidirectional, 4 frames/burst)
+  deauth_multi.h    — Multi Deauth (up to 8 BSSIDs simultaneously)
+  deauth_storm.h    — Deauth Storm (8-vector WPA2+WPA3 coordinated attack)
   beacon_spam.h     — Beacon spam tool
   probe_flood.h     — Probe request flood
+  probe_harvest.h   — Passive probe request sniffer (device + SSID recon)
   handshake.h       — Handshake / PMKID capture
   evil_portal.h     — Captive portal
   evil_twin.h       — Evil Twin AP + deauth + DNS + cred capture
@@ -461,10 +590,15 @@ src/
   karma.h           — KARMA probe response
   nav_flood.h       — CTS/RTS NAV DoS
   csa_attack.h      — Channel Switch Announcement attack
+  btm_flood.h       — BTM Flood (802.11v BSS Transition Management)
   espnow_flood.h    — ESP-NOW flood
   beacon_adv.h      — Advanced beacon injection
   pmkid_hunt.h      — PMKID extraction
-  wpa3_flood.h      — WPA3 SAE flood
+  wpa3_flood.h      — WPA3 SAE flood (6 modes incl. transition + pmkid exhaust)
+  eap_flood.h       — WPA Enterprise EAPOL state exhaustion
+  null_flood.h      — Power-save null/QoS-null/BAR confusion
+  mgt_flood.h       — All-subtype management frame spray
+  action_flood.h    — 802.11 action frame category spray
   chan_hop_deauth.h  — All-channel deauth sweep
   i2c_sniff.h       — I2C slave logger
   spi_sniff.h       — SPI MOSI sampler

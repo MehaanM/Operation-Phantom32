@@ -52,7 +52,8 @@ jobs:
           cat test_output.txt
           # Fail if zero individual test results appeared (guards against
           # the "tests compiled but never executed" silent failure).
-          result_lines=$(grep -cE "\.\.\. (PASS|FAIL)$" test_output.txt || true)
+          # Unity per-test output format: "path:line:testname:PASS" or ":FAIL:"
+          result_lines=$(grep -cE ":(PASS|FAIL)" test_output.txt || true)
           echo "Individual test result lines: $result_lines"
           if [ "$result_lines" -eq 0 ]; then
             echo "ERROR: No test results found — did any tests execute?" >&2
@@ -106,7 +107,7 @@ jobs:
         run: |
           pio test -e native_asan --verbose 2>&1 | tee asan_output.txt
           rc=${PIPESTATUS[0]}
-          result_lines=$(grep -cE "\.\.\. (PASS|FAIL)$" asan_output.txt || true)
+          result_lines=$(grep -cE ":(PASS|FAIL)" asan_output.txt || true)
           echo "Sanitizer test result lines: $result_lines"
           [ "$result_lines" -eq 0 ] && { echo "ERROR: Zero tests executed under sanitizers" >&2; exit 1; }
           exit $rc

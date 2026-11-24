@@ -1,40 +1,130 @@
-# Mission: Phantom32_Protocol
+# Phantom32
 
-![Mission: Phantom32_Protocol](logo.svg)
+A Wi-Fi and Bluetooth security research toolkit for ESP32 microcontrollers.
+Phantom32 runs entirely on the device and exposes a local HTTP web UI at
+`192.168.4.1` for configuring and operating 802.11 research tools.
 
-A maxed-out WiFi/BLE security research toolkit for ESP32 family boards.  
-Connect to its AP, open a browser, and get a full offensive + defensive suite with no SD card required.
-
-> **33 tools** · raw 802.11 injection · WPA2 + WPA3 coverage · BLE 5.0 · passive IDS
-
----
-
-## Supported Boards
-
-| Environment | Board | Flash | Notes |
-|---|---|---|---|
-| `doom` | ESP32 DevKit / WROOM-32D/U | 4 MB | Primary classic board |
-| `doom_nodemcu` | NodeMCU-32S | 4 MB | Same die, CP2102 USB |
-| `doom_wrover` | ESP32-WROVER-B | 4 MB | +PSRAM, extra RAM for large captures |
-| `doom_m5stack` | M5Stack Basic/Gray/Fire | 4 MB | Built-in LCD (see Display section) |
-| `doom_m5core2` | M5Stack Core2 | 16 MB | Touch LCD, AXP192 PMU |
-| `doom_ttgo` | TTGO T-Display | 4 MB | 1.14" TFT |
-| `doom_tcall` | TTGO T-Call (SIM800L) | 4 MB | GSM modem on UART |
-| `doom_heltec` | Heltec WiFi Kit 32 | 4 MB | OLED on SDA=4,SCL=15 |
-| `doom_s3` | Seeed XIAO ESP32-S3 (**default**) | 8 MB | BLE5, USB CDC, PSRAM |
-| `doom_s3_devkit` | ESP32-S3-DevKitC-1 | 8 MB | BLE5, USB CDC |
-| `doom_tdisplay_s3` | Lilygo T-Display-S3 | 16 MB | BLE5, 1.9" TFT |
-| `doom_m5cores3` | M5Stack CoreS3 | 16 MB | BLE5, 2" touch LCD |
-| `doom_c3` | Seeed XIAO ESP32-C3 | 4 MB | BLE5, RISC-V ★ |
-
-> ★ ESP32-C3 requires the RISC-V toolchain. On Apple Silicon install Rosetta 2 first:
-> ```bash
-> softwareupdate --install-rosetta
-> ```
+**FOR AUTHORIZED SECURITY RESEARCH AND EDUCATIONAL USE ONLY.**
+Read [LEGAL.md](./LEGAL.md) before using this software.
 
 ---
 
-## Installation
+## Table of Contents
+
+- [Features](#features)
+- [Supported Hardware](#supported-hardware)
+- [Quick Start](#quick-start)
+- [Web UI](#web-ui)
+- [Authentication](#authentication)
+- [Tools Reference](#tools-reference)
+- [Rate Limiting](#rate-limiting)
+- [Architecture](#architecture)
+- [Building from Source](#building-from-source)
+- [Flashing](#flashing)
+- [Running Unit Tests](#running-unit-tests)
+- [CI/CD](#cicd)
+- [Project Structure](#project-structure)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Security Policy](#security-policy)
+- [Legal](#legal)
+- [License](#license)
+
+---
+
+## Features
+
+### Wi-Fi Research Tools
+
+| Tool | Description |
+|------|-------------|
+| Beacon Spam | Flood nearby stations with fake AP beacon frames |
+| Deauth | Send targeted 802.11 deauthentication frames |
+| Evil Twin | Rogue AP with captive portal to capture Wi-Fi credentials |
+| Probe Flood | Send directed probe request frames for a configured SSID pool |
+| Probe Harvest | Passive collection of probe requests from nearby stations |
+| Device Tracker | Passive STA/AP detection, RSSI history, vendor (OUI) lookup, randomized MAC detection |
+| Channel Hopper | Automated multi-channel scanning with configurable dwell time |
+| KARMA Attack | Auto-respond to directed probe requests to attract clients |
+| PMKID Hunt | Capture PMKID-containing EAPOL frames for offline analysis |
+| Aegis (Defense) | Passive 802.11 anomaly detection: deauth storms, rogue AP, KARMA, sequence anomalies |
+| Evil Portal | Standalone captive portal independent of Evil Twin |
+| Handshake Capture | Passive 4-way EAPOL handshake collection |
+| Null Flood | Null-data frame injection for STA probing |
+| CSA Attack | 802.11h Channel Switch Announcement injection |
+| BTM Flood | 802.11v BSS Transition Management request injection |
+| EAP Flood | EAP frame injection for 802.1X testing |
+| Auth Flood | 802.11 open-system authentication frame flood |
+| NavFlood | Network Allocation Vector (NAV) manipulation frames |
+| Action Flood | 802.11 Action frame injection |
+| WPA3 Flood | SAE Commit/Confirm frame flood for WPA3 testing |
+| Management Flood | Generic management frame flood |
+| Deauth Storm | Multi-target sustained deauthentication |
+| Deauth Multi | Simultaneous multi-BSSID deauthentication |
+| Chan-Hop Deauth | Deauthentication synchronized with channel hopping |
+| Beacon Adv | Advanced beacon crafting with custom IEs |
+| SSID Fuzzer | Automated SSID field fuzzing for AP/client robustness testing |
+| Honeypot | Open AP honeypot for client behavior analysis |
+| ESP-NOW Flood | ESP-NOW frame injection |
+| PCAP Manager | LittleFS-backed PCAP capture and download |
+
+### Bluetooth Research Tools
+
+| Tool | Description |
+|------|-------------|
+| BLE Spam | Bluetooth Low Energy advertisement spam (Apple/Samsung/Google device impersonation) |
+| Aegis BLE | BLE scan anomaly detection |
+
+### Analytics Modules (PSRAM boards only)
+
+On boards with PSRAM (WROVER, S3, etc.) the following are additionally enabled:
+
+- Frame statistics and per-tool TX PPS graph
+- Per-BSSID RSSI history with 128-sample ring buffer
+- 802.11 sequence number tracking
+- STA/AP association state machine
+- Multicast/broadcast frame pattern analysis
+- Scan result cache with entry aging
+
+### Security Features
+
+- **Authentication** — Device-unique 12-character password generated on first
+  boot; stored in NVS. Session tokens (256-bit) stored in RAM only; expire
+  after 30 minutes. All comparisons use constant-time algorithms.
+- **IP Lockout** — Five failed login attempts triggers a 5-minute lockout.
+- **TX Rate Limiting** — Token bucket per tool and 200 fps global cap; prevents
+  unintentional sustained RF interference.
+- **HTTP Rate Limiting** — 300 requests/minute per client IP.
+- **Input Validation** — Every web UI argument is validated before use:
+  SSID, MAC, channel, integers, IP addresses. JSON output sanitized.
+
+---
+
+## Supported Hardware
+
+| Environment | Board | PSRAM | Notes |
+|-------------|-------|-------|-------|
+| `doom` | ESP32-WROOM-32D / DevKit v1 | No | PHANTOM32_LITE |
+| `doom_nodemcu` | NodeMCU-32S | No | PHANTOM32_LITE |
+| `doom_m5stack` | M5Stack Basic | No | PHANTOM32_LITE |
+| `doom_m5core2` | M5Stack Core2 | No | PHANTOM32_LITE |
+| `doom_ttgo` | TTGO T-Display | No | PHANTOM32_LITE |
+| `doom_tcall` | TTGO T-Call SIM800 | No | PHANTOM32_LITE |
+| `doom_heltec` | Heltec WiFi Kit 32 | No | PHANTOM32_LITE |
+| `doom_wrover` | ESP32-WROVER / WROVER-KIT | Yes (4 MB) | Full analytics |
+| `doom_s3` | ESP32-S3 generic | Yes | Full analytics |
+| `doom_s3_devkit` | ESP32-S3-DevKit-C1 | Yes | Full analytics |
+| `doom_tdisplay_s3` | TTGO T-Display-S3 | Yes | Full analytics |
+| `doom_m5cores3` | M5Stack CoreS3 | Yes | Full analytics |
+| `doom_c3` | ESP32-C3 / Seeed XIAO C3 | No | RISC-V; reduced feature set |
+
+**Minimum requirements:** ESP32 with 4 MB flash, Wi-Fi, 320 KB DRAM.
+No external components required. Bluetooth tools require BLE support.
+
+---
+
+## Quick Start
 
 ### 1. Install PlatformIO
 
@@ -42,573 +132,447 @@ Connect to its AP, open a browser, and get a full offensive + defensive suite wi
 pip install platformio
 ```
 
-Or install the [VS Code PlatformIO extension](https://platformio.org/install/ide?install=vscode).
+Or install the [VS Code extension](https://platformio.org/install/ide?install=vscode).
 
-### 2. Clone / open the project
-
-```bash
-cd esp32-doom
-```
-
-### 3. Build & flash
+### 2. Clone
 
 ```bash
-# Flash the default board (Seeed XIAO ESP32-S3):
-pio run -e doom_s3 -t upload
-
-# Flash ESP32 WROOM-32:
-pio run -e doom -t upload
-
-# Flash M5Stack Core2:
-pio run -e doom_m5core2 -t upload
-
-# Flash filesystem (LittleFS) — only needed first time:
-pio run -e doom_s3 -t uploadfs
+git clone https://github.com/MehaanM/Operation-Phantom32_Protocol.git
+cd Operation-Phantom32_Protocol
 ```
 
-### 4. Connect
+### 3. Build
 
-1. On your phone or laptop, connect to WiFi: **`Phantom32`** / password **`phantom32`**
-2. Open **`http://192.168.4.1`** in a browser.
-3. If you don't see the UI, your device triggered a captive portal — tap "Sign in" / the notification.
+```bash
+# ESP32-WROOM-32D (most common DevKit)
+pio run -e doom
+
+# ESP32-WROVER (PSRAM, full analytics)
+pio run -e doom_wrover
+```
+
+### 4. Flash
+
+Connect your ESP32 via USB, then:
+
+```bash
+pio run -e doom --target upload
+```
+
+If PlatformIO does not detect the port automatically:
+
+```bash
+pio run -e doom --target upload --upload-port /dev/cu.usbserial-0001
+```
+
+Replace `/dev/cu.usbserial-0001` with your actual port
+(`pio device list` to find it on your machine).
+
+### 5. Connect
+
+1. Connect your computer or phone to the Wi-Fi AP:
+   - SSID: `Phantom32`
+   - Password: `phantom32`
+2. Open `http://192.168.4.1/dashboard` in a browser.
+3. Log in with the password printed to serial (115200 baud) on first boot.
 
 ---
 
 ## Web UI
 
-The UI has eight tabs:
+The web UI is a single-page dashboard served entirely from the ESP32.
+No internet connection is required.
 
-| Tab | Contents |
-|---|---|
-| **Dashboard** | Live heap / uptime / active tool / board; quick-start buttons |
-| **WiFi Attacks** | All WiFi injection tools with scan bar |
-| **BLE** | Bluetooth Low Energy spam tools |
-| **Passive** | Handshake capture, PMKID, Evil Portal, Honeypot, Probe Harvest |
-| **Hardware** | I2C / SPI / UART sniffers |
-| **Files** | PCAP file manager (list / download / delete) |
-| **Aegis** | Passive IDS dashboard (embedded) |
-| **CLI** | Full command-line interface with tab-complete & history |
+**Navigation:**
+- `/dashboard` — System overview, live stats, quick actions
+- `/` — Main tool hub
+- `/cli` — Serial command-line interface over HTTP
+- `/login` — Authentication
 
-### Scan bar (WiFi tab)
+All pages use a dark theme and are mobile-responsive.
 
-Click **Scan APs** at the top of the WiFi tab.  
-Select any AP from the dropdown — BSSID, channel, and SSID are auto-filled into every tool card.
+---
 
-### Tool cards
+## Authentication
 
-Click a card header to expand it.  
-Fill in parameters (dropdowns for mode/channel/reason, number inputs for counts, MAC address fields) then click **▶ Start**.  
-A green pulse on the card confirms the tool is running.  
-Click **■ Stop** or start another tool (only one WiFi tool at a time).
+On first boot, Phantom32 generates a device-unique 12-character alphanumeric
+password and prints it to the serial console (UART0, 115200 baud):
 
-### Files tab
+```
+[auth] Generated new password: Xk7mP3qNvR2w
+[auth] Store this somewhere safe.
+```
 
-After a Handshake or PMKID capture, switch to **Files** to download the `.pcap` to your computer.  
-Use Hashcat or Wireshark to crack / analyze the capture offline.
+This password is stored in ESP32 NVS flash and persists across reboots.
+**It is never hardcoded in firmware.**
+
+### Session Tokens
+
+After logging in, the server issues a 64-character hex session token as a
+`HttpOnly` cookie (`phantom32_token`). Tokens:
+
+- Are 256 bits of random data
+- Are stored in device RAM only (not NVS or flash)
+- Expire after 30 minutes of inactivity
+- Are invalidated on reboot
+
+### IP Lockout
+
+Five consecutive failed login attempts from the same IP address result in a
+5-minute lockout. The lockout applies only to that IP address.
+
+### API Access
+
+For programmatic or scripting access, use the API key printed to UART on
+first boot. Pass it in the `X-Phantom32-Key` header or `?apikey=` query param.
+
+### Resetting Credentials
+
+If locked out, connect a serial terminal at 115200 baud and press the ESP32
+reset button. The password is reprinted on every boot if no session exists.
+
+Alternatively, call `POST /api/auth/reset-creds` with a valid current session
+token to rotate credentials in-place.
 
 ---
 
 ## Tools Reference
 
-### WiFi Attacks
-
-#### Deauth
-Sends 802.11 deauthentication + disassociation frames in both directions (AP→STA and STA→AP spoofed reverse), 4 frames per burst at 5 ms intervals.
-
-| Field | Default | Description |
-|---|---|---|
-| Target BSSID | `FF:FF:FF:FF:FF:FF` | AP to deauthenticate from |
-| Channel | 6 | Operating channel |
-| Reason | 7 (Class 3) | Deauth reason code (1–24) |
-| Broadcast | ✓ | Send to broadcast — deauths all clients |
-
-CLI: `deauth AA:BB:CC:DD:EE:FF ch=6 reason=7 broadcast=1`
-
----
-
-#### Deauth Storm ⚡ *(new)*
-Nuclear multi-vector deauth that cycles 8 attack vectors in rapid rotation.  
-Covers both **WPA2** and **WPA3** APs — no need to know which you're targeting.
-
-| Vector | Frame type | Purpose |
-|---|---|---|
-| 1 | Deauth AP→STA | Standard WPA2 deauth |
-| 2 | Disassoc AP→STA | Association table eviction |
-| 3 | Deauth STA→AP (spoofed) | PMF bypass for transition mode |
-| 4 | Disassoc STA→AP (spoofed) | PMF bypass for transition mode |
-| 5–6 | SAE Commit flood | WPA3 state machine exhaustion |
-| 7 | PMKID Assoc flood | WPA3 AP CPU drain |
-| 8 | BTM Request | Force roam (iOS/Android/Windows) |
-
-CLI: `stormdeauth AA:BB:CC:DD:EE:FF ch=6`
-
----
-
-#### WPA3 Flood
-SAE (Dragonfly) handshake flood against WPA3-Personal APs.
-
-| Mode | Description |
-|---|---|
-| `commit` | SAE Commit flood — exhausts AP SAE state machine |
-| `confirm` | SAE Confirm flood |
-| `both` | Alternate Commit + Confirm |
-| `eapstart` | EAP-Start flood |
-| `transition` | Unprotected deauth BC + SAE commit — **best for WPA3-Transition APs** |
-| `pmkid` | PMKID assoc flood — drains AP CPU regardless of PMF |
-
-> **WPA3 deauth guide:** For WPA3-Transition (mixed WPA2/WPA3), use `transition` mode — it hits WPA2 clients with unprotected deauths while simultaneously exhausting the SAE state machine. For WPA3-only with PMF Required, use `both` or `pmkid`. For maximum coverage use **Deauth Storm** which applies all vectors automatically.
-
-CLI: `wpa3flood AA:BB:CC:DD:EE:FF ch=6 mode=transition`
-
----
-
-#### Multi Deauth *(new)*
-Deauths up to 8 BSSIDs simultaneously, channel-hopping between them in round-robin.
-
-| Parameter | Description |
-|---|---|
-| `bssid0=…&ch0=6` | Target 1 BSSID + channel |
-| `bssid1=…&ch1=11` | Target 2 BSSID + channel |
-| … up to `bssid7` / `ch7` | Up to 8 targets |
-
-CLI: `multideauth bssid0=AA:BB:CC:DD:EE:FF ch0=6 bssid1=11:22:33:44:55:66 ch1=11`
-
----
-
-#### Beacon Spam
-Floods the air with fake access points.
-
-| Field | Default | Description |
-|---|---|---|
-| SSID | `Free WiFi` | Beacon SSID (or base name for random) |
-| Count | 200 | Beacons to send (0 = continuous) |
-| Random SSIDs | ✓ | Randomise SSID and BSSID each frame |
-
-CLI: `beacon "Free WiFi" count=500 random=1`
-
----
-
-#### Probe Flood
-Sends probe request frames as if hunting for a network.
-
-CLI: `probe TestNet count=1000`
-
----
-
-#### Evil Twin
-Clones a real AP (deauths clients from it, lures them to the rogue AP, serves a captive portal that steals credentials).
-
-| Field | Description |
-|---|---|
-| Clone SSID | Name of the network to impersonate |
-| Target BSSID | Real AP MAC — deauth source |
-| Channel | Channel to operate on |
-
-Credentials appear under the **📋 Creds** button, also at `/api/eviltwin/creds`.
-
----
-
-#### Auth Flood
-Floods an AP's association table.
-
-| Mode | Description |
-|---|---|
-| 0 – Auth only | Sends auth requests |
-| 1 – Assoc only | Sends association requests |
-| 2 – Auth+Assoc | Both (table overflow) |
-| 3 – Disassoc BC | Disassociate broadcast |
-| 4 – All three | Rotate through all types |
-
----
-
-#### KARMA
-Answers every probe request with a matching AP advertisement. Devices with saved networks auto-connect.
-
-| Mode | Description |
-|---|---|
-| Open | No password — fastest |
-| WPA2 | With PSK (device may show "wrong password") |
-
----
-
-#### NAV Flood
-Corrupts the 802.11 virtual carrier-sense mechanism using CTS/RTS frames with max NAV duration (32767 µs).  
-Causes nearby stations to defer transmission (soft DoS).
-
----
-
-#### CSA Attack
-Sends Channel Switch Announcement (CSA) + BTM Request + Neighbor Report action frames to force clients to roam to a non-existent or attacker-controlled channel.
-
----
-
-#### BTM Flood *(new)*
-802.11v BSS Transition Management (BTM) flood — forces modern STAs (iOS, Android, Windows) to roam away from the target AP.
-
-| Mode | Description |
-|---|---|
-| 0 – BTM Request | BSS Transition Request flood |
-| 1 – Neighbor Report | Neighbor Report flood |
-| 2 – Both | Alternate both |
-
-| Field | Description |
-|---|---|
-| `bssid` | Target AP BSSID |
-| `ch` | AP channel |
-| `redirect_ch` | Channel to redirect clients to (default 13) |
-| `broadcast` | 1 = send to broadcast DA |
-
----
-
-#### EAP Flood *(new)*
-WPA Enterprise (802.1X) EAPOL state machine exhaustion. Sends EAPOL frames from random locally-administered MACs to drain the AP's RADIUS thread pool.
-
-| Mode | Description |
-|---|---|
-| 0 – EAPOL Start | Trigger RADIUS EAP negotiation |
-| 1 – EAP Identity | Flood EAP Identity responses |
-| 2 – EAPOL M1 | EAPOL handshake message 1 flood |
-| 3 – All | Rotate through all types |
-
----
-
-#### Null Flood *(new)*
-Power-save state machine confusion. Alternates the Power Management (PM) bit in null data / QoS-null / PS-Poll / BAR frames to confuse AP buffering state machines.
-
-| Mode | Description |
-|---|---|
-| 0 – Null+QoS-Null | PM bit toggle on every frame |
-| 1 – PS-Poll | PS-Poll flood |
-| 2 – BAR | Block ACK Request flood |
-| 3 – All | Rotate through all |
-
----
-
-#### Mgmt Spray *(new)*
-Sprays all 8 management frame subtypes in rapid rotation from random locally-administered MACs.
-
-| Phase | Frame type |
-|---|---|
-| 0 | Probe Request |
-| 1 | Authentication |
-| 2 | Association Request |
-| 3 | Reassociation Request |
-| 4 | Deauth STA→AP |
-| 5 | Disassoc STA→AP |
-| 6 | Action BTM |
-| 7 | ATIM |
-
----
-
-#### Action Flood *(new)*
-Sprays 802.11 action frames across all major categories with random payloads.
-
-| Mode | Category | Description |
-|---|---|---|
-| `random` | All (0,1,2,3,5,7,8,9,10,17) | Random category rotation |
-| `spectrum` | 0 | Spectrum Management |
-| `blockack` | 3 | ADDBA (Block ACK) |
-| `saquery` | 8 | SA Query |
-| `wnm` | 10 | WNM Sleep Mode (action 7) |
-
----
-
-#### ESP-NOW Flood
-Sends ESP-NOW broadcast frames to the target MAC.  
-Useful for flooding ESP-NOW mesh networks or discovering ESP-NOW receivers.
-
----
-
-#### Advanced Frames (Adv Frames)
-Injects specialty management frames:
-
-| Mode | Description |
-|---|---|
-| `wps` | WPS beacon injection |
-| `fuzz` | Random IE fuzzer |
-| `overflow` | Information Element buffer overflow |
-| `hidden` | Zero-length hidden SSID |
-| `bigIE` | Oversized vendor IE |
-| `ssidOverflow` | 255-byte SSID |
-| `tkipMic` | TKIP MIC failure (triggers forced re-key) |
-| `dupSeq` | Duplicate sequence number |
-| `quiet` | Quiet IE (STA silence) |
-| `wds` | WDS/4-address frame |
-
----
-
-#### Chan Hop Deauth
-Passively sniffs beacons on channels 1–13, builds a live AP list, then deauths every discovered AP.  
-No configuration required — just start it.  
-Discovered APs appear under **📋 APs found**.
-
----
-
-### BLE Tools
-
-#### BLE Spam
-Triggers Bluetooth popups on nearby devices.
-
-| Mode | Target |
-|---|---|
-| `apple` | Random Apple Continuity (AirPods, iOS popups) |
-| `continuity` | All Apple Continuity sub-types |
-| `airdrop` | AirDrop flood (iOS "AirDrop from…") |
-| `handoff` | Handoff / Universal Clipboard |
-| `android` | Android FastPair popup |
-| `googlenearby` | Google Nearby Share |
-| `windows` | Windows SwiftPair popup |
-| `swiftpair` | Named SwiftPair device |
-| `samsung` | Samsung BLE |
-| `airtag` | AirTag clone |
-| `ibeacon` | Apple iBeacon |
-| `eddystone` | Google Eddystone-URL |
-| `namespam` | Random device name flood |
-| `scan` | BLE scan request flood |
-| `rapidflood` | Random BLE advertisement flood |
-
-> On ESP32-S3 and ESP32-C3 (BLE 5.0), the firmware advertises at BLE5 2M PHY for increased range.
-
-CLI: `ble apple` / `ble windows` / `ble rapidflood`
-
----
-
-### Passive / Monitor
-
-#### Probe Harvest *(new)*
-Passively sniffs the air for 802.11 probe requests and builds a map of:
-- **Device MAC addresses** — who is nearby
-- **SSID history** — what networks they've previously connected to (their saved network list)
-- **Signal strength (RSSI)** — how close they are
-
-No frames transmitted — completely passive.  
-Stored in RAM (up to 128 entries). View results via **📋 Devices** button.  
-Also available at `/api/probeharvest/results`.
-
-This is the first step before an Evil Twin or KARMA attack — you can see which SSID a device is probing for and clone it precisely.
-
----
-
-#### Handshake Grab
-Listens for EAPOL 4-way handshake frames and saves them to a `.pcap` on LittleFS.  
-Enable **Force deauth** to send 20 deauth frames first (makes clients re-authenticate).
-
-After capture → **Files** tab → Download `.pcap` → crack with:
-
-```bash
-hashcat -m 22000 capture.pcap wordlist.txt
-# or
-aircrack-ng capture.pcap -w wordlist.txt
+Full HTTP API documentation for all tools is in
+[docs/api-reference.md](./docs/api-reference.md).
+
+Each tool follows the same pattern:
+
+```
+GET  /api/<tool>/status    — current state, counters
+POST /api/<tool>/start     — start the tool (with parameters)
+POST /api/<tool>/stop      — stop the tool
 ```
 
 ---
 
-#### PMKID Hunt
-Sends EAPOL frame 1 to the AP and captures the PMKID from the response — no client required.  
-Saves to LittleFS as `.pcap`.
+## Rate Limiting
 
-```bash
-# crack with hcxtools:
-hcxpcapngtool capture.pcap -o hashes.txt
-hashcat -m 22000 hashes.txt wordlist.txt
-```
+Phantom32 enforces two layers of rate limiting:
 
----
+**TX Rate Limiting (frame injection)**
+- Global budget: 200 frames/second across all active tools.
+- Per-tool limits configurable via `/api/rla/tool`.
+- Implemented as a token bucket algorithm. Frames are dropped (not queued)
+  when the budget is exhausted.
 
-#### Evil Portal
-Opens a captive portal that serves a fake login page on `http://192.168.4.1`.  
-Credentials are stored in memory and shown via the **📋 Creds** button.
+**HTTP Rate Limiting**
+- 300 requests/minute per client IP.
+- Clients over the limit receive HTTP 429.
+- Configurable via `/api/rla/global`.
 
----
-
-#### Honeypot
-Opens TCP listeners on ports 22 (SSH banner), 80 (HTTP), and 2323 (Telnet).  
-Logs every connection attempt and any data sent. View log at `/api/honeypot/log`.
-
----
-
-### Hardware Tools
-
-> Pin defaults are auto-filled based on the detected board.  
-> Override any pin number before starting.
-
-#### I2C Sniff
-Acts as an I2C slave and logs every byte from the master.
-
-| Field | Default (ESP32) | Default (S3 XIAO) |
-|---|---|---|
-| SDA | 21 | 5 |
-| SCL | 22 | 6 |
-| Address | 0x50 | 0x50 |
-
-Log at `/api/i2c/log`
-
-#### SPI Sniff
-ISR-safe MOSI sampler — samples MOSI on every CLK edge.
-
-| Field | Default (ESP32) | Default (S3 XIAO) |
-|---|---|---|
-| CLK | 18 | 7 |
-| MOSI | 23 | 9 |
-| CS | 5 | 44 |
-
-Log at `/api/spi/log`
-
-#### UART Bridge
-Bridges UART1 to USB serial. Useful for man-in-the-middle of UART debug ports.
-
-| Field | Default (ESP32) | Default (S3) |
-|---|---|---|
-| RX | 16 | 44 |
-| TX | 17 | 43 |
-| Baud | 115200 | 115200 |
-
----
-
-## CLI Reference
-
-Access the CLI on the **⌨ CLI** tab, or via HTTP:
-
-```bash
-curl -X POST http://192.168.4.1/api/cli -d "help"
-```
-
-### Core commands
-
-| Command | Description |
-|---|---|
-| `help` | Show all categories |
-| `help <cmd>` | Detailed help for a command |
-| `status` | Heap, uptime, active tool |
-| `modules` | List all tool slugs |
-| `start <slug> [key=val …]` | Start a tool |
-| `stop [slug]` | Stop the active (or named) tool |
-| `reboot` | Soft-restart the ESP32 |
-
-### Quick shortcuts
-
-```
-d AA:BB:CC:DD:EE:FF ch=6     → deauth
-b "Free WiFi" random=1        → beacon
-p TestNet                     → probe
-hs AA:BB:CC:DD:EE:FF force=1  → handshake
-bt apple                      → ble spam
-stormdeauth AA:BB:.. ch=6    → multi-vector WPA2+WPA3 deauth
-```
-
-### Defence (Aegis IDS)
-
-```
-aegis           → summary
-scan            → cached AP list
-clients         → nearby stations
-events          → recent IDS alerts
-attackers       → ranked deauth attackers
-channels        → per-channel frame counts
-trust HomeNet AA:BB:CC:DD:EE:FF 6
-untrust
-```
-
-### Safety limits
-
-```
-safety                       → show current limits
-safety dps=50 bps=100 ast=30 → set deauth/beacon pps + auto-stop
-block AA:BB:CC:DD:EE:FF      → block a BSSID from attack
-unblock                      → clear blocklist
-```
-
-### Diagnostics
-
-```
-diag channel     → per-channel management frame counts
-diag heatmap     → RSSI histogram
-diag clients     → client inventory with vendor OUI
-diag ies AA:BB:CC:DD:EE:FF  → decode AP information elements
-diag packets     → recent management frames
-```
-
----
-
-## Device-Specific Notes
-
-### ESP32-S3 / ESP32-C3 (BLE 5.0)
-- BLE advertisements use 2M PHY for extended range.
-- USB CDC serial is active (`-DARDUINO_USB_CDC_ON_BOOT=1`).
-- When flashing the XIAO S3: hold BOOT button while plugging in USB if the port doesn't appear.
-
-### ESP32-C3 (Apple Silicon Mac)
-The RISC-V toolchain is x86-only. Install Rosetta 2 first:
-```bash
-softwareupdate --install-rosetta
-pio run -e doom_c3 -t upload
-```
-
-### M5Stack (Basic / Core2 / CoreS3)
-The firmware boots normally. The LCD is not driven by default — connect to the web UI over WiFi instead.  
-Default I2C: SDA=21, SCL=22. The AXP192 PMU (Core2) is on the same bus at 0x34.
-
-### TTGO T-Display
-Default pins match the standard ESP32 layout. The TFT display is not driven.
-
-### Heltec WiFi Kit 32
-I2C on SDA=4, SCL=15 (the OLED bus). Set those pins if using the I2C sniff tool.
+Both limits persist to NVS across reboots.
 
 ---
 
 ## Architecture
 
+See [docs/architecture.md](./docs/architecture.md) for:
+
+- System block diagram
+- Module map (all source files and their purpose)
+- Memory layout (LITE vs full analytics)
+- Authentication flow diagram
+- Rate limiting design
+- FreeRTOS task table
+- NVS namespace map
+- Guide to adding new tools
+
+---
+
+## Building from Source
+
+### Prerequisites
+
+- PlatformIO Core >= 6.1
+- Python >= 3.11
+- ESP-IDF is handled automatically by PlatformIO
+
+### Build all environments
+
+```bash
+# Build everything (takes ~10 minutes on first run)
+for env in doom doom_nodemcu doom_wrover doom_s3 doom_c3; do
+  pio run -e $env
+done
 ```
-src/
-  main.cpp          — setup(), loop(), AP/server init, tool registry
-  module.h          — ToolModule struct, g_tools[], tool_register/start/stop
-  hub_html.h        — PROGMEM HTML/CSS/JS for the web UI
-  board.h           — board detection, /api/board route, pin defaults
-  cli.h             — full CLI dispatcher, /api/cli route
-  aegis.h           — passive WiFi IDS
-  aegis_ble.h       — BLE advertisement scanner
-  safety.h          — rate limiter, blocklist, auto-stop
-  persist.h         — NVS profile save/load
-  diag.h            — diagnostics (channel map, IEs)
-  capture.h         — PCAP writer (LittleFS, fsLock semaphore)
-  pcap_mgr.h        — /api/pcaps, /api/pcap/dl, /api/pcap/del, /api/fs
-  frames.h          — raw 802.11 frame builders (f_deauth, f_disassoc,
-                       f_deauth_r, f_disassoc_r, f_actionBTM, etc.)
-  bypass.cpp        — ieee80211_raw_frame_sanity_check override (enables injection)
-  deauth.h          — Deauth tool (bidirectional, 4 frames/burst)
-  deauth_multi.h    — Multi Deauth (up to 8 BSSIDs simultaneously)
-  deauth_storm.h    — Deauth Storm (8-vector WPA2+WPA3 coordinated attack)
-  beacon_spam.h     — Beacon spam tool
-  probe_flood.h     — Probe request flood
-  probe_harvest.h   — Passive probe request sniffer (device + SSID recon)
-  handshake.h       — Handshake / PMKID capture
-  evil_portal.h     — Captive portal
-  evil_twin.h       — Evil Twin AP + deauth + DNS + cred capture
-  honeypot.h        — TCP honeypot
-  ble_spam.h        — BLE advertisement spam (15 modes)
-  auth_flood.h      — Auth/assoc/disassoc flood
-  karma.h           — KARMA probe response
-  nav_flood.h       — CTS/RTS NAV DoS
-  csa_attack.h      — Channel Switch Announcement attack
-  btm_flood.h       — BTM Flood (802.11v BSS Transition Management)
-  espnow_flood.h    — ESP-NOW flood
-  beacon_adv.h      — Advanced beacon injection
-  pmkid_hunt.h      — PMKID extraction
-  wpa3_flood.h      — WPA3 SAE flood (6 modes incl. transition + pmkid exhaust)
-  eap_flood.h       — WPA Enterprise EAPOL state exhaustion
-  null_flood.h      — Power-save null/QoS-null/BAR confusion
-  mgt_flood.h       — All-subtype management frame spray
-  action_flood.h    — 802.11 action frame category spray
-  chan_hop_deauth.h  — All-channel deauth sweep
-  i2c_sniff.h       — I2C slave logger
-  spi_sniff.h       — SPI MOSI sampler
-  uart_bridge.h     — UART1 bridge
+
+### RAM/Flash usage
+
+```bash
+pio run -e doom 2>&1 | grep -E "RAM:|Flash:|DRAM:|IRAM:"
 ```
+
+LITE builds target less than 55% DRAM used (target: ~114 KB of 320 KB).
+
+### Partition tables
+
+| File | Use |
+|------|-----|
+| `partitions.csv` | Standard 4 MB flash (most boards) |
+| `partitions_16mb.csv` | 16 MB flash (M5Stack CoreS3, some S3 boards) |
+
+---
+
+## Flashing
+
+### Standard flash
+
+```bash
+pio run -e doom --target upload
+```
+
+### Full flash (firmware + filesystem + bootloader)
+
+```bash
+pio run -e doom --target upload --target uploadfs
+```
+
+### OTA (not yet implemented)
+
+OTA is planned for a future release. Currently all updates require USB.
+
+### Serial monitor
+
+```bash
+pio device monitor --baud 115200
+```
+
+---
+
+## Running Unit Tests
+
+Unit tests run entirely on your host machine. No ESP32 required.
+
+```bash
+pio test -e native
+```
+
+Expected output:
+
+```
+test/unit/test_frame_parsing.cpp    42 Tests 0 Failures 0 Ignored
+test/unit/test_input_validator.cpp  76 Tests 0 Failures 0 Ignored
+test/unit/test_device_tracker.cpp   28 Tests 0 Failures 0 Ignored
+test/unit/test_auth_manager.cpp     29 Tests 0 Failures 0 Ignored
+test/unit/test_rate_limiter.cpp     21 Tests 0 Failures 0 Ignored
+test/unit/test_evil_twin.cpp        29 Tests 0 Failures 0 Ignored
+test/unit/test_probe_flood.cpp      20 Tests 0 Failures 0 Ignored
+```
+
+245 total test cases covering: frame parsing, input validation,
+device tracking, session management, rate limiting, credential capture,
+and probe flood logic.
+
+---
+
+## CI/CD
+
+GitHub Actions runs on every push to `main` or `develop` and on all pull
+requests targeting `main`. The pipeline:
+
+1. **Build matrix** — Builds all 13 PlatformIO environments in parallel.
+   Firmware artifacts are uploaded for `main` branch builds.
+2. **Native unit tests** — Runs all 245 test cases on Ubuntu (no hardware).
+3. **Config validation** — Python script verifies every environment has either
+   `PHANTOM32_LITE` or `BOARD_HAS_PSRAM` defined.
+4. **Static analysis** — Checks for hardcoded credentials and
+   `-Wl,-zmuldefs` usage.
+
+Workflow definition: [.github/workflows/build.yml](./.github/workflows/build.yml)
+
+---
+
+## Project Structure
+
+```
+.
+├── src/
+│   ├── main.cpp                # Firmware entry point, setup(), loop()
+│   ├── module.h                # ToolModule struct and registry (g_tools[])
+│   ├── auth_manager.h          # HTTP authentication layer
+│   ├── rate_limiter_adv.h      # TX and HTTP rate limiting
+│   ├── input_validator.h       # Input sanitization and validation
+│   ├── extended_modules.h      # Analytics module aggregator (PSRAM only)
+│   ├── safety.h                # Safety and autostop controls
+│   ├── aegis.h                 # Passive 802.11 anomaly detection
+│   ├── beacon_spam.h           # Beacon spam tool
+│   ├── deauth.h                # Deauthentication tool
+│   ├── evil_twin.h             # Evil twin + captive portal
+│   ├── probe_flood.h           # Probe request flood
+│   ├── probe_harvest.h         # Passive probe collection
+│   ├── device_tracker.h        # STA/AP tracker with RSSI history
+│   ├── karma.h                 # KARMA attack
+│   ├── pmkid_hunt.h            # PMKID capture
+│   ├── pcap_mgr.h              # PCAP capture and download
+│   ├── cli.h                   # HTTP CLI interface
+│   ├── diag.h                  # System diagnostics endpoint
+│   ├── board.h                 # Board-specific pin/LED config
+│   └── [25 more tool headers]
+├── test/
+│   └── unit/
+│       ├── test_frame_parsing.cpp
+│       ├── test_input_validator.cpp
+│       ├── test_device_tracker.cpp
+│       ├── test_auth_manager.cpp
+│       ├── test_rate_limiter.cpp
+│       ├── test_evil_twin.cpp
+│       └── test_probe_flood.cpp
+├── docs/
+│   ├── architecture.md         # System design and module map
+│   └── api-reference.md        # Full HTTP API reference
+├── .github/
+│   └── workflows/
+│       └── build.yml           # CI/CD pipeline
+├── platformio.ini              # Build system config (13 environments)
+├── partitions.csv              # 4 MB partition table
+├── partitions_16mb.csv         # 16 MB partition table
+├── README.md                   # This file
+├── LEGAL.md                    # Legal terms, disclaimers, jurisdiction guidance
+├── SECURITY.md                 # Responsible disclosure policy
+├── CONTRIBUTING.md             # Developer setup and contribution guide
+├── CHANGELOG.md                # Version history
+└── LICENSE                     # MIT License
+```
+
+---
+
+## Configuration
+
+### AP Settings
+
+Defined in `src/main.cpp`:
+
+```cpp
+#define AP_SSID        "Phantom32"
+#define AP_PASSWORD    "phantom32"
+#define AP_IP          "192.168.4.1"
+#define AP_CHANNEL     6
+#define AP_MAX_CLIENTS 8
+```
+
+Change these before building if you want a different AP name or password.
+
+### NVS-Persisted Settings
+
+The following settings survive reboots (stored in ESP32 NVS):
+
+| Setting | Default | How to change |
+|---------|---------|---------------|
+| Login password | Random 12-char (first boot) | `POST /api/auth/change-password` |
+| API key | Random 32-char (first boot) | `POST /api/auth/reset-creds` |
+| Global TX fps limit | 200 | `POST /api/rla/global` |
+| HTTP req/min limit | 300 | `POST /api/rla/global` |
+| Per-tool TX limits | (unlimited) | `POST /api/rla/tool` |
+
+### PHANTOM32_LITE Mode
+
+Non-PSRAM boards compile with `-DPHANTOM32_LITE`, which:
+- Disables all 13 analytics modules
+- Reduces static array sizes (device tracker, probe flood, etc.)
+- Keeps all 28+ research tools functional
+
+This is set automatically per-environment in `platformio.ini` and requires
+no manual configuration.
+
+---
+
+## Troubleshooting
+
+**Build fails: DRAM overflow**
+
+If you are adding new large static arrays, guard them with:
+```cpp
+#ifdef PHANTOM32_LITE
+#define MY_MAX_ENTRIES 8
+#else
+#define MY_MAX_ENTRIES 128
+#endif
+```
+Check RAM after: `pio run -e doom 2>&1 | grep "RAM:"`. Target is under 55%.
+
+**Upload fails: port not found**
+
+```bash
+pio device list
+pio run -e doom --target upload --upload-port /dev/YOUR_PORT
+```
+
+On macOS the port is typically `/dev/cu.usbserial-XXXX`.
+On Linux it is typically `/dev/ttyUSB0`.
+On Windows it is typically `COM3` or similar.
+
+**Cannot log in / forgot password**
+
+Connect a serial terminal at 115200 baud and reboot the device. The login
+password is printed on boot. If you have a valid session, call
+`POST /api/auth/reset-creds` to rotate credentials.
+
+**Web UI does not load**
+
+- Confirm you are connected to the `Phantom32` AP (not your normal network).
+- Navigate to `http://192.168.4.1/dashboard` (not HTTPS).
+- If the captive portal intercepts your browser, dismiss it and navigate
+  manually.
+
+**BLE tools not working on ESP32-C3**
+
+The C3 environment (`doom_c3`) enables BLE but its NimBLE stack initializes
+differently. Ensure `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` is set (it is in
+`platformio.ini`).
+
+**PlatformIO: RISC-V toolchain not found (Apple Silicon Mac)**
+
+```bash
+# Install Rosetta (one-time)
+softwareupdate --install-rosetta
+
+# Then build normally
+pio run -e doom_c3
+```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+- Development environment setup
+- Code style guide
+- RAM-conscious coding guidelines
+- Pull request requirements
+- Testing requirements
+
+---
+
+## Security Policy
+
+See [SECURITY.md](./SECURITY.md) for:
+- Supported versions
+- How to report a vulnerability (responsible disclosure)
+- Security architecture overview
+- What is and is not considered a vulnerability
 
 ---
 
 ## Legal
 
-This firmware is for **authorized security testing, research, and educational use only**.  
-Deauthenticating clients, capturing credentials, or flooding radio spectrum on networks you do not own or have explicit written permission to test is illegal in most jurisdictions.  
-The authors accept no liability for misuse.
+**Read [LEGAL.md](./LEGAL.md) before using this software.**
+
+This firmware includes tools that can disrupt Wi-Fi networks and capture
+network traffic. These capabilities are legal only in environments you own or
+have explicit written authorization to test. Unauthorized use is a criminal
+offense in most countries.
+
+---
+
+## License
+
+MIT License. See [LICENSE](./LICENSE) for the full text, including the
+security research disclaimer.
+
+Copyright (c) 2024 Mehaan Minocha

@@ -277,7 +277,7 @@ void test_probe_max_cap() {
   uint8_t mac[] = {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
   DtDevice *d = find_or_add(mac, -60);
   for (int i = 0; i < DT_MAX_PROBES + 2; i++) {
-    char ssid[8]; snprintf(ssid, 8, "net%d", i);
+    char ssid[32]; snprintf(ssid, 32, "net%d", i);
     add_probe(d, ssid);
   }
   TEST_ASSERT_EQUAL(DT_MAX_PROBES, d->probe_count);

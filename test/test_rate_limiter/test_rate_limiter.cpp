@@ -298,7 +298,7 @@ void test_rla_null_tool_name() {
 void test_rla_many_tools_capacity() {
   rla_reset();
   for (int i = 0; i < RLA_MAX_TOOLS; i++) {
-    char name[8]; snprintf(name, 8, "t%d", i);
+    char name[32]; snprintf(name, 32, "t%d", i);
     TEST_ASSERT_NOT_NULL(rla_find_or_add_tool(name, 10.0f, 10.0f));
   }
   // Adding one more should fail.

@@ -133,7 +133,7 @@ void cat_ingest_assoc(const uint8_t *client_mac, const uint8_t *ap_bssid,
   cat_push_history(*c, ap_bssid, ssid, ch, rssi, is_reassoc);
 }
 
-void cat_ingest_deauth(const uint8_t *client_mac, const uint8_t *ap_bssid) {
+inline void cat_ingest_deauth(const uint8_t *client_mac, const uint8_t *ap_bssid) {
   if (cat_is_bcast(client_mac)) return;
   CatClient *c = cat_find(client_mac);
   if (!c) return;

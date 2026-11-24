@@ -90,6 +90,7 @@ inline void safety_tick(){
 inline void safety_routes(){
   extern WebServer server;
   server.on("/api/safety/get", HTTP_GET, [](){
+    if (!auth_check()) { auth_reject(); return; }
     String j = "{\"dps\":"+String(g_safety.deauth_per_sec)
              + ",\"bps\":"+String(g_safety.beacon_per_sec)
              + ",\"pps\":"+String(g_safety.probe_per_sec)
@@ -98,6 +99,7 @@ inline void safety_routes(){
     server.send(200,"application/json",j);
   });
   server.on("/api/safety/set", HTTP_POST, [](){
+    if (!auth_check()) { auth_reject(); return; }
     if (server.hasArg("dps")) g_safety.deauth_per_sec = server.arg("dps").toInt();
     if (server.hasArg("bps")) g_safety.beacon_per_sec = server.arg("bps").toInt();
     if (server.hasArg("pps")) g_safety.probe_per_sec  = server.arg("pps").toInt();
@@ -106,11 +108,13 @@ inline void safety_routes(){
     server.send(200,"application/json","{\"ok\":1}");
   });
   server.on("/api/safety/block", HTTP_POST, [](){
+    if (!auth_check()) { auth_reject(); return; }
     if (!server.hasArg("mac")) return server.send(400,"application/json","{\"ok\":0}");
     safety_blocklist_add(server.arg("mac"));
     server.send(200,"application/json","{\"ok\":1}");
   });
   server.on("/api/safety/unblock", HTTP_POST, [](){
+    if (!auth_check()) { auth_reject(); return; }
     safety_blocklist_clear();
     server.send(200,"application/json","{\"ok\":1}");
   });

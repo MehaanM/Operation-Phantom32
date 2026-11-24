@@ -207,7 +207,7 @@ void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub,
 }
 
 // ─── Periodic tick (call every 1s) ────────────────────────────────────────────
-void jd_tick(uint8_t current_ch) {
+inline void jd_tick(uint8_t current_ch) {
   if (!g_jd.monitoring) return;
   uint32_t now = millis();
   uint32_t elapsed = now - g_jd.window_start;

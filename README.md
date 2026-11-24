@@ -172,9 +172,10 @@ Replace `/dev/cu.usbserial-0001` with your actual port
 
 1. Connect your computer or phone to the Wi-Fi AP:
    - SSID: `Phantom32`
-   - Password: `phantom32`
+   - Wi-Fi password: `phantom32` _(this is the network join password, not the dashboard login)_
 2. Open `http://192.168.4.1/dashboard` in a browser.
-3. Log in with the password printed to serial (115200 baud) on first boot.
+3. Log in with the **dashboard password** printed to serial (115200 baud) on first boot.
+   This is a device-unique, randomly generated password — not `phantom32`.
 
 ---
 
@@ -195,8 +196,20 @@ All pages use a dark theme and are mobile-responsive.
 
 ## Authentication
 
+Phantom32 uses **two separate credentials** that serve different purposes:
+
+| Credential | Default value | Purpose |
+|---|---|---|
+| Wi-Fi AP password | `phantom32` | Joins the ESP32's access point (network-layer access) |
+| Dashboard password | _(randomly generated)_ | Logs into the web UI and API (application-layer access) |
+
+The Wi-Fi AP password (`phantom32`) is a known default that lets you connect to the
+device's network. It does **not** grant access to any tool, API endpoint, or system
+configuration — every protected route additionally requires a valid session token obtained
+by logging in with the dashboard password.
+
 On first boot, Phantom32 generates a device-unique 12-character alphanumeric
-password and prints it to the serial console (UART0, 115200 baud):
+dashboard password and prints it to the serial console (UART0, 115200 baud):
 
 ```
 [auth] Generated new password: Xk7mP3qNvR2w
@@ -357,17 +370,23 @@ Expected output:
 
 ```
 test/unit/test_frame_parsing.cpp    42 Tests 0 Failures 0 Ignored
-test/unit/test_input_validator.cpp  76 Tests 0 Failures 0 Ignored
-test/unit/test_device_tracker.cpp   28 Tests 0 Failures 0 Ignored
-test/unit/test_auth_manager.cpp     29 Tests 0 Failures 0 Ignored
-test/unit/test_rate_limiter.cpp     21 Tests 0 Failures 0 Ignored
+test/unit/test_input_validator.cpp  83 Tests 0 Failures 0 Ignored
+test/unit/test_device_tracker.cpp   29 Tests 0 Failures 0 Ignored
+test/unit/test_auth_manager.cpp     32 Tests 0 Failures 0 Ignored
+test/unit/test_rate_limiter.cpp     19 Tests 0 Failures 0 Ignored
 test/unit/test_evil_twin.cpp        29 Tests 0 Failures 0 Ignored
 test/unit/test_probe_flood.cpp      20 Tests 0 Failures 0 Ignored
+test/unit/test_safety.cpp           28 Tests 0 Failures 0 Ignored
+test/unit/test_aegis.cpp            16 Tests 0 Failures 0 Ignored
+test/unit/test_beacon_spam.cpp      28 Tests 0 Failures 0 Ignored
+test/unit/test_integration.cpp      18 Tests 0 Failures 0 Ignored
+test/unit/test_memory.cpp           24 Tests 0 Failures 0 Ignored
 ```
 
-245 total test cases covering: frame parsing, input validation,
+368 total test cases covering: frame parsing, input validation,
 device tracking, session management, rate limiting, credential capture,
-and probe flood logic.
+probe flood, TX safety limits, IDS/anomaly detection, beacon spam,
+cross-module integration, and memory boundary conditions.
 
 ---
 
@@ -378,7 +397,7 @@ requests targeting `main`. The pipeline:
 
 1. **Build matrix** — Builds all 13 PlatformIO environments in parallel.
    Firmware artifacts are uploaded for `main` branch builds.
-2. **Native unit tests** — Runs all 245 test cases on Ubuntu (no hardware).
+2. **Native unit tests** — Runs all 368 test cases on Ubuntu (no hardware).
 3. **Config validation** — Python script verifies every environment has either
    `PHANTOM32_LITE` or `BOARD_HAS_PSRAM` defined.
 4. **Static analysis** — Checks for hardcoded credentials and

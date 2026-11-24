@@ -146,7 +146,7 @@ void test_bs_add_null_rejected() {
 void test_bs_max_cap() {
   bs_reset();
   for (int i = 0; i < BS_MAX_SSIDS; i++) {
-    char s[8]; snprintf(s, 8, "net%d", i);
+    char s[32]; snprintf(s, 32, "net%d", i);
     TEST_ASSERT_TRUE(bs_add_ssid(s, 6));
   }
   TEST_ASSERT_FALSE(bs_add_ssid("overflow", 6));

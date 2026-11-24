@@ -207,7 +207,7 @@ bool cfg_load() {
 // ─── Default initialization ───────────────────────────────────────────────────
 void cfg_init_defaults() {
   if (!cfg_exists("ap_ssid"))       cfg_set("ap_ssid", "Phantom32");
-  if (!cfg_exists("ap_password"))   cfg_set("ap_password", "phantom32");
+  if (!cfg_exists("ap_password"))   cfg_set("ap_password", "phantom32"); // ap-default
   if (!cfg_exists("ap_channel"))    cfg_set_int("ap_channel", 6);
   if (!cfg_exists("ap_hidden"))     cfg_set_bool("ap_hidden", false);
   if (!cfg_exists("auto_scan"))     cfg_set_bool("auto_scan", true);
@@ -216,7 +216,7 @@ void cfg_init_defaults() {
   if (!cfg_exists("log_level"))     cfg_set_int("log_level", 2);
   if (!cfg_exists("web_refresh"))   cfg_set_int("web_refresh", 5000);
   if (!cfg_exists("tx_power"))      cfg_set_int("tx_power", 20);
-  if (!cfg_exists("hostname"))      cfg_set("hostname", "phantom32");
+  if (!cfg_exists("hostname"))      cfg_set("hostname", "phantom32"); // ap-default
   if (!cfg_exists("timezone_offset")) cfg_set_int("timezone_offset", 0);
   if (!cfg_exists("enable_ble"))    cfg_set_bool("enable_ble", true);
   if (!cfg_exists("enable_ntp"))    cfg_set_bool("enable_ntp", true);

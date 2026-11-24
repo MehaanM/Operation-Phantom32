@@ -147,7 +147,7 @@ input:focus, select:focus, textarea:focus { border-color:var(--accent); }
       </div>
       <div class="field-row">
         <div class="field-label"><span>Password</span><small>Min 8 chars</small></div>
-        <div class="field-input"><input type="password" id="ap_pass" value="phantom32"></div>
+        <div class="field-input"><input type="password" id="ap_pass" value="" placeholder="Current AP password"></div>
       </div>
       <div class="field-row">
         <div class="field-label"><span>Channel</span><small>1–13 (default 6)</small></div>
@@ -177,7 +177,7 @@ input:focus, select:focus, textarea:focus { border-color:var(--accent); }
       </div>
       <div class="field-row">
         <div class="field-label"><span>Hostname</span><small>mDNS name</small></div>
-        <div class="field-input"><input type="text" id="hostname" value="phantom32"></div>
+        <div class="field-input"><input type="text" id="hostname" value="" placeholder="phantom32"></div>
       </div>
       <div class="action-row">
         <button class="btn btn-primary" onclick="saveNetwork()">Apply Network</button>

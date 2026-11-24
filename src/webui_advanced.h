@@ -950,7 +950,7 @@ input[type=range]{width:100%;accent-color:#1f6feb}
   <div class="section-desc">Change requires reboot to take effect.</div>
   <div class="form-row">
     <div class="form-group"><label>SSID</label><input type="text" id="apSsid" value="Phantom32"></div>
-    <div class="form-group"><label>Password (min 8)</label><input type="password" id="apPass" value="phantom32"></div>
+    <div class="form-group"><label>Password (min 8)</label><input type="password" id="apPass" value="" placeholder="Current AP password"></div>
   </div>
   <div class="form-row">
     <div class="form-group"><label>Channel</label>

@@ -60,20 +60,28 @@ jobs:
 
       - name: Check for hardcoded AP password in non-define contexts
         run: |
+          # Allowed exceptions:
+          #   - Lines that ARE the #define for AP_PASSWORD
+          #   - Comment lines (//)
+          #   - Factory-default initialization marked with // ap-default
+          #   - HTML placeholder= attributes (not value=)
           if grep -rn '"phantom32"' src/ \
-               | grep -v 'AP_PASSWORD\s*=\|//\|#define'; then
-            echo "ERROR: Hardcoded AP password found outside AP_PASSWORD define." >&2
+               | grep -v '#define\|//\|ap-default\|placeholder='; then
+            echo "ERROR: Hardcoded AP password found in an unexpected context." >&2
+            echo "       If this is a factory default, add '// ap-default' to the line." >&2
             exit 1
           fi
-          echo "OK: No hardcoded passwords."
+          echo "OK: No unexpected hardcoded passwords."
 
-      - name: Check for -Wl,-zmuldefs (linker duplicate-symbol suppressor)
+      - name: Reject -Wl,-zmuldefs (duplicate-symbol suppressor)
         run: |
           if grep -q "zmuldefs" platformio.ini; then
-            echo "WARN: -Wl,-zmuldefs is set."
-            echo "This suppresses duplicate-symbol linker errors, which can mask real bugs."
-            echo "Verify no unintentional duplicate definitions are hidden by this flag."
+            echo "ERROR: -Wl,-zmuldefs found in platformio.ini." >&2
+            echo "This flag suppresses duplicate-symbol linker errors and can mask real bugs." >&2
+            echo "Fix the duplicate symbols instead of hiding them, then remove this flag." >&2
+            exit 1
           fi
+          echo "OK: -Wl,-zmuldefs is not present."
 
       - name: Check for security-critical TODO/FIXME/HACK comments
         run: |
@@ -90,28 +98,36 @@ jobs:
           python3 - <<'EOF'
           import re, sys
 
+          # Routes in main.cpp
           with open('src/main.cpp') as f:
-              content = f.read()
+              main_content = f.read()
 
-          # Routes that MUST be auth-guarded (not captive portal redirects).
-          must_guard = [
-              '/api/reboot',
-              '/api/fs/format',
-              '/api/fs/info',
-              '/api/wifi/channel',
-              '/api/promisc',
-              '/api/ext/toggle',
-              '/api/reset/stats',
-              '/api/hop',
-              '/api/sys',
-              '/api/modules',
-              '/api/scan',
-              '/dashboard',
+          # Routes in safety.h
+          with open('src/safety.h') as f:
+              safety_content = f.read()
+
+          # (source_file_content, route_path)
+          checks = [
+              (main_content, '/api/reboot'),
+              (main_content, '/api/fs/format'),
+              (main_content, '/api/fs/info'),
+              (main_content, '/api/wifi/channel'),
+              (main_content, '/api/promisc'),
+              (main_content, '/api/ext/toggle'),
+              (main_content, '/api/reset/stats'),
+              (main_content, '/api/hop'),
+              (main_content, '/api/sys'),
+              (main_content, '/api/modules'),
+              (main_content, '/api/scan'),
+              (main_content, '/dashboard'),
+              (safety_content, '/api/safety/get'),
+              (safety_content, '/api/safety/set'),
+              (safety_content, '/api/safety/block'),
+              (safety_content, '/api/safety/unblock'),
           ]
 
           failures = []
-          for route in must_guard:
-              # Find the server.on block for this route.
+          for content, route in checks:
               pattern = re.compile(
                   r'server\.on\s*\(\s*"' + re.escape(route) + r'".*?(?=server\.on|\Z)',
                   re.DOTALL
@@ -130,7 +146,7 @@ jobs:
                   print(' ', f)
               sys.exit(1)
           else:
-              print(f'OK: All {len(must_guard)} sensitive routes have auth guards.')
+              print(f'OK: All {len(checks)} sensitive routes have auth guards.')
           EOF
 
       - name: Verify PHANTOM32_LITE/PSRAM coverage

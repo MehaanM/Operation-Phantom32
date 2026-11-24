@@ -11,8 +11,13 @@
 
 extern WebServer server;
 
+#ifdef PHANTOM32_LITE
+#define PFL_MAX_CLIENTS  8
+#define PFL_MAX_TARGETS  4    // unique SSIDs probed per client (lite)
+#else
 #define PFL_MAX_CLIENTS  48
 #define PFL_MAX_TARGETS  32   // unique SSIDs probed per client
+#endif
 #define PFL_HIST_LEN     30
 #define PFL_FLOOD_THRESH  8   // probes/sec threshold
 

@@ -84,6 +84,11 @@ uint16_t g_seq = 0;
 #include "device_tracker.h"
 #include "oui_full.h"
 
+// ---- Security hardening modules ----
+#include "auth_manager.h"
+#include "rate_limiter_adv.h"
+#include "input_validator.h"
+
 // ---- Extended analytical modules (all sessions) ----
 #include "extended_modules.h"
 
@@ -606,7 +611,7 @@ static void serve_hop_status() {
 
 static void handle_hop_control() {
   if (server.hasArg("enable"))    g_hop_enabled = server.arg("enable") == "1";
-  if (server.hasArg("dwell_ms"))  g_hop_dwell_ms = max(50, server.arg("dwell_ms").toInt());
+  if (server.hasArg("dwell_ms"))  g_hop_dwell_ms = max(50, (int)server.arg("dwell_ms").toInt());
   if (server.hasArg("channel") && !g_hop_enabled) {
     int ch = server.arg("channel").toInt();
     if (ch >= 1 && ch <= 14) {
@@ -981,7 +986,7 @@ static void register_tools() {
   tool_register({"aegis",       "Aegis IDS",        "Passive WiFi IDS + BLE.",                                               1, true,  aegisSetupW, aegisLoopW,  aegisRoutesW,  nullptr,     nullptr});
   tool_register({"deauth",      "Deauth",            "802.11 deauth injection.",                                              1, false, nullptr,     nullptr,     dt_routes,     dt_start,    dt_stop});
   tool_register({"beacon",      "Beacon Spam",       "Rotating fake beacons.",                                                1, false, nullptr,     nullptr,     bs_routes,     bs_start,    bs_stop});
-  tool_register({"probe",       "Probe Flood",       "Randomised probe flood.",                                               1, false, nullptr,     nullptr,     pf_routes,     pf_start,    pf_stop});
+  tool_register({"probe",       "Probe Flood",       "Randomised probe flood.",                                               1, false, nullptr,     nullptr,     pfl_routes,    nullptr,     nullptr});
   tool_register({"handshake",   "Handshake/PMKID",   "EAPOL→PCAP on flash.",                                                  1, false, nullptr,     nullptr,     hs_routes,     hs_start,    hs_stop});
   tool_register({"portal",      "Evil Portal",       "Captive portal cred capture.",                                          1, false, nullptr,     ep_loop,     ep_routes,     ep_start,    ep_stop});
   tool_register({"honeypot",    "Honeypot",          "TCP 22/80/2323 + log.",                                                 0, false, nullptr,     hp_loop,     hp_routes,     hp_start,    hp_stop});
@@ -989,7 +994,7 @@ static void register_tools() {
   tool_register({"i2c",         "I2C Sniff",         "I2C slave logger.",                                                     0, false, nullptr,     nullptr,     i2c_routes,    i2c_start,   i2c_stop});
   tool_register({"spi",         "SPI Sniff",         "ISR-safe MOSI sampler.",                                                0, false, nullptr,     nullptr,     spi_routes,    spi_start,   spi_stop});
   tool_register({"uart",        "UART Bridge",       "UART1↔USB.",                                                            0, false, nullptr,     uart_loop,   uart_routes,   uart_start,  uart_stop});
-  tool_register({"eviltwin",    "Evil Twin",         "Rogue AP + deauth + DNS + cred capture.",                               1, false, nullptr,     et_loop,     et_routes,     et_start,    et_stop});
+  tool_register({"eviltwin",    "Evil Twin",         "Rogue AP + deauth + DNS + cred capture.",                               1, false, nullptr,     nullptr,     et_routes,     nullptr,     et_stop});
   tool_register({"authflood",   "Auth Flood",        "Auth/assoc/disassoc flood.",                                            1, false, nullptr,     nullptr,     af_routes,     af_start,    af_stop});
   tool_register({"karma",       "KARMA",             "Probe response spoofing.",                                              1, false, nullptr,     nullptr,     karma_routes,  karma_start, karma_stop});
   tool_register({"navflood",    "NAV Flood",         "CTS/RTS NAV DoS.",                                                      1, false, nullptr,     nullptr,     nf_routes,     nf_start,    nf_stop});
@@ -1007,7 +1012,7 @@ static void register_tools() {
   tool_register({"actionflood", "Action Flood",      "802.11 action frame category spray.",                                   1, false, nullptr,     nullptr,     acf_routes,    acf_start,   acf_stop});
   tool_register({"pwnface",     "Pwngotchi",         "Autonomous UCB-guided handshake hunter.",                               1, false, nullptr,     nullptr,     pw_routes,     pw_start,    pw_stop});
   tool_register({"probeharvest","Probe Harvest",     "Passive probe request sniffer — STA MAC + saved network history.",     1, true,  nullptr,     nullptr,     prh_routes,    prh_start,   prh_stop});
-  tool_register({"stormdeauth", "Deauth Storm",      "Multi-vector WPA2+WPA3 deauth storm (8 attack vectors).",              1, false, nullptr,     nullptr,     ds_routes,     ds_start,    ds_stop});
+  tool_register({"stormdeauth", "Deauth Storm",      "Multi-vector WPA2+WPA3 deauth storm (8 attack vectors).",              1, false, nullptr,     nullptr,     das_routes,    nullptr,     nullptr});
   tool_register({"ssidfuzz",    "SSID Fuzzer",       "Beacon/probe fuzzing with UTF-8/ctrl/fmt/emoji/inject/long/repeat SSIDs.", 1, false, nullptr, nullptr, sf_routes,     sf_start,    sf_stop});
   tool_register({"devtrack",    "Device Tracker",    "Passive 802.11 device fingerprinting — vendor, type, probes, RSSI history.", 1, true, nullptr, nullptr, devt_routes, devt_start,  devt_stop});
 }
@@ -1103,6 +1108,10 @@ void setup() {
   tool_wifi_resume  = doom_resume;
   doom_resume();
 
+  // ---- Security modules ----
+  auth_init();
+  rla_init();
+
   // ---- Register core routes ----
   safety_routes();
   diag_routes();
@@ -1111,6 +1120,7 @@ void setup() {
   pcapmgr_routes();
   dashboard_routes();
   system_routes();
+  iv_routes();
 
   // ---- Main endpoints ----
   server.on("/",          HTTP_GET, serveHub);
@@ -1177,13 +1187,17 @@ void loop() {
   // Heap watchdog
   check_heap();
 
-  // Age scan cache every 5s
+  // Age scan cache every 5s (full build only — scan_result_cache.h not in lite)
   static uint32_t last_age = 0;
   uint32_t now = millis();
+#ifndef PHANTOM32_LITE
   if (now - last_age > 5000) {
     last_age = now;
     src_age_entries();
   }
+#else
+  (void)last_age; (void)now;
+#endif
 
   // Watchdog tap
   g_watchdog_ts = now;

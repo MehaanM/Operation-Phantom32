@@ -323,7 +323,7 @@ static String eap_json_all() {
   return s;
 }
 
-inline void eap_routes() {
+inline void eapm_routes() {
   server.on("/api/eap/all", HTTP_GET, []() {
     server.send(200, "application/json", eap_json_all());
   });

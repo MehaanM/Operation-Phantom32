@@ -906,6 +906,7 @@ static void captivePortalRoutes() {
 
 static void dashboard_routes() {
   server.on("/dashboard", HTTP_GET, []() {
+    if (!auth_check_or_redirect(true)) return;
     server.send_P(200, "text/html", DASHBOARD_PAGE);
   });
 }
@@ -915,24 +916,36 @@ static void dashboard_routes() {
 // ============================================================
 
 static void system_routes() {
-  server.on("/api/sys", HTTP_GET, serve_sys_status);
+  server.on("/api/sys", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    serve_sys_status();
+  });
 
-  server.on("/api/hop", HTTP_GET,  serve_hop_status);
-  server.on("/api/hop", HTTP_POST, handle_hop_control);
+  server.on("/api/hop", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    serve_hop_status();
+  });
+  server.on("/api/hop", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    handle_hop_control();
+  });
 
   server.on("/api/reset/stats", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
     g_frames_rx = g_frames_mgmt = g_frames_data = g_frames_ctrl = 0;
     g_fps_current = 0;
     server.send(200, "application/json", "{\"ok\":true}");
   });
 
   server.on("/api/reboot", HTTP_POST, []() {
-    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Rebooting in 1s…\"}");
+    if (!auth_check()) { auth_reject(); return; }
+    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Rebooting in 1s\"}");
     delay(1000);
     ESP.restart();
   });
 
   server.on("/api/fs/info", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
     uint32_t used  = LittleFS.usedBytes();
     uint32_t total = LittleFS.totalBytes();
     String s = "{\"used\":" + String(used) + ",\"total\":" + String(total) + "}";
@@ -940,29 +953,36 @@ static void system_routes() {
   });
 
   server.on("/api/fs/format", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
     bool ok = LittleFS.format();
     server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
   });
 
   server.on("/api/wifi/channel", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
     String s = "{\"channel\":" + String(g_current_ch) + "}";
     server.send(200, "application/json", s);
   });
 
   server.on("/api/wifi/channel", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
     if (server.hasArg("ch")) {
-      int ch = server.arg("ch").toInt();
-      if (ch >= 1 && ch <= 14) {
-        g_current_ch = ch;
-        esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+      long ch = 0;
+      if (iv_check_int_range(server.arg("ch").c_str(), 1, 14, &ch)) {
+        g_current_ch = (uint8_t)ch;
+        esp_wifi_set_channel((uint8_t)ch, WIFI_SECOND_CHAN_NONE);
         server.send(200, "application/json", "{\"ok\":true}");
         return;
       }
+      server.send(400, "application/json",
+                  ("{\"error\":" + iv_json_escape(iv_error()) + "}"));
+      return;
     }
-    server.send(400, "application/json", "{\"error\":\"invalid channel\"}");
+    server.send(400, "application/json", "{\"error\":\"missing ch\"}");
   });
 
   server.on("/api/promisc", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
     if (server.hasArg("enable")) {
       if (server.arg("enable") == "1") doom_resume();
       else doom_suspend();
@@ -972,6 +992,7 @@ static void system_routes() {
   });
 
   server.on("/api/ext/toggle", HTTP_POST, []() {
+    if (!auth_check()) { auth_reject(); return; }
     g_ext_modules_enabled = !g_ext_modules_enabled;
     String s = "{\"enabled\":" + String(g_ext_modules_enabled ? "true" : "false") + "}";
     server.send(200, "application/json", s);
@@ -1123,9 +1144,18 @@ void setup() {
   iv_routes();
 
   // ---- Main endpoints ----
-  server.on("/",          HTTP_GET, serveHub);
-  server.on("/api/modules", HTTP_GET, listModules);
-  server.on("/api/scan",  HTTP_GET, scanAPs);
+  server.on("/", HTTP_GET, []() {
+    if (!auth_check_or_redirect(true)) return;
+    serveHub();
+  });
+  server.on("/api/modules", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    listModules();
+  });
+  server.on("/api/scan", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    scanAPs();
+  });
 
   // ---- Register tools and their routes ----
   register_tools();
@@ -1134,8 +1164,14 @@ void setup() {
   }
 
   // ---- Core module routes ----
-  server.on("/aegis", HTTP_GET, []() { handleRoot(); });
-  server.on("/cli",   HTTP_GET, serveHub);
+  server.on("/aegis", HTTP_GET, []() {
+    if (!auth_check_or_redirect(true)) return;
+    handleRoot();
+  });
+  server.on("/cli", HTTP_GET, []() {
+    if (!auth_check_or_redirect(true)) return;
+    serveHub();
+  });
 
   // ---- CLI ----
   cli_routes();

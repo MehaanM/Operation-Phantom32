@@ -136,7 +136,6 @@ static PfdScanner* pfd_alloc(const uint8_t *mac) {
   g_pfd.scanners[idx].active = true;
   memcpy(g_pfd.scanners[idx].mac, mac, 6);
   g_pfd.scanners[idx].is_random_mac = pfd_is_random(mac);
-  g_pfd.scanners[idx].first_seen_ts = millis()/1000; // Note: field is first_ts
   g_pfd.scanners[idx].first_ts = millis()/1000;
   g_pfd.scanners[idx].rssi_min = 0; g_pfd.scanners[idx].rssi_max = -100;
   g_pfd.scanners[idx].min_ch_gap_ms = 0xFFFF;

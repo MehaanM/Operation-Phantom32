@@ -1,23 +1,181 @@
-name: PlatformIO Build Matrix
+name: Phantom32 CI
 
 on:
   push:
     branches: [ main, develop, "release/**" ]
     paths:
       - 'src/**'
+      - 'test/**'
       - 'platformio.ini'
       - 'partitions*.csv'
       - '.github/workflows/build.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'platformio.ini'
-      - 'partitions*.csv'
+
+# Cancel in-progress runs for the same branch on new pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIO_VERSION: "6.1.16"
 
 jobs:
+  # ----------------------------------------------------------------
+  # Job 1: Native unit tests (fastest; run first to catch regressions)
+  # ----------------------------------------------------------------
+  native-tests:
+    name: Unit tests (native)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-native-${{ hashFiles('platformio.ini') }}-v2
+          restore-keys: pio-native-
+
+      - name: Install PlatformIO
+        run: pip install "platformio==${{ env.PIO_VERSION }}"
+
+      - name: Install GCC (native build toolchain)
+        run: sudo apt-get install -y --no-install-recommends gcc g++ make
+
+      - name: Run unit tests
+        run: pio test -e native --verbose
+
+  # ----------------------------------------------------------------
+  # Job 2: Static analysis (no compiler needed, runs fast)
+  # ----------------------------------------------------------------
+  lint:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded AP password in non-define contexts
+        run: |
+          if grep -rn '"phantom32"' src/ \
+               | grep -v 'AP_PASSWORD\s*=\|//\|#define'; then
+            echo "ERROR: Hardcoded AP password found outside AP_PASSWORD define." >&2
+            exit 1
+          fi
+          echo "OK: No hardcoded passwords."
+
+      - name: Check for -Wl,-zmuldefs (linker duplicate-symbol suppressor)
+        run: |
+          if grep -q "zmuldefs" platformio.ini; then
+            echo "WARN: -Wl,-zmuldefs is set."
+            echo "This suppresses duplicate-symbol linker errors, which can mask real bugs."
+            echo "Verify no unintentional duplicate definitions are hidden by this flag."
+          fi
+
+      - name: Check for security-critical TODO/FIXME/HACK comments
+        run: |
+          found=$(grep -rn "TODO.*auth\|FIXME.*auth\|TODO.*security\|FIXME.*security\|HACK\|XXX" src/ || true)
+          if [ -n "$found" ]; then
+            echo "WARN: Unresolved security-related TODO/FIXME/HACK items:"
+            echo "$found"
+          else
+            echo "OK: No pending security TODOs."
+          fi
+
+      - name: Check all sensitive routes have auth guards
+        run: |
+          python3 - <<'EOF'
+          import re, sys
+
+          with open('src/main.cpp') as f:
+              content = f.read()
+
+          # Routes that MUST be auth-guarded (not captive portal redirects).
+          must_guard = [
+              '/api/reboot',
+              '/api/fs/format',
+              '/api/fs/info',
+              '/api/wifi/channel',
+              '/api/promisc',
+              '/api/ext/toggle',
+              '/api/reset/stats',
+              '/api/hop',
+              '/api/sys',
+              '/api/modules',
+              '/api/scan',
+              '/dashboard',
+          ]
+
+          failures = []
+          for route in must_guard:
+              # Find the server.on block for this route.
+              pattern = re.compile(
+                  r'server\.on\s*\(\s*"' + re.escape(route) + r'".*?(?=server\.on|\Z)',
+                  re.DOTALL
+              )
+              match = pattern.search(content)
+              if not match:
+                  failures.append(f'MISSING route: {route}')
+                  continue
+              block = match.group(0)
+              if 'auth_check' not in block:
+                  failures.append(f'UNGUARDED: {route}')
+
+          if failures:
+              print('Authentication audit FAILED:')
+              for f in failures:
+                  print(' ', f)
+              sys.exit(1)
+          else:
+              print(f'OK: All {len(must_guard)} sensitive routes have auth guards.')
+          EOF
+
+      - name: Verify PHANTOM32_LITE/PSRAM coverage
+        run: |
+          python3 - <<'EOF'
+          import configparser, sys
+
+          cfg = configparser.ConfigParser()
+          cfg.read('platformio.ini')
+
+          missing = []
+          for section in cfg.sections():
+              if not section.startswith('env:') or section == 'env':
+                  continue
+              env = section[4:]
+              if env in ('native',):
+                  continue  # skip test env
+              flags = (cfg.get(section, 'build_flags', fallback='') +
+                       cfg.get('env', 'build_flags', fallback=''))
+              has_psram = 'BOARD_HAS_PSRAM' in flags
+              has_lite  = 'PHANTOM32_LITE' in flags
+              if not has_psram and not has_lite:
+                  missing.append(env)
+
+          if missing:
+              print('ERROR: These environments have neither BOARD_HAS_PSRAM nor PHANTOM32_LITE:')
+              for e in missing:
+                  print(' ', e)
+              sys.exit(1)
+          else:
+              print('OK: All environments have PSRAM or LITE flag.')
+          EOF
+
+  # ----------------------------------------------------------------
+  # Job 3: Firmware build matrix
+  # ----------------------------------------------------------------
   build:
     name: Build ${{ matrix.env }}
+    needs: [ native-tests, lint ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -41,47 +199,51 @@ jobs:
           - doom_c3
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/packages
-          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            pio-${{ matrix.env }}-
-            pio-
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install PlatformIO
-        run: pip install --quiet platformio
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v2
+          restore-keys: |
+            pio-${{ matrix.env }}-
+            pio-
 
-      - name: Install ESP32 platform
-        run: pio pkg install --platform espressif32@6.5.0
+      - name: Install PlatformIO
+        run: pip install "platformio==${{ env.PIO_VERSION }}"
 
       - name: Build ${{ matrix.env }}
         run: pio run -e ${{ matrix.env }}
 
-      - name: Collect build artifacts
+      - name: Report RAM and Flash usage
+        if: always()
+        run: |
+          echo "=== Memory report: ${{ matrix.env }} ==="
+          pio run -e ${{ matrix.env }} 2>&1 \
+            | grep -E "RAM:|Flash:|DRAM:|IRAM:|DATA:|BSS:" \
+            || echo "(no memory lines found)"
+
+      - name: Collect firmware artifacts
         if: success()
         run: |
           mkdir -p artifacts/${{ matrix.env }}
-          cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}/firmware.bin || true
-          cp .pio/build/${{ matrix.env }}/partitions.bin artifacts/${{ matrix.env }}/partitions.bin || true
-          cp .pio/build/${{ matrix.env }}/bootloader.bin artifacts/${{ matrix.env }}/bootloader.bin || true
+          cp .pio/build/${{ matrix.env }}/firmware.bin \
+             artifacts/${{ matrix.env }}/ 2>/dev/null || true
+          cp .pio/build/${{ matrix.env }}/partitions.bin \
+             artifacts/${{ matrix.env }}/ 2>/dev/null || true
+          cp .pio/build/${{ matrix.env }}/bootloader.bin \
+             artifacts/${{ matrix.env }}/ 2>/dev/null || true
 
-      - name: Check RAM/Flash usage
-        run: |
-          pio run -e ${{ matrix.env }} --silent 2>&1 | grep -E "RAM:|Flash:" || true
-
-      - name: Upload firmware artifacts
+      - name: Upload firmware artifact
         if: success() && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
@@ -89,94 +251,20 @@ jobs:
           path: artifacts/${{ matrix.env }}/
           retention-days: 30
 
-  # Separate job: check that all envs appear in a build_flags matrix
-  config-check:
-    name: Validate platformio.ini
+  # ----------------------------------------------------------------
+  # Job 4: Build summary (requires all board builds to pass)
+  # ----------------------------------------------------------------
+  build-summary:
+    name: All builds passed
+    needs: build
     runs-on: ubuntu-latest
+    if: always()
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install PlatformIO
-        run: pip install --quiet platformio
-      - name: List all environments
-        run: pio project config --json-output | python3 -c "
-import sys, json
-cfg = json.load(sys.stdin)
-envs = [k.replace('env:','') for k in cfg.keys() if k.startswith('env:') and k != 'env']
-print(f'Found {len(envs)} environments:', ', '.join(sorted(envs)))
-assert len(envs) > 0, 'No environments found'
-"
-      - name: Check PHANTOM32_LITE coverage
+      - name: Check result
         run: |
-          python3 -c "
-import configparser
-cfg = configparser.ConfigParser()
-cfg.read('platformio.ini')
-no_psram_envs = []
-psram_envs = []
-for s in cfg.sections():
-    if not s.startswith('env:') or s == 'env':
-        continue
-    env = s[4:]
-    flags = cfg.get(s, 'build_flags', fallback='') + cfg.get('env', 'build_flags', fallback='')
-    has_psram = 'BOARD_HAS_PSRAM' in flags
-    has_lite  = 'PHANTOM32_LITE' in flags
-    if has_psram:
-        psram_envs.append(env)
-    elif has_lite:
-        no_psram_envs.append(env)
-    else:
-        print(f'WARNING: {env} has neither BOARD_HAS_PSRAM nor PHANTOM32_LITE')
-print(f'LITE envs: {no_psram_envs}')
-print(f'PSRAM envs: {psram_envs}')
-"
-
-  # Native unit tests (no hardware needed)
-  native-tests:
-    name: Native unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/packages
-          key: pio-native-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            pio-native-
-            pio-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install PlatformIO
-        run: pip install --quiet platformio
-      - name: Run native tests
-        run: pio test -e native --verbose
-
-  # Lint: check for common coding issues
-  lint:
-    name: Static analysis
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check for hardcoded credentials
-        run: |
-          # Flag if default password is left in production code paths
-          if grep -rn '"phantom32"' src/ | grep -v "AP_PASSWORD\|//\|test\|example"; then
-            echo "WARNING: Possible hardcoded password found outside AP_PASSWORD define"
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            echo "All 13 board builds passed."
+          else
+            echo "One or more board builds failed. See the build matrix above." >&2
+            exit 1
           fi
-      - name: Check -Wl,-zmuldefs usage
-        run: |
-          if grep -c "zmuldefs" platformio.ini; then
-            echo "INFO: -Wl,-zmuldefs is set. Verify no actual duplicate symbols are hidden."
-            echo "Consider running: pio run -e doom 2>&1 | grep 'multiple definition'"
-          fi
-      - name: Check for TODO/FIXME security items
-        run: |
-          grep -rn "TODO.*auth\|FIXME.*auth\|TODO.*security\|FIXME.*security\|HACK\|XXX" src/ || true

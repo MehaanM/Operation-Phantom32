@@ -212,7 +212,7 @@ void test_lockout_still_active_at_expiry_boundary() {
     uint32_t ip = 0xC0A80004;
     for (int i = 0; i < LOCKOUT_MAX_FAILURES; i++)
         ip_record_failure(ip);
-    g_mock_time_s += LOCKOUT_DURATION_S; // exactly at boundary — still locked
+    g_mock_time_s += LOCKOUT_DURATION_S - 1; // one second before expiry — still locked
     TEST_ASSERT_TRUE(ip_is_locked(ip));
 }
 

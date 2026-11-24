@@ -10,8 +10,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <stdbool.h>
 
 // ============================================================
 // SHARED TEST INFRA: minimal reprints of module stubs

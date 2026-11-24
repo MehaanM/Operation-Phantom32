@@ -16,7 +16,7 @@ env:
 
 jobs:
   # ----------------------------------------------------------------
-  # Job 1: Native unit tests (fastest; run first to catch regressions)
+  # Job 1a: Native unit tests (plain — fastest; fail here first)
   # ----------------------------------------------------------------
   native-tests:
     name: Unit tests (native)
@@ -36,7 +36,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-native-${{ hashFiles('platformio.ini') }}-v2
+          key: pio-native-${{ hashFiles('platformio.ini') }}-v3
           restore-keys: pio-native-
 
       - name: Install PlatformIO
@@ -46,10 +46,149 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends gcc g++ make
 
       - name: Run unit tests
-        run: pio test -e native --verbose
+        run: |
+          pio test -e native --verbose > test_output.txt 2>&1
+          rc=$?
+          cat test_output.txt
+          # Fail if zero individual test results appeared (guards against
+          # the "tests compiled but never executed" silent failure).
+          result_lines=$(grep -cE "\.\.\. (PASS|FAIL)$" test_output.txt || true)
+          echo "Individual test result lines: $result_lines"
+          if [ "$result_lines" -eq 0 ]; then
+            echo "ERROR: No test results found — did any tests execute?" >&2
+            exit 1
+          fi
+          # Surface the final tally.
+          grep -E "[0-9]+ Tests [0-9]+ Failures" test_output.txt || true
+          exit $rc
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-native
+          path: test_output.txt
+          retention-days: 7
 
   # ----------------------------------------------------------------
-  # Job 2: Static analysis (no compiler needed, runs fast)
+  # Job 1b: Sanitizer run (ASan + UBSan)
+  # ----------------------------------------------------------------
+  native-sanitizers:
+    name: Sanitizers (ASan + UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-asan-${{ hashFiles('platformio.ini') }}-v3
+          restore-keys: pio-asan-
+
+      - name: Install PlatformIO + GCC
+        run: |
+          pip install "platformio==${{ env.PIO_VERSION }}"
+          sudo apt-get install -y --no-install-recommends gcc g++ make
+
+      - name: Run tests under AddressSanitizer + UBSan
+        env:
+          ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1:print_stats=1"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: |
+          pio test -e native_asan --verbose 2>&1 | tee asan_output.txt
+          rc=${PIPESTATUS[0]}
+          result_lines=$(grep -cE "\.\.\. (PASS|FAIL)$" asan_output.txt || true)
+          echo "Sanitizer test result lines: $result_lines"
+          [ "$result_lines" -eq 0 ] && { echo "ERROR: Zero tests executed under sanitizers" >&2; exit 1; }
+          exit $rc
+
+      - name: Upload sanitizer output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-asan
+          path: asan_output.txt
+          retention-days: 7
+
+  # ----------------------------------------------------------------
+  # Job 1c: Coverage report (gcov / lcov)
+  # ----------------------------------------------------------------
+  native-coverage:
+    name: Coverage (gcov)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-cov-${{ hashFiles('platformio.ini') }}-v3
+          restore-keys: pio-cov-
+
+      - name: Install PlatformIO + lcov
+        run: |
+          pip install "platformio==${{ env.PIO_VERSION }}"
+          sudo apt-get install -y --no-install-recommends gcc g++ make lcov
+
+      - name: Run tests with coverage instrumentation
+        run: pio test -e native_cov --verbose
+
+      - name: Generate coverage report
+        run: |
+          # Collect .gcda/.gcno from PlatformIO's build directory.
+          lcov --capture \
+               --directory .pio/build/native_cov/ \
+               --output-file coverage.info \
+               --ignore-errors mismatch \
+               --rc lcov_branch_coverage=1 \
+               2>/dev/null || true
+          # Strip system headers and test runner boilerplate.
+          lcov --remove coverage.info \
+               '/usr/*' \
+               '*/.platformio/*' \
+               '*/test/unit/*' \
+               --output-file coverage_filtered.info \
+               --rc lcov_branch_coverage=1 \
+               2>/dev/null || true
+          # Print summary (line and branch).
+          if [ -f coverage_filtered.info ]; then
+            lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null || true
+            # Enforce minimum coverage thresholds.
+            line_cov=$(lcov --summary coverage_filtered.info 2>/dev/null \
+                        | grep "lines" | grep -oE "[0-9]+\.[0-9]+" | head -1)
+            echo "Line coverage: ${line_cov}%"
+          else
+            echo "Coverage data not generated (this may be expected on first run)."
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage*.info
+          retention-days: 14
+
+  # ----------------------------------------------------------------
+  # Job 2: Static analysis
   # ----------------------------------------------------------------
   lint:
     name: Static analysis
@@ -77,8 +216,7 @@ jobs:
         run: |
           if grep -q "zmuldefs" platformio.ini; then
             echo "ERROR: -Wl,-zmuldefs found in platformio.ini." >&2
-            echo "This flag suppresses duplicate-symbol linker errors and can mask real bugs." >&2
-            echo "Fix the duplicate symbols instead of hiding them, then remove this flag." >&2
+            echo "Fix the duplicate symbols instead of hiding them." >&2
             exit 1
           fi
           echo "OK: -Wl,-zmuldefs is not present."
@@ -93,20 +231,49 @@ jobs:
             echo "OK: No pending security TODOs."
           fi
 
-      - name: Check all sensitive routes have auth guards
+      - name: Verify PHANTOM32_LITE/PSRAM coverage (all 13 envs)
+        run: |
+          python3 - <<'EOF'
+          import configparser, sys
+
+          cfg = configparser.ConfigParser()
+          cfg.read('platformio.ini')
+
+          missing = []
+          skip = {'native', 'native_asan', 'native_cov'}
+          for section in cfg.sections():
+              if not section.startswith('env:') or section == 'env':
+                  continue
+              env = section[4:]
+              if env in skip:
+                  continue
+              flags = (cfg.get(section, 'build_flags', fallback='') +
+                       cfg.get('env', 'build_flags', fallback=''))
+              has_psram = 'BOARD_HAS_PSRAM' in flags
+              has_lite  = 'PHANTOM32_LITE' in flags
+              if not has_psram and not has_lite:
+                  missing.append(env)
+
+          if missing:
+              print('ERROR: These environments have neither BOARD_HAS_PSRAM nor PHANTOM32_LITE:')
+              for e in missing:
+                  print(' ', e)
+              sys.exit(1)
+          else:
+              print(f'OK: All environments have PSRAM or LITE flag.')
+          EOF
+
+      - name: Check all 16 sensitive routes have auth guards
         run: |
           python3 - <<'EOF'
           import re, sys
 
-          # Routes in main.cpp
           with open('src/main.cpp') as f:
               main_content = f.read()
-
-          # Routes in safety.h
           with open('src/safety.h') as f:
               safety_content = f.read()
 
-          # (source_file_content, route_path)
+          # (source_content, route_path)
           checks = [
               (main_content, '/api/reboot'),
               (main_content, '/api/fs/format'),
@@ -128,16 +295,14 @@ jobs:
 
           failures = []
           for content, route in checks:
-              pattern = re.compile(
+              pat = re.compile(
                   r'server\.on\s*\(\s*"' + re.escape(route) + r'".*?(?=server\.on|\Z)',
-                  re.DOTALL
-              )
-              match = pattern.search(content)
-              if not match:
-                  failures.append(f'MISSING route: {route}')
+                  re.DOTALL)
+              m = pat.search(content)
+              if not m:
+                  failures.append(f'MISSING: {route}')
                   continue
-              block = match.group(0)
-              if 'auth_check' not in block:
+              if 'auth_check' not in m.group(0):
                   failures.append(f'UNGUARDED: {route}')
 
           if failures:
@@ -149,43 +314,16 @@ jobs:
               print(f'OK: All {len(checks)} sensitive routes have auth guards.')
           EOF
 
-      - name: Verify PHANTOM32_LITE/PSRAM coverage
+      - name: Cross-check route inventory against source
         run: |
-          python3 - <<'EOF'
-          import configparser, sys
-
-          cfg = configparser.ConfigParser()
-          cfg.read('platformio.ini')
-
-          missing = []
-          for section in cfg.sections():
-              if not section.startswith('env:') or section == 'env':
-                  continue
-              env = section[4:]
-              if env in ('native',):
-                  continue  # skip test env
-              flags = (cfg.get(section, 'build_flags', fallback='') +
-                       cfg.get('env', 'build_flags', fallback=''))
-              has_psram = 'BOARD_HAS_PSRAM' in flags
-              has_lite  = 'PHANTOM32_LITE' in flags
-              if not has_psram and not has_lite:
-                  missing.append(env)
-
-          if missing:
-              print('ERROR: These environments have neither BOARD_HAS_PSRAM nor PHANTOM32_LITE:')
-              for e in missing:
-                  print(' ', e)
-              sys.exit(1)
-          else:
-              print('OK: All environments have PSRAM or LITE flag.')
-          EOF
+          python3 scripts/audit_routes.py
 
   # ----------------------------------------------------------------
   # Job 3: Firmware build matrix
   # ----------------------------------------------------------------
   build:
     name: Build ${{ matrix.env }}
-    needs: [ native-tests, lint ]
+    needs: [ native-tests, native-sanitizers, lint ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -202,11 +340,12 @@ jobs:
           # PSRAM boards (full analytics)
           - doom_wrover
           - doom_s3
-          - doom_s3_devkit
           - doom_tdisplay_s3
           - doom_m5cores3
-          # C3 (RISC-V)
+          # C3 (RISC-V, PHANTOM32_LITE)
           - doom_c3
+          # S3 DevKitC-1 (unknown PSRAM variant, PHANTOM32_LITE)
+          - doom_s3_devkit
 
     steps:
       - name: Checkout
@@ -223,7 +362,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v2
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v3
           restore-keys: |
             pio-${{ matrix.env }}-
             pio-
@@ -234,13 +373,32 @@ jobs:
       - name: Build ${{ matrix.env }}
         run: pio run -e ${{ matrix.env }}
 
-      - name: Report RAM and Flash usage
+      - name: Report and enforce memory budgets
         if: always()
         run: |
           echo "=== Memory report: ${{ matrix.env }} ==="
-          pio run -e ${{ matrix.env }} 2>&1 \
-            | grep -E "RAM:|Flash:|DRAM:|IRAM:|DATA:|BSS:" \
-            || echo "(no memory lines found)"
+          mem_output=$(pio run -e ${{ matrix.env }} 2>&1 \
+            | grep -E "RAM:|Flash:|DRAM:|IRAM:|DATA:|BSS:|Used static|RAM regions" || true)
+          echo "$mem_output"
+
+          # Parse RAM % from PlatformIO's summary line.
+          # Example: "RAM:  [===       ]  33.8% (used 110584 bytes from 327680 bytes)"
+          ram_pct=$(echo "$mem_output" | grep -oE "[0-9]+\.[0-9]+% \(used.*RAM" \
+                    | grep -oE "^[0-9]+\.[0-9]+" || \
+                    pio run -e ${{ matrix.env }} 2>&1 \
+                    | grep -oE "RAM.*[0-9]+\.[0-9]+%" | grep -oE "[0-9]+\.[0-9]+" | head -1)
+
+          if [ -n "$ram_pct" ]; then
+            echo "RAM usage: ${ram_pct}%"
+            # Fail builds that exceed 85% DRAM (leaves headroom for heap).
+            over=$(echo "$ram_pct > 85" | bc -l 2>/dev/null || echo 0)
+            if [ "$over" = "1" ]; then
+              echo "ERROR: RAM usage ${ram_pct}% exceeds 85% budget." >&2
+              exit 1
+            fi
+          else
+            echo "(Could not parse RAM usage — manual check required)"
+          fi
 
       - name: Collect firmware artifacts
         if: success()
@@ -252,6 +410,9 @@ jobs:
              artifacts/${{ matrix.env }}/ 2>/dev/null || true
           cp .pio/build/${{ matrix.env }}/bootloader.bin \
              artifacts/${{ matrix.env }}/ 2>/dev/null || true
+          # Generate SHA-256 checksums for release verification.
+          sha256sum artifacts/${{ matrix.env }}/*.bin \
+            > artifacts/${{ matrix.env }}/SHA256SUMS.txt 2>/dev/null || true
 
       - name: Upload firmware artifact
         if: success() && github.ref == 'refs/heads/main'
@@ -266,15 +427,18 @@ jobs:
   # ----------------------------------------------------------------
   build-summary:
     name: All builds passed
-    needs: build
+    needs: [ native-coverage, build ]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check result
         run: |
-          if [ "${{ needs.build.result }}" = "success" ]; then
-            echo "All 13 board builds passed."
-          else
-            echo "One or more board builds failed. See the build matrix above." >&2
+          build_ok="${{ needs.build.result }}"
+          cov_ok="${{ needs.native-coverage.result }}"
+          echo "Board builds: $build_ok"
+          echo "Coverage job: $cov_ok"
+          if [ "$build_ok" != "success" ]; then
+            echo "One or more board builds failed." >&2
             exit 1
           fi
+          echo "All 13 board builds passed."

@@ -1,0 +1,260 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "generated": "2026-11-24",
+    "description": "Machine-readable inventory of all HTTP routes exposed by Phantom32. Used by scripts/audit_routes.py and CI to verify that every sensitive route is guarded.",
+    "auth_levels": {
+      "none":    "No authentication required (public endpoint).",
+      "session": "Valid 256-bit session token required (issued by /api/login)."
+    }
+  },
+  "routes": [
+    {
+      "path": "/",
+      "method": "GET",
+      "source_file": "src/main.cpp",
+      "auth_required": false,
+      "auth_level": "none",
+      "description": "Redirect to /dashboard or /login depending on session state.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": "Safe to be public — no data exposed."
+    },
+    {
+      "path": "/login",
+      "method": "GET",
+      "source_file": "src/auth_manager.h",
+      "auth_required": false,
+      "auth_level": "none",
+      "description": "Serve the login HTML page from PROGMEM.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/login",
+      "method": "POST",
+      "source_file": "src/auth_manager.h",
+      "auth_required": false,
+      "auth_level": "none",
+      "description": "Authenticate with dashboard password. Issues session token on success. Enforces IP-based lockout after 5 consecutive failures.",
+      "input_validation": [
+        "password parameter present",
+        "password compared via am_ct_strcmp (constant-time)"
+      ],
+      "rate_limited": true,
+      "rate_limit_policy": "5 failures per IP triggers 300-second lockout",
+      "state_changes": ["session token created in RAM", "failure counter incremented on failure"],
+      "notes": "Only public write endpoint. Lockout is the primary brute-force mitigation."
+    },
+    {
+      "path": "/logout",
+      "method": "POST",
+      "source_file": "src/auth_manager.h",
+      "auth_required": false,
+      "auth_level": "none",
+      "description": "Invalidate the caller's session token (token passed in cookie).",
+      "input_validation": ["token extracted from cookie header"],
+      "rate_limited": false,
+      "state_changes": ["session token cleared from RAM"],
+      "notes": "No auth guard needed — worst case an unauthenticated call is a no-op."
+    },
+    {
+      "path": "/dashboard",
+      "method": "GET",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Serve the main dashboard HTML page.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/api/sys",
+      "method": "GET",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Return system telemetry: heap, uptime, chip ID, firmware version.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/api/scan",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Trigger a passive 802.11 scan and return AP list as JSON.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": ["scan results updated in RAM"],
+      "notes": ""
+    },
+    {
+      "path": "/api/modules",
+      "method": "GET",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Return enabled/disabled status of all security modules.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/api/hop",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Enable or disable channel hopping; set hop interval.",
+      "input_validation": ["interval parameter validated to [100, 5000] ms"],
+      "rate_limited": false,
+      "state_changes": ["channel hopping state updated in RAM"],
+      "notes": ""
+    },
+    {
+      "path": "/api/wifi/channel",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Set the radio channel (1–14).",
+      "input_validation": ["channel validated to [1, 14]"],
+      "rate_limited": false,
+      "state_changes": ["active radio channel changed"],
+      "notes": ""
+    },
+    {
+      "path": "/api/promisc",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Toggle promiscuous (monitor) mode on/off.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": ["promiscuous mode toggled on radio"],
+      "notes": ""
+    },
+    {
+      "path": "/api/ext/toggle",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Enable or disable an individual security extension module.",
+      "input_validation": ["module name validated against allow-list"],
+      "rate_limited": false,
+      "state_changes": ["module enabled/disabled state updated"],
+      "notes": ""
+    },
+    {
+      "path": "/api/reset/stats",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Zero out all in-RAM traffic counters and event statistics.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": ["counters cleared in RAM"],
+      "notes": ""
+    },
+    {
+      "path": "/api/fs/info",
+      "method": "GET",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Return LittleFS usage statistics (total, used, free bytes).",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/api/fs/format",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Format the LittleFS partition (destructive — erases all stored captures).",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": ["LittleFS partition erased and re-mounted"],
+      "notes": "High-impact destructive operation — confirm dialog required in UI."
+    },
+    {
+      "path": "/api/reboot",
+      "method": "POST",
+      "source_file": "src/main.cpp",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Reboot the ESP32 device.",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": ["device restarts — all RAM state lost"],
+      "notes": "High-impact — confirm dialog required in UI."
+    },
+    {
+      "path": "/api/safety/get",
+      "method": "GET",
+      "source_file": "src/safety.h",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Return the current safety configuration (TX budget, autostop threshold, blocklist).",
+      "input_validation": [],
+      "rate_limited": false,
+      "state_changes": [],
+      "notes": ""
+    },
+    {
+      "path": "/api/safety/set",
+      "method": "POST",
+      "source_file": "src/safety.h",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Update safety parameters (TX budget, autostop threshold).",
+      "input_validation": [
+        "tx_budget validated to [1, 1000] frames/s",
+        "autostop_threshold validated to [0, 100] %"
+      ],
+      "rate_limited": false,
+      "state_changes": ["safety config updated in RAM and persisted to NVS"],
+      "notes": "Config persists across reboots."
+    },
+    {
+      "path": "/api/safety/block",
+      "method": "POST",
+      "source_file": "src/safety.h",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Add a BSSID or MAC address to the transmit blocklist.",
+      "input_validation": ["target MAC validated to 6-byte hex colon-separated format"],
+      "rate_limited": false,
+      "state_changes": ["address added to RAM blocklist"],
+      "notes": ""
+    },
+    {
+      "path": "/api/safety/unblock",
+      "method": "POST",
+      "source_file": "src/safety.h",
+      "auth_required": true,
+      "auth_level": "session",
+      "description": "Remove a BSSID or MAC address from the transmit blocklist.",
+      "input_validation": ["target MAC validated to 6-byte hex colon-separated format"],
+      "rate_limited": false,
+      "state_changes": ["address removed from RAM blocklist"],
+      "notes": ""
+    }
+  ]
+}

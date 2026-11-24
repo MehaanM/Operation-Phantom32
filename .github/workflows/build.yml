@@ -3,12 +3,6 @@ name: Phantom32 CI
 on:
   push:
     branches: [ main, develop, "release/**" ]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'platformio.ini'
-      - 'partitions*.csv'
-      - '.github/workflows/build.yml'
   pull_request:
     branches: [ main ]
 

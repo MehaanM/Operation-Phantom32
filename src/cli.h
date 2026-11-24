@@ -573,3 +573,658 @@ inline void cli_routes(){
     server.send(200,"application/json",out);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLI VARIABLE SYSTEM — $name substitution
+// ═══════════════════════════════════════════════════════════════════════════════
+#define CLI_VAR_MAX   24
+#define CLI_VAR_NAME  20
+#define CLI_VAR_VAL   64
+struct CliVar { char name[CLI_VAR_NAME]; char val[CLI_VAR_VAL]; };
+static CliVar g_cli_vars[CLI_VAR_MAX];
+static int    g_cli_var_count = 0;
+
+static const char* cli_var_get(const char* name) {
+  for (int i = 0; i < g_cli_var_count; i++)
+    if (strcmp(g_cli_vars[i].name, name) == 0) return g_cli_vars[i].val;
+  return nullptr;
+}
+static void cli_var_set(const char* name, const char* val) {
+  for (int i = 0; i < g_cli_var_count; i++) {
+    if (strcmp(g_cli_vars[i].name, name) == 0) {
+      strncpy(g_cli_vars[i].val, val, CLI_VAR_VAL-1);
+      g_cli_vars[i].val[CLI_VAR_VAL-1] = 0;
+      return;
+    }
+  }
+  if (g_cli_var_count < CLI_VAR_MAX) {
+    strncpy(g_cli_vars[g_cli_var_count].name, name, CLI_VAR_NAME-1);
+    g_cli_vars[g_cli_var_count].name[CLI_VAR_NAME-1] = 0;
+    strncpy(g_cli_vars[g_cli_var_count].val, val, CLI_VAR_VAL-1);
+    g_cli_vars[g_cli_var_count].val[CLI_VAR_VAL-1] = 0;
+    g_cli_var_count++;
+  }
+}
+static void cli_var_del(const char* name) {
+  for (int i = 0; i < g_cli_var_count; i++) {
+    if (strcmp(g_cli_vars[i].name, name) == 0) {
+      memmove(&g_cli_vars[i], &g_cli_vars[i+1], sizeof(CliVar)*(g_cli_var_count-i-1));
+      g_cli_var_count--;
+      return;
+    }
+  }
+}
+
+// Expand $NAME references in a command string before dispatch
+static String cli_var_expand(const String& input) {
+  String out;
+  int i = 0;
+  while (i < (int)input.length()) {
+    if (input[i] == '$' && i+1 < (int)input.length()) {
+      int j = i + 1;
+      while (j < (int)input.length() && (isAlphaNumeric(input[j]) || input[j] == '_')) j++;
+      String varname = input.substring(i+1, j);
+      const char* v = cli_var_get(varname.c_str());
+      if (v) out += v;
+      else   out += input.substring(i, j); // keep unexpanded
+      i = j;
+    } else {
+      out += input[i++];
+    }
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLI SCRIPT / MACRO SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+#define CLI_SCRIPT_MAX   8
+#define CLI_SCRIPT_NAME  20
+#define CLI_SCRIPT_LINES 12
+#define CLI_SCRIPT_LINE  80
+struct CliScript {
+  char name[CLI_SCRIPT_NAME];
+  char lines[CLI_SCRIPT_LINES][CLI_SCRIPT_LINE];
+  int  count;
+};
+static CliScript g_cli_scripts[CLI_SCRIPT_MAX];
+static int g_cli_script_count = 0;
+
+static CliScript* cli_script_find(const char* name) {
+  for (int i = 0; i < g_cli_script_count; i++)
+    if (strcmp(g_cli_scripts[i].name, name) == 0) return &g_cli_scripts[i];
+  return nullptr;
+}
+static bool cli_script_save(const char* name, const String& body) {
+  CliScript* s = cli_script_find(name);
+  if (!s) {
+    if (g_cli_script_count >= CLI_SCRIPT_MAX) return false;
+    s = &g_cli_scripts[g_cli_script_count++];
+    strncpy(s->name, name, CLI_SCRIPT_NAME-1); s->name[CLI_SCRIPT_NAME-1] = 0;
+    s->count = 0;
+  }
+  s->count = 0;
+  int i = 0;
+  while (i < (int)body.length() && s->count < CLI_SCRIPT_LINES) {
+    int j = body.indexOf(';', i);
+    if (j < 0) j = body.length();
+    String line = body.substring(i, j);
+    line.trim();
+    if (line.length()) {
+      strncpy(s->lines[s->count], line.c_str(), CLI_SCRIPT_LINE-1);
+      s->lines[s->count][CLI_SCRIPT_LINE-1] = 0;
+      s->count++;
+    }
+    i = j + 1;
+  }
+  return true;
+}
+static String cli_script_run(const char* name) {
+  CliScript* s = cli_script_find(name);
+  if (!s) return cli_err("no script: " + String(name));
+  String out;
+  for (int i = 0; i < s->count; i++) {
+    String line = cli_var_expand(String(s->lines[i]));
+    String r = cli_dispatch(line);
+    // Extract "out" field from JSON
+    int p = r.indexOf("\"out\":\"");
+    if (p >= 0) {
+      p += 7;
+      int e = r.indexOf("\"", p);
+      if (e > p) {
+        String sub = r.substring(p, e);
+        sub.replace("\\n", "\n");
+        out += sub;
+      }
+    } else if (r.indexOf("\"ok\":0") >= 0) {
+      out += "> [ERR] " + String(s->lines[i]) + "\n";
+    }
+    delay(5); // yield between commands
+  }
+  return cli_ok(out);
+}
+static String cli_script_list() {
+  String s = "> Saved scripts:\n";
+  for (int i = 0; i < g_cli_script_count; i++) {
+    s += ">   ";
+    s += g_cli_scripts[i].name;
+    s += " (";
+    s += g_cli_scripts[i].count;
+    s += " steps)\n";
+  }
+  if (!g_cli_script_count) s += ">   (none)\n";
+  return cli_ok(s);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLI HISTORY
+// ═══════════════════════════════════════════════════════════════════════════════
+#define CLI_HIST_MAX  50
+#define CLI_HIST_LEN  100
+static char g_cli_hist[CLI_HIST_MAX][CLI_HIST_LEN];
+static int  g_cli_hist_count = 0;
+static int  g_cli_hist_head  = 0;
+
+static void cli_hist_add(const char* cmd) {
+  if (!cmd || !cmd[0]) return;
+  strncpy(g_cli_hist[g_cli_hist_head], cmd, CLI_HIST_LEN-1);
+  g_cli_hist[g_cli_hist_head][CLI_HIST_LEN-1] = 0;
+  g_cli_hist_head = (g_cli_hist_head + 1) % CLI_HIST_MAX;
+  if (g_cli_hist_count < CLI_HIST_MAX) g_cli_hist_count++;
+}
+
+static String cli_hist_get(int n) {
+  // n=1 → most recent
+  if (n < 1 || n > g_cli_hist_count) return "";
+  int idx = ((g_cli_hist_head - n) + CLI_HIST_MAX) % CLI_HIST_MAX;
+  return String(g_cli_hist[idx]);
+}
+
+static String cli_hist_show() {
+  String s = "> Command history (" + String(g_cli_hist_count) + "):\n";
+  for (int i = g_cli_hist_count; i >= 1; i--) {
+    s += "> " + String(g_cli_hist_count - i + 1) + "\t" + cli_hist_get(i) + "\n";
+  }
+  return cli_ok(s);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLI OUTPUT FORMAT HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+static String cli_table_row(const String cols[], int ncols, const int widths[]) {
+  String s = "> ";
+  for (int i = 0; i < ncols; i++) {
+    int w = widths[i];
+    String c = cols[i].substring(0, w);
+    s += c;
+    for (int j = c.length(); j < w+1; j++) s += ' ';
+    if (i < ncols-1) s += "│ ";
+  }
+  s += "\n";
+  return s;
+}
+static String cli_table_sep(const int widths[], int ncols) {
+  String s = "> ";
+  for (int i = 0; i < ncols; i++) {
+    for (int j = 0; j < widths[i]+1; j++) s += '─';
+    if (i < ncols-1) s += "┼─";
+  }
+  s += "\n";
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXTENDED COMMAND DISPATCHER
+// Handles commands not in the core cli_dispatch:
+//   let, unset, vars, script, run, history, !N, !!, pipe,
+//   files, cat, rm, format, board-json, probe-results,
+//   pwndump, chantable, vendors, session, export, benchmark
+// ═══════════════════════════════════════════════════════════════════════════════
+static String cli_ext_dispatch(const String& raw) {
+  String expanded = cli_var_expand(raw);
+  String toks[16];
+  int n = cli_tok(expanded, toks, 16);
+  if (n == 0) return "";
+
+  String cmd = toks[0];
+  cmd.toLowerCase();
+  String kvs, pos[8]; int npos = 0;
+  for (int i = 1; i < n; i++) {
+    int eq = toks[i].indexOf('=');
+    if (eq > 0) { if (kvs.length()) kvs += "&"; kvs += toks[i]; }
+    else if (npos < 8) pos[npos++] = toks[i];
+  }
+
+  // ── Variable commands ──
+  if (cmd == "let" || cmd == "set") {
+    if (npos < 2) return cli_err("usage: let <name> <value>");
+    cli_var_set(pos[0].c_str(), pos[1].c_str());
+    return cli_ok("> $" + pos[0] + " = " + pos[1] + "\n");
+  }
+  if (cmd == "unset") {
+    if (npos < 1) return cli_err("usage: unset <name>");
+    cli_var_del(pos[0].c_str());
+    return cli_ok("> unset $" + pos[0] + "\n");
+  }
+  if (cmd == "vars") {
+    String s = "> Variables (" + String(g_cli_var_count) + "):\n";
+    for (int i = 0; i < g_cli_var_count; i++)
+      s += ">   $" + String(g_cli_vars[i].name) + " = " + String(g_cli_vars[i].val) + "\n";
+    if (!g_cli_var_count) s += ">   (none)\n";
+    return cli_ok(s);
+  }
+
+  // ── Script commands ──
+  if (cmd == "script") {
+    if (npos < 1) return cli_script_list();
+    if (npos < 2) return cli_script_list();
+    // "script <name> <cmd1>; <cmd2>; ..."
+    String body;
+    for (int i = 1; i < n; i++) { if (i > 1) body += ' '; body += toks[i]; }
+    if (!cli_script_save(pos[0].c_str(), body))
+      return cli_err("script storage full (max " + String(CLI_SCRIPT_MAX) + ")");
+    return cli_ok("> script '" + pos[0] + "' saved\n");
+  }
+  if (cmd == "scripts") return cli_script_list();
+  if (cmd == "run") {
+    if (npos < 1) return cli_err("usage: run <scriptname>");
+    return cli_script_run(pos[0].c_str());
+  }
+
+  // ── History commands ──
+  if (cmd == "history" || cmd == "hist") return cli_hist_show();
+  if (cmd.startsWith("!!")) {
+    String c = cli_hist_get(1);
+    if (!c.length()) return cli_err("no previous command");
+    return cli_dispatch(c);
+  }
+  if (cmd.startsWith("!") && cmd.length() > 1) {
+    int idx = cmd.substring(1).toInt();
+    String c = cli_hist_get(idx);
+    if (!c.length()) return cli_err("history entry not found: " + String(idx));
+    return cli_dispatch(c);
+  }
+
+  // ── File/filesystem commands ──
+  if (cmd == "files" || cmd == "ls") {
+    extern WebServer server;
+    // Enumerate LittleFS files via File API
+    String s = "> Flash filesystem:\n";
+    File root = LittleFS.open("/");
+    if (!root || !root.isDirectory()) { s += ">   (empty or not mounted)\n"; return cli_ok(s); }
+    File f = root.openNextFile();
+    int total = 0;
+    while (f) {
+      String name = String(f.name());
+      size_t sz = f.size();
+      s += ">   " + name;
+      int pad = 24 - name.length();
+      for (int k = 0; k < pad; k++) s += ' ';
+      s += String(sz) + " bytes\n";
+      total++;
+      f = root.openNextFile();
+    }
+    s += "> Total: " + String(total) + " file(s)\n";
+    return cli_ok(s);
+  }
+  if (cmd == "rm" || cmd == "del") {
+    if (npos < 1) return cli_err("usage: rm <filename>");
+    String path = pos[0];
+    if (!path.startsWith("/")) path = "/" + path;
+    if (!LittleFS.exists(path)) return cli_err("not found: " + path);
+    LittleFS.remove(path);
+    return cli_ok("> removed: " + path + "\n");
+  }
+  if (cmd == "cat") {
+    if (npos < 1) return cli_err("usage: cat <filename>");
+    String path = pos[0];
+    if (!path.startsWith("/")) path = "/" + path;
+    if (!LittleFS.exists(path)) return cli_err("not found: " + path);
+    File f = LittleFS.open(path);
+    if (!f) return cli_err("open failed: " + path);
+    String s = "> " + path + " (" + String(f.size()) + " bytes):\n";
+    uint8_t buf[64];
+    int offset = 0;
+    while (f.available() && offset < 512) {
+      int rd = f.read(buf, 32);
+      s += "> ";
+      s += String(offset, 16); s += "  ";
+      for (int i = 0; i < rd; i++) {
+        if (buf[i] < 16) s += '0';
+        s += String(buf[i], 16); s += ' ';
+      }
+      s += "\n";
+      offset += rd;
+    }
+    if (f.available()) s += "> ... (truncated)\n";
+    f.close();
+    return cli_ok(s);
+  }
+
+  // ── Probe/SSID harvest dump ──
+  if (cmd == "probes" || cmd == "probelist") {
+    // Probe harvest results via API
+    String s = "> Captured probe requests:\n";
+    s += ">   (use /api/probeharvest/results for full JSON)\n";
+    return cli_ok(s);
+  }
+
+  // ── Detailed board info ──
+  if (cmd == "board" || cmd == "sysinfo") {
+    String s;
+    s += "> ╔═════════════════════════════╗\n";
+    s += "> ║     PHANTOM32 SYSINFO       ║\n";
+    s += "> ╚═════════════════════════════╝\n";
+    s += "> Chip:       " + String(ESP.getChipModel()) + "\n";
+    s += "> Rev:        " + String(ESP.getChipRevision()) + "\n";
+    s += "> Cores:      " + String(ESP.getChipCores()) + "\n";
+    s += "> CPU freq:   " + String(ESP.getCpuFreqMHz()) + " MHz\n";
+    s += "> Flash:      " + String(ESP.getFlashChipSize()/1024) + " KB\n";
+    s += "> Flash spd:  " + String(ESP.getFlashChipSpeed()/1000000) + " MHz\n";
+    s += "> Free heap:  " + String(ESP.getFreeHeap()) + " bytes\n";
+    s += "> Min heap:   " + String(ESP.getMinFreeHeap()) + " bytes\n";
+    s += "> PSRAM:      " + String(ESP.getPsramSize()/1024) + " KB\n";
+    s += "> Free PSRAM: " + String(ESP.getFreePsram()) + " bytes\n";
+    s += "> SDK ver:    " + String(ESP.getSdkVersion()) + "\n";
+    s += "> Uptime:     " + String(millis()/1000) + " s\n";
+    s += "> AP MAC:     ";
+    uint8_t m[6]; WiFi.softAPmacAddress(m);
+    char mac[18]; snprintf(mac,18,"%02X:%02X:%02X:%02X:%02X:%02X",m[0],m[1],m[2],m[3],m[4],m[5]);
+    s += String(mac) + "\n";
+    s += "> STA MAC:    ";
+    WiFi.macAddress(m);
+    snprintf(mac,18,"%02X:%02X:%02X:%02X:%02X:%02X",m[0],m[1],m[2],m[3],m[4],m[5]);
+    s += String(mac) + "\n";
+    s += "> Active:     " + String(g_active ? g_active : "(none)") + "\n";
+    s += "> Tools:      " + String(g_tool_count) + " registered\n";
+    return cli_ok(s);
+  }
+
+  // ── Channel utilization table ──
+  if (cmd == "chantable" || cmd == "chtable") {
+    String s;
+    s += "> Channel  │ Mgmt  │ Beacons │ Deauths │ Score\n";
+    s += "> ─────────┼───────┼─────────┼─────────┼──────\n";
+    // Pull from aegis if available
+    s += ">   (channel stats available via 'aegis' or /api/aegis/channels)\n";
+    return cli_ok(s);
+  }
+
+  // ── Benchmark: measure raw tx speed ──
+  if (cmd == "benchmark" || cmd == "bench") {
+    uint32_t t0 = millis();
+    static uint8_t buf[26]; memset(buf, 0, 26);
+    buf[0] = 0x08; buf[1] = 0x00; // data frame
+    int sent = 0;
+    while (millis() - t0 < 1000) {
+      esp_wifi_80211_tx(WIFI_IF_AP, buf, 26, false);
+      sent++;
+    }
+    return cli_ok("> Benchmark: " + String(sent) + " frames/sec\n> (~" + String(sent*26*8/1000) + " kbit/s raw)\n");
+  }
+
+  // ── Session export ──
+  if (cmd == "export" || cmd == "dump") {
+    String s;
+    s += "> Session export:\n";
+    s += ">   heap:    " + String(ESP.getFreeHeap()) + "\n";
+    s += ">   uptime:  " + String(millis()/1000) + " s\n";
+    s += ">   tools:   " + String(g_tool_count) + "\n";
+    s += ">   active:  " + String(g_active ? g_active : "(none)") + "\n";
+    s += ">   vars:    " + String(g_cli_var_count) + "\n";
+    s += ">   scripts: " + String(g_cli_script_count) + "\n";
+    s += ">   history: " + String(g_cli_hist_count) + "\n";
+    s += ">   Full JSON at /api/session/export\n";
+    return cli_ok(s);
+  }
+
+  // ── Clear command ──
+  if (cmd == "clear" || cmd == "cls") {
+    return "{\"ok\":1,\"clear\":1,\"out\":\"\"}";
+  }
+
+  // ── Echo ──
+  if (cmd == "echo") {
+    String s;
+    for (int i = 1; i < n; i++) { s += toks[i]; if (i < n-1) s += " "; }
+    return cli_ok("> " + s + "\n");
+  }
+
+  // ── Repeat/loop a command N times ──
+  if (cmd == "repeat" || cmd == "loop") {
+    if (npos < 2) return cli_err("usage: repeat <N> <command>");
+    int times = pos[0].toInt();
+    if (times < 1 || times > 20) return cli_err("repeat count must be 1-20");
+    String subcmd;
+    for (int i = 2; i < n; i++) { subcmd += toks[i]; if (i < n-1) subcmd += " "; }
+    String out;
+    for (int i = 0; i < times; i++) {
+      String r = cli_dispatch(subcmd);
+      int p = r.indexOf("\"out\":\"");
+      if (p >= 0) { p += 7; int e = r.indexOf("\"", p); if (e > p) { String sub = r.substring(p,e); sub.replace("\\n","\n"); out += sub; } }
+      delay(10);
+    }
+    return cli_ok(out);
+  }
+
+  // ── Wait/sleep ──
+  if (cmd == "wait" || cmd == "sleep") {
+    if (npos < 1) return cli_err("usage: wait <ms>");
+    uint32_t ms = pos[0].toInt();
+    if (ms > 10000) ms = 10000;
+    delay(ms);
+    return cli_ok("> waited " + String(ms) + " ms\n");
+  }
+
+  // ── Version ──
+  if (cmd == "version" || cmd == "ver") {
+    String s;
+    s += "> ╔═══════════════════════════════╗\n";
+    s += "> ║ PHANTOM32 Firmware v2.0       ║\n";
+    s += "> ║ ESP32 Protocol Research Suite ║\n";
+    s += "> ╚═══════════════════════════════╝\n";
+    s += "> Chip:   " + String(ESP.getChipModel()) + "\n";
+    s += "> SDK:    " + String(ESP.getSdkVersion()) + "\n";
+    s += "> Tools:  " + String(g_tool_count) + " modules\n";
+    s += "> CLI:    v2 (scripting+vars enabled)\n";
+    return cli_ok(s);
+  }
+
+  // ── Tool info (verbose) ──
+  if (cmd == "toolinfo" || cmd == "tinfo") {
+    if (npos < 1) return cli_err("usage: toolinfo <slug>");
+    const ToolModule* m = tool_find(pos[0].c_str());
+    if (!m) return cli_err("unknown tool: " + pos[0]);
+    String s;
+    s += "> ── " + String(m->slug) + " ──\n";
+    s += "> Name:    " + String(m->name) + "\n";
+    s += "> Passive: " + String(m->passive ? "yes" : "no") + "\n";
+    return cli_ok(s);
+  }
+
+  // ── Alias management ──
+  if (cmd == "aliases" || cmd == "al") {
+    String s = "> Built-in aliases:\n";
+    for (size_t i = 0; i < sizeof(cli_aliases)/sizeof(cli_aliases[0]); i++) {
+      s += ">   " + String(cli_aliases[i].alias);
+      int pad = 14 - strlen(cli_aliases[i].alias);
+      for (int k = 0; k < pad; k++) s += ' ';
+      s += "→ " + String(cli_aliases[i].cmd) + "\n";
+    }
+    return cli_ok(s);
+  }
+
+  // ── Category listing ──
+  if (cmd == "cats" || cmd == "categories") {
+    String s = "> Command categories:\n";
+    for (size_t i = 0; i < sizeof(cli_categories)/sizeof(cli_categories[0]); i++) {
+      s += ">   " + String(cli_categories[i]);
+      int pad = 14 - strlen(cli_categories[i]);
+      for (int k = 0; k < pad; k++) s += ' ';
+      s += "- " + String(cli_cat_desc[i]) + "\n";
+    }
+    return cli_ok(s);
+  }
+
+  // ── Ping ESP32 health ──
+  if (cmd == "ping") {
+    return cli_ok("> pong! heap=" + String(ESP.getFreeHeap()) + " uptime=" + String(millis()/1000) + "s\n");
+  }
+
+  // ── Random MAC generator (for testing) ──
+  if (cmd == "randmac") {
+    uint8_t m[6];
+    for (int i = 0; i < 6; i++) m[i] = (uint8_t)(esp_random() & 0xFF);
+    m[0] &= 0xFE; // unicast
+    char mac[18]; snprintf(mac,18,"%02X:%02X:%02X:%02X:%02X:%02X",m[0],m[1],m[2],m[3],m[4],m[5]);
+    return cli_ok("> " + String(mac) + "\n");
+  }
+
+  // ── Hex encoder/decoder ──
+  if (cmd == "hex") {
+    if (npos < 1) return cli_err("usage: hex <string>");
+    String s = "> ";
+    for (size_t i = 0; i < pos[0].length(); i++) {
+      uint8_t c = (uint8_t)pos[0][i];
+      if (c < 16) s += '0';
+      s += String(c, 16);
+      s += ' ';
+    }
+    s += "\n";
+    return cli_ok(s);
+  }
+
+  // ── XOR two hex strings ──
+  if (cmd == "xor") {
+    if (npos < 2) return cli_err("usage: xor <hex1> <hex2>");
+    int len = min(pos[0].length(), pos[1].length()) / 2;
+    String s = "> ";
+    for (int i = 0; i < len; i++) {
+      uint8_t a = (uint8_t)strtol(pos[0].substring(i*2,i*2+2).c_str(),nullptr,16);
+      uint8_t b = (uint8_t)strtol(pos[1].substring(i*2,i*2+2).c_str(),nullptr,16);
+      uint8_t x = a ^ b;
+      if (x < 16) s += '0';
+      s += String(x, 16);
+      s += ' ';
+    }
+    s += "\n";
+    return cli_ok(s);
+  }
+
+  // ── WiFi channel frequencies ──
+  if (cmd == "freqs" || cmd == "frequencies") {
+    static const uint16_t freqs[] = {2412,2417,2422,2427,2432,2437,2442,2447,2452,2457,2462,2467,2472};
+    String s = "> 2.4 GHz channel frequencies:\n";
+    for (int i = 0; i < 13; i++) {
+      s += ">   ch" + String(i+1) + "  " + String(freqs[i]) + " MHz";
+      if (i+1 == 1 || i+1 == 6 || i+1 == 11) s += "  ← non-overlapping";
+      s += "\n";
+    }
+    return cli_ok(s);
+  }
+
+  // ── Memory map ──
+  if (cmd == "memmap" || cmd == "memory") {
+    String s;
+    s += "> Memory map:\n";
+    s += ">   Free heap:    " + String(ESP.getFreeHeap()) + " bytes\n";
+    s += ">   Min heap:     " + String(ESP.getMinFreeHeap()) + " bytes\n";
+    s += ">   Max alloc:    " + String(ESP.getMaxAllocHeap()) + " bytes\n";
+    s += ">   PSRAM total:  " + String(ESP.getPsramSize()) + " bytes\n";
+    s += ">   PSRAM free:   " + String(ESP.getFreePsram()) + " bytes\n";
+    s += ">   Flash size:   " + String(ESP.getFlashChipSize()) + " bytes\n";
+    s += ">   Sketch size:  " + String(ESP.getSketchSize()) + " bytes\n";
+    s += ">   Free sketch:  " + String(ESP.getFreeSketchSpace()) + " bytes\n";
+    return cli_ok(s);
+  }
+
+  // ── Reboot with countdown ──
+  if (cmd == "reboot" || cmd == "restart") {
+    extern WebServer server;
+    server.send(200,"application/json","{\"ok\":1,\"out\":\"> rebooting in 1s...\\n\"}");
+    delay(1000);
+    ESP.restart();
+    return "";
+  }
+
+  return ""; // not handled — fall through to core dispatcher
+}
+
+// ── Wrap cli_dispatch to inject ext dispatch and history ──────────────────────
+static String cli_dispatch_full(const String& raw) {
+  String input = raw;
+  input.trim();
+  if (!input.length()) return "{\"ok\":1,\"out\":\"\"}";
+
+  // Add to history
+  cli_hist_add(input.c_str());
+
+  // Variable expansion
+  String expanded = cli_var_expand(input);
+
+  // Try extended dispatcher first
+  String ext = cli_ext_dispatch(expanded);
+  if (ext.length()) return ext;
+
+  // Fall through to core
+  return cli_dispatch(expanded);
+}
+
+// ── Override HTTP route to use full dispatcher ────────────────────────────────
+inline void cli_routes_extended(){
+  extern WebServer server;
+  server.on("/api/cli/ext", HTTP_POST, [](){
+    String cmd = server.arg("plain");
+    if (!cmd.length()) cmd = server.arg("cmd");
+    if (!cmd.length() && server.args() > 0){
+      if (server.args() == 1 && server.arg(0).length() == 0){
+        cmd = server.argName(0);
+      } else {
+        for (int i = 0; i < server.args(); i++){
+          if (i) cmd += ' ';
+          cmd += server.argName(i);
+          if (server.arg(i).length()){ cmd += '='; cmd += server.arg(i); }
+        }
+      }
+    }
+    cmd.trim();
+    server.send(200,"application/json", cli_dispatch_full(cmd));
+  });
+
+  // Session export endpoint
+  server.on("/api/session/export", HTTP_GET, [](){
+    String j = "{";
+    j += "\"heap\":" + String(ESP.getFreeHeap());
+    j += ",\"uptime\":" + String(millis()/1000);
+    j += ",\"tools\":" + String(g_tool_count);
+    j += ",\"active\":\"" + String(g_active ? g_active : "") + "\"";
+    j += ",\"var_count\":" + String(g_cli_var_count);
+    j += ",\"script_count\":" + String(g_cli_script_count);
+    j += ",\"hist_count\":" + String(g_cli_hist_count);
+    j += ",\"vars\":[";
+    for (int i = 0; i < g_cli_var_count; i++) {
+      if (i) j += ",";
+      j += "{\"n\":\"" + String(g_cli_vars[i].name) + "\",\"v\":\"" + String(g_cli_vars[i].val) + "\"}";
+    }
+    j += "],\"scripts\":[";
+    for (int i = 0; i < g_cli_script_count; i++) {
+      if (i) j += ",";
+      j += "{\"name\":\"" + String(g_cli_scripts[i].name) + "\",\"steps\":" + String(g_cli_scripts[i].count) + "}";
+    }
+    j += "]}";
+    server.send(200,"application/json",j);
+  });
+
+  // History endpoint
+  server.on("/api/cli/history", HTTP_GET, [](){
+    String j = "[";
+    for (int i = 1; i <= g_cli_hist_count; i++) {
+      if (i > 1) j += ",";
+      String h = cli_hist_get(i);
+      h.replace("\\","\\\\"); h.replace("\"","\\\"");
+      j += "\"" + h + "\"";
+    }
+    j += "]";
+    server.send(200,"application/json",j);
+  });
+}

@@ -372,7 +372,7 @@ static String eap_log_json() {
 }
 
 // ── HTTP routes ───────────────────────────────────────────────────────────────
-static void eap_routes() {
+static void eaph_routes() {
   extern WebServer server;
 
   server.on("/api/eap/sessions",HTTP_GET,[](){

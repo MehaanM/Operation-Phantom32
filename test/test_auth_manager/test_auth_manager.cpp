@@ -44,7 +44,7 @@ static AmSession  g_am_sessions[AM_MAX_SESSIONS];
 static AmLockout  g_am_lockouts[16];
 static int        g_am_lockout_count;
 static char       g_am_password[AM_MAX_PASS_LEN + 1];
-static char       g_am_apikey[AM_APIKEY_LEN + 1];
+static char       g_am_apikey[AM_APIKEY_LEN + 1] __attribute__((unused));
 
 static uint32_t g_mock_time_s = 1000;
 
@@ -175,8 +175,8 @@ static void am_record_success(const char *ip) {
 static bool am_validate_password(const char *pw, char *err_out = nullptr) {
   if (!pw) { if (err_out) strcpy(err_out, "null"); return false; }
   int len = strlen(pw);
-  if (len < AM_MIN_PASS_LEN) { if (err_out) sprintf(err_out, "too short (%d)", len); return false; }
-  if (len > AM_MAX_PASS_LEN) { if (err_out) sprintf(err_out, "too long (%d)", len); return false; }
+  if (len < AM_MIN_PASS_LEN) { if (err_out) snprintf(err_out, 64, "too short (%d)", len); return false; }
+  if (len > AM_MAX_PASS_LEN) { if (err_out) snprintf(err_out, 64, "too long (%d)", len); return false; }
   bool has_upper = false, has_digit = false;
   for (int i = 0; i < len; i++) {
     if (isupper(pw[i])) has_upper = true;

@@ -284,7 +284,7 @@ void test_alert_stores_bssid() {
 void test_alert_stores_timestamp() {
   ag_reset();
   g_mock_ms = 99999;
-  uint8_t bssid[] = {0};
+  uint8_t bssid[6] = {0};
   ag_add_alert(AG_EVT_SEQ_ANOMALY, "seq", bssid);
   TEST_ASSERT_EQUAL(99999u, g_ag_alerts[0].ts_ms);
 }

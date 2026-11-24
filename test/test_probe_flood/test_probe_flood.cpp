@@ -126,7 +126,7 @@ void test_ssid_different_ssids() {
 void test_ssid_max_cap() {
   pfl_reset();
   for (int i = 0; i < PFL_MAX_SSIDS; i++) {
-    char s[8]; snprintf(s, 8, "net%d", i);
+    char s[32]; snprintf(s, 32, "net%d", i);
     TEST_ASSERT_TRUE(pfl_add_ssid(s, 6));
   }
   TEST_ASSERT_FALSE(pfl_add_ssid("overflow", 6));

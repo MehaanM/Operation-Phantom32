@@ -84,13 +84,13 @@ static bool check_ip(const char *ip) {
   if (!ip) return false;
   int len = strlen(ip);
   if (len < 7 || len > 15) return false;
-  int dots=0, oct=0, octv=0; bool in_oct=false;
+  int oct=0, octv=0; bool in_oct=false;
   for (int i = 0; i <= len; i++) {
     char c = ip[i];
     if (isdigit(c)) { octv=octv*10+(c-'0'); if(octv>255) return false; in_oct=true; }
     else if (c=='.'||c=='\0') {
       if (!in_oct) return false;
-      oct++; dots+=(c=='.'); octv=0; in_oct=false;
+      oct++; octv=0; in_oct=false;
     } else return false;
   }
   return oct == 4;

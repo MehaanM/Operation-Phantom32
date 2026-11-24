@@ -198,8 +198,8 @@ void test_cred_clear() {
 void test_cred_max_cap_wraps() {
   et_reset();
   for (int i = 0; i < ET_MAX_CREDS; i++) {
-    char ssid[8], ip[16];
-    snprintf(ssid, 8, "net%d", i);
+    char ssid[32], ip[16];
+    snprintf(ssid, 32, "net%d", i);
     snprintf(ip, 16, "10.0.0.%d", i % 254 + 1);
     et_add_cred(ssid, "pass1234", ip);
   }

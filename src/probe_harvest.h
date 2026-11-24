@@ -7,7 +7,11 @@
 // Probe Request Harvester — passive recon.
 // Sniffs probe requests and logs the STA MAC + SSID being probed for
 // (reveals the device's saved network history). No frames transmitted.
+#ifdef PHANTOM32_LITE
+#define PRH_MAX_ENTRIES 16
+#else
 #define PRH_MAX_ENTRIES 128
+#endif
 struct PrhEntry {
   uint8_t sta[6];
   char    ssid[33];

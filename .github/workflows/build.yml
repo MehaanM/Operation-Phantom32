@@ -1,0 +1,182 @@
+name: PlatformIO Build Matrix
+
+on:
+  push:
+    branches: [ main, develop, "release/**" ]
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+      - 'partitions*.csv'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+      - 'partitions*.csv'
+
+jobs:
+  build:
+    name: Build ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          # Non-PSRAM boards (PHANTOM32_LITE)
+          - doom
+          - doom_nodemcu
+          - doom_m5stack
+          - doom_m5core2
+          - doom_ttgo
+          - doom_tcall
+          - doom_heltec
+          # PSRAM boards (full analytics)
+          - doom_wrover
+          - doom_s3
+          - doom_s3_devkit
+          - doom_tdisplay_s3
+          - doom_m5cores3
+          # C3 (RISC-V)
+          - doom_c3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-${{ matrix.env }}-
+            pio-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install --quiet platformio
+
+      - name: Install ESP32 platform
+        run: pio pkg install --platform espressif32@6.5.0
+
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Collect build artifacts
+        if: success()
+        run: |
+          mkdir -p artifacts/${{ matrix.env }}
+          cp .pio/build/${{ matrix.env }}/firmware.bin artifacts/${{ matrix.env }}/firmware.bin || true
+          cp .pio/build/${{ matrix.env }}/partitions.bin artifacts/${{ matrix.env }}/partitions.bin || true
+          cp .pio/build/${{ matrix.env }}/bootloader.bin artifacts/${{ matrix.env }}/bootloader.bin || true
+
+      - name: Check RAM/Flash usage
+        run: |
+          pio run -e ${{ matrix.env }} --silent 2>&1 | grep -E "RAM:|Flash:" || true
+
+      - name: Upload firmware artifacts
+        if: success() && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: phantom32-${{ matrix.env }}-${{ github.sha }}
+          path: artifacts/${{ matrix.env }}/
+          retention-days: 30
+
+  # Separate job: check that all envs appear in a build_flags matrix
+  config-check:
+    name: Validate platformio.ini
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install --quiet platformio
+      - name: List all environments
+        run: pio project config --json-output | python3 -c "
+import sys, json
+cfg = json.load(sys.stdin)
+envs = [k.replace('env:','') for k in cfg.keys() if k.startswith('env:') and k != 'env']
+print(f'Found {len(envs)} environments:', ', '.join(sorted(envs)))
+assert len(envs) > 0, 'No environments found'
+"
+      - name: Check PHANTOM32_LITE coverage
+        run: |
+          python3 -c "
+import configparser
+cfg = configparser.ConfigParser()
+cfg.read('platformio.ini')
+no_psram_envs = []
+psram_envs = []
+for s in cfg.sections():
+    if not s.startswith('env:') or s == 'env':
+        continue
+    env = s[4:]
+    flags = cfg.get(s, 'build_flags', fallback='') + cfg.get('env', 'build_flags', fallback='')
+    has_psram = 'BOARD_HAS_PSRAM' in flags
+    has_lite  = 'PHANTOM32_LITE' in flags
+    if has_psram:
+        psram_envs.append(env)
+    elif has_lite:
+        no_psram_envs.append(env)
+    else:
+        print(f'WARNING: {env} has neither BOARD_HAS_PSRAM nor PHANTOM32_LITE')
+print(f'LITE envs: {no_psram_envs}')
+print(f'PSRAM envs: {psram_envs}')
+"
+
+  # Native unit tests (no hardware needed)
+  native-tests:
+    name: Native unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: pio-native-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-native-
+            pio-
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install --quiet platformio
+      - name: Run native tests
+        run: pio test -e native --verbose
+
+  # Lint: check for common coding issues
+  lint:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for hardcoded credentials
+        run: |
+          # Flag if default password is left in production code paths
+          if grep -rn '"phantom32"' src/ | grep -v "AP_PASSWORD\|//\|test\|example"; then
+            echo "WARNING: Possible hardcoded password found outside AP_PASSWORD define"
+          fi
+      - name: Check -Wl,-zmuldefs usage
+        run: |
+          if grep -c "zmuldefs" platformio.ini; then
+            echo "INFO: -Wl,-zmuldefs is set. Verify no actual duplicate symbols are hidden."
+            echo "Consider running: pio run -e doom 2>&1 | grep 'multiple definition'"
+          fi
+      - name: Check for TODO/FIXME security items
+        run: |
+          grep -rn "TODO.*auth\|FIXME.*auth\|TODO.*security\|FIXME.*security\|HACK\|XXX" src/ || true

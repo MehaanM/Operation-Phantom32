@@ -15,8 +15,13 @@
 
 extern WebServer server;
 
+#ifdef PHANTOM32_LITE
+#define ET_MAX_CREDS      8
+#define ET_MAX_LOG        16
+#else
 #define ET_MAX_CREDS      64
 #define ET_MAX_LOG        128
+#endif
 #define ET_SSID_MAX       32
 #define ET_CRED_MAX       64
 

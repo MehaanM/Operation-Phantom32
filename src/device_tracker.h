@@ -129,11 +129,21 @@ struct DtRssiHist {
 };
 
 // ── Probe history (up to 12 SSIDs per device) ────────────────────────────────
+#ifdef PHANTOM32_LITE
+#define DT_MAX_PROBES 4
+#define DT_MAX_DEVICES 20
+#define DT_MAX_APS     8
+#define DT_MAX_ALERTS  8
+#else
 #define DT_MAX_PROBES 12
+#define DT_MAX_DEVICES 96
+#endif
 #define DT_SSID_LEN   33
 
 // ── Device record ─────────────────────────────────────────────────────────────
+#ifndef DT_MAX_DEVICES
 #define DT_MAX_DEVICES 96
+#endif
 struct DtDevice {
   uint8_t    mac[6];
   char       vendor[20];
@@ -158,7 +168,9 @@ struct DtDevice {
 };
 
 // ── AP → client association map ───────────────────────────────────────────────
+#ifndef DT_MAX_APS
 #define DT_MAX_APS 32
+#endif
 struct DtAP {
   uint8_t  bssid[6];
   char     ssid[33];
@@ -171,7 +183,9 @@ struct DtAP {
 };
 
 // ── Alert record ──────────────────────────────────────────────────────────────
+#ifndef DT_MAX_ALERTS
 #define DT_MAX_ALERTS 24
+#endif
 struct DtAlert {
   uint8_t  mac[6];
   char     vendor[20];

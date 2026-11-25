@@ -1,6 +1,6 @@
 <title>Operation Phantom32</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 
 <style>
@@ -12,16 +12,16 @@
   --border:   #0a2040;
   --border-hi:#0f3060;
   --cyan:     #00f0ff;
-  --cyan-dim: #004858;
+  --cyan-dim: #0a5a70;
   --cyan-glow:rgba(0,240,255,.18);
   --purple:   #8b00ff;
   --purple-lo:rgba(139,0,255,.12);
   --green:    #00ff88;
-  --green-dim:#004d2a;
+  --green-dim:#005e34;
   --red:      #ff2244;
-  --fg:       #8ab8d0;
-  --fg-hi:    #c8e8f8;
-  --fg-dim:   #1a3a52;
+  --fg:       #b8d8ea;
+  --fg-hi:    #e8f6ff;
+  --fg-dim:   #6a9ab8;
   color-scheme: dark;
 }
 
@@ -32,6 +32,7 @@ body {
   color: var(--fg);
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 15px;
+  font-weight: 500;
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
@@ -132,11 +133,11 @@ body::before {
 }
 
 .logo-text {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 18px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 15px;
   font-weight: 700;
   color: var(--fg-hi);
-  letter-spacing: .06em;
+  letter-spacing: .04em;
   line-height: 1.1;
   text-transform: uppercase;
 }
@@ -240,8 +241,8 @@ body::before {
 .hero-tag::after { transform: scaleX(-1); }
 
 .hero h1 {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: clamp(36px, 7vw, 72px);
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(28px, 5.5vw, 60px);
   font-weight: 700;
   line-height: 1.0;
   color: var(--fg-hi);
@@ -263,11 +264,11 @@ body::before {
 
 .hero-desc {
   font-size: 16px;
-  color: var(--fg);
+  color: var(--fg-hi);
   max-width: 500px;
   margin: 0 auto 48px;
   line-height: 1.7;
-  opacity: .8;
+  opacity: .9;
 }
 
 .hero-stats {
@@ -407,12 +408,12 @@ body::before {
 
 .board-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .board-name {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 15px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
   font-weight: 700;
   color: var(--fg-hi);
   line-height: 1.2;
-  letter-spacing: .03em;
+  letter-spacing: .04em;
   text-transform: uppercase;
 }
 .board-module { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--fg-dim); margin-top: 2px; letter-spacing: .1em; }
@@ -430,7 +431,7 @@ body::before {
 .badge.lite  { background: rgba(0,240,255,.06);  color: var(--cyan);   border: 1px solid var(--cyan-dim); }
 .badge.psram { background: rgba(0,255,136,.06);  color: var(--green);  border: 1px solid var(--green-dim); }
 .badge.chip  { background: rgba(139,0,255,.08);  color: #b060ff;       border: 1px solid rgba(139,0,255,.25); }
-.board-desc { font-size: 12px; color: var(--fg-dim); line-height: 1.6; }
+.board-desc { font-size: 12px; color: var(--fg); line-height: 1.6; }
 .board-flash-btn { margin-top: auto; display: block; width: 100%; }
 
 esp-web-install-button { display: block; width: 100%; }
@@ -472,8 +473,8 @@ esp-web-install-button [slot="activate"] {
 /* ── Instructions tab ───────────────────────────── */
 .instr-wrap { max-width: 760px; margin: 0 auto; padding: 60px 0 80px; }
 .page-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: clamp(28px, 5vw, 44px);
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(22px, 4vw, 36px);
   font-weight: 700;
   color: var(--fg-hi);
   text-transform: uppercase;
@@ -512,15 +513,15 @@ esp-web-install-button [slot="activate"] {
 }
 .step-body { padding: 10px 0 44px; }
 .step-heading {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 18px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
   font-weight: 700;
   color: var(--fg-hi);
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: .06em;
   margin-bottom: 10px;
 }
-.step-text { font-size: 14px; color: var(--fg-dim); line-height: 1.75; }
+.step-text { font-size: 14px; color: var(--fg); line-height: 1.75; }
 .step-text strong { color: var(--fg); }
 .step-text code {
   font-family: 'Share Tech Mono', monospace;
@@ -593,8 +594,8 @@ esp-web-install-button [slot="activate"] {
   position: relative;
 }
 .about-name {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: clamp(22px, 4vw, 34px);
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(18px, 3vw, 28px);
   font-weight: 700;
   color: var(--fg-hi);
   text-transform: uppercase;
@@ -627,7 +628,7 @@ esp-web-install-button [slot="activate"] {
 .about-section-label::before { content: "//"; color: var(--cyan-dim); }
 .about-section-label::after  { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-.about-p { font-size: 14px; color: var(--fg-dim); line-height: 1.8; margin-bottom: 14px; }
+.about-p { font-size: 14px; color: var(--fg); line-height: 1.8; margin-bottom: 14px; }
 .about-p strong { color: var(--fg); }
 .about-p em { font-style: normal; color: var(--cyan); }
 
@@ -655,7 +656,7 @@ esp-web-install-button [slot="activate"] {
 .compare-item {
   font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
-  color: var(--fg-dim);
+  color: var(--fg);
   padding: 5px 0;
   display: flex;
   align-items: flex-start;

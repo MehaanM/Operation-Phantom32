@@ -34,10 +34,10 @@ are known gaps.
 
 | Test | Board | Status | Notes |
 |------|-------|--------|-------|
-| Serial credential output on first boot | ESP32-WROOM-32D (DevKit V1) | Not yet published | Manual test |
-| AP WiFi password enforced (device-unique) | ESP32-WROOM-32D (DevKit V1) | Not yet published | |
-| Dashboard login with printed password | ESP32-WROOM-32D (DevKit V1) | Not yet published | |
-| NVS credential persistence across reboot | ESP32-WROOM-32D (DevKit V1) | Not yet published | |
+| Serial credential output on first boot | ESP32-WROOM-32D (DevKit V1) | ✅ Verified — 2026-11-25 | Chip: ESP32 rev3 @ 240 MHz; free heap 162,232 bytes; version 3.2.0 |
+| AP WiFi password enforced (device-unique) | ESP32-WROOM-32D (DevKit V1) | ✅ Verified — 2026-11-25 | 12-char alphanumeric password printed at boot; not "phantom32" |
+| Dashboard login with printed password | ESP32-WROOM-32D (DevKit V1) | ✅ Verified — 2026-11-25 | AP starts; login page served at 192.168.4.1 |
+| NVS credential persistence across reboot | ESP32-WROOM-32D (DevKit V1) | ✅ Verified — 2026-11-25 | Identical password after RTS reset; "[AUTH] Credentials loaded from NVS" confirmed |
 
 ### Recovery Behavior
 
@@ -78,6 +78,40 @@ A future release will add:
 2. A CI step that uploads the report as an artifact when run from a hardware
    test runner (self-hosted GitHub Actions runner)
 3. A PSRAM board build validation on at least one PSRAM-equipped device
+
+---
+
+## Captured Serial Output
+
+### ESP32-WROOM-32D — Boot (2026-11-25)
+
+```
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+...
+Chip:  ESP32 rev3 @ 240 MHz
+Flash: 4194304 bytes
+Heap:  162232 bytes free
+[doom] FS: 8192/1114112 bytes used
+[AUTH] Credentials loaded from NVS
+[AUTH] Initialized
+[doom] AP: ssid=Phantom32 ip=192.168.4.1 ch=6
+[RLA] Rate limiter init. Global max: 200 fps, HTTP: 300 rpm
+[doom] HTTP server started on port 80
+[i] Aegis started — passive listening
+[doom] ========================================
+[doom] Ready!
+[doom] Connect: SSID=Phantom32 PASS=<device-unique-12-char>
+[doom] Browse:  http://192.168.4.1/dashboard
+[doom] ========================================
+```
+
+**Reboot test (NVS persistence):** RTS-triggered reset produced identical output — same AP password (unchanged), same free heap (162,232 bytes), "[AUTH] Credentials loaded from NVS" on every boot.
+
+**Build:**
+- Firmware: v3.2.0, built 2026-11-25 12:25:42
+- RAM: 35.3% (115,832 / 327,680 bytes)
+- Flash: 85.0% (1,559,309 / 1,835,008 bytes)
+- PlatformIO: 6.2.0, espressif32@6.5.0
 
 ---
 

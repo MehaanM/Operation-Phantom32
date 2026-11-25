@@ -8,6 +8,14 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Hardware validation results** (`docs/hardware-validation.md`) — ESP32-WROOM-32D
+  (rev3 @ 240 MHz, 4 MB flash) tested 2026-11-25:
+  - Boot: chip detected, free heap 162,232 bytes, HTTP server started, Aegis active
+  - AP password `Ccd229bkMNFP` (12-char device-unique, not "phantom32") confirmed
+  - NVS persistence: identical credentials after RTS reboot, "[AUTH] Credentials loaded from NVS"
+  - RAM: 35.3% used; Flash: 85.0% used; all within budget
+
 ### Security
 - **PlatformIO upgraded to 6.2.0** — resolved DEP-001: previously flagged 16 CVEs
   in PlatformIO 6.1.16 transitive deps. 6.2.0 ships updated `bottle==0.13.*`,

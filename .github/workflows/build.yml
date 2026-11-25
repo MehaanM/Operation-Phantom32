@@ -11,6 +11,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Default: minimal read-only permissions. Jobs that need more declare it explicitly.
+permissions:
+  contents: read
+
 env:
   PIO_VERSION: "6.2.0"
 
@@ -21,17 +25,20 @@ jobs:
   native-tests:
     name: Unit tests (native)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
       - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.platformio/.cache
@@ -50,22 +57,18 @@ jobs:
           pio test -e native --verbose > test_output.txt 2>&1
           rc=$?
           cat test_output.txt
-          # Fail if zero individual test results appeared (guards against
-          # the "tests compiled but never executed" silent failure).
-          # Unity per-test output format: "path:line:testname:PASS" or ":FAIL:"
           result_lines=$(grep -cE ":(PASS|FAIL)" test_output.txt || true)
           echo "Individual test result lines: $result_lines"
           if [ "$result_lines" -eq 0 ]; then
             echo "ERROR: No test results found — did any tests execute?" >&2
             exit 1
           fi
-          # Surface the final tally.
           grep -E "[0-9]+ Tests [0-9]+ Failures" test_output.txt || true
           exit $rc
 
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: test-output-native
           path: test_output.txt
@@ -77,17 +80,20 @@ jobs:
   native-sanitizers:
     name: Sanitizers (ASan + UBSan)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
       - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.platformio/.cache
@@ -114,7 +120,7 @@ jobs:
 
       - name: Upload sanitizer output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: test-output-asan
           path: asan_output.txt
@@ -126,17 +132,20 @@ jobs:
   native-coverage:
     name: Coverage (gcov)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
       - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.platformio/.cache
@@ -151,21 +160,17 @@ jobs:
 
       - name: Run tests with coverage instrumentation
         run: |
-          # On Linux/GCC, PlatformIO passes build_flags only to compilation, not linking.
-          # Pass -lgcov explicitly through the linker environment so libgcov is linked.
           export LDFLAGS="-lgcov"
           pio test -e native_cov --verbose
 
       - name: Generate coverage report
         run: |
-          # Collect .gcda/.gcno from PlatformIO's build directory.
           lcov --capture \
                --directory .pio/build/native_cov/ \
                --output-file coverage.info \
                --ignore-errors mismatch \
                --rc lcov_branch_coverage=1 \
                2>/dev/null || true
-          # Strip system headers and test runner boilerplate.
           lcov --remove coverage.info \
                '/usr/*' \
                '*/.platformio/*' \
@@ -173,21 +178,19 @@ jobs:
                --output-file coverage_filtered.info \
                --rc lcov_branch_coverage=1 \
                2>/dev/null || true
-          # Print summary (line and branch).
           if [ -f coverage_filtered.info ]; then
             lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null || true
-            # Enforce minimum coverage thresholds.
             line_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
                         | grep "lines" | grep -oE "[0-9]+\.[0-9]+" | head -1)
             branch_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
                           | grep "branches" | grep -oE "[0-9]+\.[0-9]+" | head -1)
-            echo "Line coverage:   ${line_cov}%  (minimum: 80%)"
-            echo "Branch coverage: ${branch_cov}%  (minimum: 50%)"
+            echo "Line coverage:   ${line_cov}%  (minimum: 85%)"
+            echo "Branch coverage: ${branch_cov}%  (minimum: 70%)"
             failed=0
             if [ -n "$line_cov" ]; then
-              under=$(echo "$line_cov < 80.0" | bc -l 2>/dev/null || echo 0)
+              under=$(echo "$line_cov < 85.0" | bc -l 2>/dev/null || echo 0)
               if [ "$under" = "1" ]; then
-                echo "ERROR: Line coverage ${line_cov}% is below the 80% minimum." >&2
+                echo "ERROR: Line coverage ${line_cov}% is below the 85% minimum." >&2
                 failed=1
               fi
             else
@@ -195,9 +198,9 @@ jobs:
               failed=1
             fi
             if [ -n "$branch_cov" ]; then
-              under=$(echo "$branch_cov < 50.0" | bc -l 2>/dev/null || echo 0)
+              under=$(echo "$branch_cov < 70.0" | bc -l 2>/dev/null || echo 0)
               if [ "$under" = "1" ]; then
-                echo "ERROR: Branch coverage ${branch_cov}% is below the 50% minimum." >&2
+                echo "ERROR: Branch coverage ${branch_cov}% is below the 70% minimum." >&2
                 failed=1
               fi
             fi
@@ -209,7 +212,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: coverage-report
           path: coverage*.info
@@ -221,14 +224,17 @@ jobs:
   secret-scan:
     name: Secret scanning (gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           fetch-depth: 0  # full history required for gitleaks
 
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
@@ -239,12 +245,15 @@ jobs:
   dep-scan:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
@@ -253,10 +262,6 @@ jobs:
 
       - name: Audit CI security tools (must pass — no known CVEs expected)
         run: |
-          # Audit the security tools this CI pipeline introduces directly.
-          # pip-audit itself has no known CVEs and must pass clean.
-          # Note: pip-audit 2.7+ separates --format (json/columns) from
-          # --output (file path). Use -f json to set format; stdout → file.
           echo "pip-audit" > /tmp/ci_security_tools.txt
           pip-audit --requirement /tmp/ci_security_tools.txt -f json \
             > pip_audit_tools.json
@@ -264,11 +269,6 @@ jobs:
 
       - name: Audit full PlatformIO dependency tree (findings logged, not gating)
         run: |
-          # Audit all Python packages installed including PlatformIO's transitive
-          # dependencies. Findings are recorded in pip_audit_full.json and surfaced
-          # here for visibility. This step does NOT gate the build — the unresolved
-          # PlatformIO transitive CVEs are documented in docs/dependency-inventory.md
-          # (DEP-001) with risk assessment and resolution path.
           pip-audit -f json > pip_audit_full.json || true
           echo "--- PlatformIO dependency vulnerability summary ---"
           python3 - <<'PYEOF'
@@ -278,7 +278,6 @@ jobs:
           except (json.JSONDecodeError, FileNotFoundError) as e:
               print(f'WARNING: Could not parse audit output: {e}')
               sys.exit(0)
-          # pip-audit -f json outputs a list of {name, version, vulns}
           if isinstance(data, list):
               deps = data
           elif isinstance(data, dict):
@@ -301,7 +300,7 @@ jobs:
 
       - name: Upload audit reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: pip-audit-report
           path: |
@@ -310,19 +309,82 @@ jobs:
           retention-days: 14
 
   # ----------------------------------------------------------------
+  # Job 1f: SBOM generation (CycloneDX)
+  # ----------------------------------------------------------------
+  sbom:
+    name: Generate SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install SBOM tools
+        run: pip install cyclonedx-bom "platformio==${{ env.PIO_VERSION }}"
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          # Generate SBOM for the Python/CI tooling environment.
+          cyclonedx-py environment -o sbom-ci.json --format json 2>/dev/null || \
+            python3 -c "
+          import subprocess, json, datetime
+          pkgs = subprocess.run(['pip', 'list', '--format=json'], capture_output=True, text=True)
+          components = []
+          for p in json.loads(pkgs.stdout):
+              components.append({
+                  'type': 'library',
+                  'name': p['name'],
+                  'version': p['version'],
+                  'purl': f\"pkg:pypi/{p['name']}@{p['version']}\"
+              })
+          sbom = {
+              'bomFormat': 'CycloneDX',
+              'specVersion': '1.4',
+              'version': 1,
+              'metadata': {
+                  'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+                  'component': {
+                      'type': 'firmware',
+                      'name': 'Phantom32',
+                      'version': '3.2.0'
+                  }
+              },
+              'components': components
+          }
+          json.dump(sbom, open('sbom-ci.json', 'w'), indent=2)
+          print(f'Generated SBOM with {len(components)} components.')
+          "
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom-ci.json
+          retention-days: 90
+
+  # ----------------------------------------------------------------
   # Job 2: Static analysis + formatting
   # ----------------------------------------------------------------
   lint:
     name: Static analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Check clang-format compliance
         run: |
           sudo apt-get install -y --no-install-recommends clang-format
-          # Collect all C/C++ source files and check formatting.
           find src/ -name "*.cpp" -o -name "*.h" | sort > /tmp/src_files.txt
           errors=0
           while IFS= read -r f; do
@@ -341,15 +403,9 @@ jobs:
 
       - name: Check for hardcoded AP password in non-define contexts
         run: |
-          # Allowed exceptions:
-          #   - Lines that ARE the #define for AP_PASSWORD
-          #   - Comment lines (//)
-          #   - Factory-default initialization marked with // ap-default
-          #   - HTML placeholder= attributes (not value=)
           if grep -rn '"phantom32"' src/ \
                | grep -v '#define\|//\|ap-default\|placeholder='; then
             echo "ERROR: Hardcoded AP password found in an unexpected context." >&2
-            echo "       If this is a factory default, add '// ap-default' to the line." >&2
             exit 1
           fi
           echo "OK: No unexpected hardcoded passwords."
@@ -358,7 +414,6 @@ jobs:
         run: |
           if grep -q "zmuldefs" platformio.ini; then
             echo "ERROR: -Wl,-zmuldefs found in platformio.ini." >&2
-            echo "Fix the duplicate symbols instead of hiding them." >&2
             exit 1
           fi
           echo "OK: -Wl,-zmuldefs is not present."
@@ -415,7 +470,6 @@ jobs:
           with open('src/safety.h') as f:
               safety_content = f.read()
 
-          # (source_content, route_path)
           checks = [
               (main_content, '/api/reboot'),
               (main_content, '/api/fs/format'),
@@ -467,6 +521,9 @@ jobs:
     name: Build ${{ matrix.env }}
     needs: [ native-tests, native-sanitizers, lint, secret-scan ]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -491,15 +548,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
       - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.platformio/.cache
@@ -523,23 +580,28 @@ jobs:
             | grep -E "RAM:|Flash:|DRAM:|IRAM:|DATA:|BSS:|Used static|RAM regions" || true)
           echo "$mem_output"
 
-          # Parse RAM % from PlatformIO's summary line.
-          # Example: "RAM:  [===       ]  33.8% (used 110584 bytes from 327680 bytes)"
-          ram_pct=$(echo "$mem_output" | grep -oE "[0-9]+\.[0-9]+% \(used.*RAM" \
-                    | grep -oE "^[0-9]+\.[0-9]+" || \
-                    pio run -e ${{ matrix.env }} 2>&1 \
+          # Enforce RAM budget (≤ 85% DRAM).
+          ram_pct=$(pio run -e ${{ matrix.env }} 2>&1 \
                     | grep -oE "RAM.*[0-9]+\.[0-9]+%" | grep -oE "[0-9]+\.[0-9]+" | head -1)
-
           if [ -n "$ram_pct" ]; then
             echo "RAM usage: ${ram_pct}%"
-            # Fail builds that exceed 85% DRAM (leaves headroom for heap).
             over=$(echo "$ram_pct > 85" | bc -l 2>/dev/null || echo 0)
             if [ "$over" = "1" ]; then
               echo "ERROR: RAM usage ${ram_pct}% exceeds 85% budget." >&2
               exit 1
             fi
-          else
-            echo "(Could not parse RAM usage — manual check required)"
+          fi
+
+          # Enforce Flash budget (≤ 90% of partition).
+          flash_pct=$(pio run -e ${{ matrix.env }} 2>&1 \
+                      | grep -oE "Flash.*[0-9]+\.[0-9]+%" | grep -oE "[0-9]+\.[0-9]+" | head -1)
+          if [ -n "$flash_pct" ]; then
+            echo "Flash usage: ${flash_pct}%"
+            over=$(echo "$flash_pct > 90" | bc -l 2>/dev/null || echo 0)
+            if [ "$over" = "1" ]; then
+              echo "ERROR: Flash usage ${flash_pct}% exceeds 90% budget." >&2
+              exit 1
+            fi
           fi
 
       - name: Collect firmware artifacts
@@ -552,23 +614,25 @@ jobs:
              artifacts/${{ matrix.env }}/ 2>/dev/null || true
           cp .pio/build/${{ matrix.env }}/bootloader.bin \
              artifacts/${{ matrix.env }}/ 2>/dev/null || true
-          # Generate SHA-256 checksums for release verification.
           sha256sum artifacts/${{ matrix.env }}/*.bin \
             > artifacts/${{ matrix.env }}/SHA256SUMS.txt 2>/dev/null || true
-          # Reproducible build manifest: records every input that determines the output.
-          cat > artifacts/${{ matrix.env }}/BUILD_MANIFEST.txt <<EOF
-          build_env:      ${{ matrix.env }}
-          git_commit:     ${{ github.sha }}
-          git_ref:        ${{ github.ref }}
-          runner_os:      ${{ runner.os }}
-          pio_version:    ${{ env.PIO_VERSION }}
-          built_at:       $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          workflow_run:   ${{ github.run_id }}/${{ github.run_number }}
+          cat > artifacts/${{ matrix.env }}/BUILD_MANIFEST.json <<EOF
+          {
+            "project": "Phantom32",
+            "version": "3.2.0",
+            "build_env": "${{ matrix.env }}",
+            "git_commit": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "runner_os": "${{ runner.os }}",
+            "pio_version": "${{ env.PIO_VERSION }}",
+            "built_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "workflow_run": "${{ github.run_id }}/${{ github.run_number }}"
+          }
           EOF
 
       - name: Upload firmware artifact
         if: success() && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: phantom32-${{ matrix.env }}-${{ github.sha }}
           path: artifacts/${{ matrix.env }}/
@@ -581,7 +645,10 @@ jobs:
     name: All builds passed
     needs: [ build, native-coverage ]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
+    permissions:
+      contents: read
     steps:
       - name: Check result
         run: |

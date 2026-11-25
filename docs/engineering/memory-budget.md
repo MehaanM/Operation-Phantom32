@@ -1,0 +1,100 @@
+# Memory Budget — Phantom32
+
+**Version:** 3.2.0  
+**Board:** ESP32-WROOM-32D (320 KB DRAM, 4 MB Flash)  
+**Measured:** 2026-11-25
+
+---
+
+## Summary (PHANTOM32_LITE mode)
+
+| Metric | Value | Budget | Status |
+|--------|-------|--------|--------|
+| Static RAM | 115,832 bytes | ≤ 278,528 bytes (85%) | ✅ 35.3% |
+| Flash | 1,559,309 bytes | ≤ 1,651,507 bytes (90%) | ✅ 85.0% |
+| Free heap at boot | 162,232 bytes | ≥ 80,000 bytes | ✅ |
+| Free heap budget | 162,232 bytes remaining | — | ✅ |
+
+---
+
+## Static RAM Breakdown (estimated by module)
+
+| Component | Static RAM | Notes |
+|-----------|-----------|-------|
+| ESP-IDF WiFi stack | ~65 KB | Fixed system allocation |
+| FreeRTOS (tasks + stacks) | ~20 KB | Scales with task count |
+| Web server (AsyncWebServer) | ~8 KB | Buffer pool |
+| Auth manager (`g_am_sessions[8]`, lockout table) | ~2 KB | Fixed 8 sessions × 196 bytes |
+| Rate limiter (`g_tools[16]`, `g_http_ips[8]`) | ~1 KB | Fixed tables |
+| Input validator | ~0.5 KB | Stack-allocated scratch only |
+| PROGMEM HTML/JS (flash, not RAM) | — | Served from flash |
+| Application code + globals | ~19 KB | main.cpp + headers |
+
+*Note: ESP-IDF internal allocations vary by WiFi mode and task count. These are estimates from the PlatformIO size report and ESP-IDF documentation.*
+
+---
+
+## Heap Usage at Runtime
+
+Measured on ESP32-WROOM-32D running v3.2.0 (LITE mode):
+
+| Point | Free heap | Notes |
+|-------|-----------|-------|
+| After boot | 162,232 bytes | Before any HTTP requests |
+| After 1 login | ~160,000 bytes | Session allocated |
+| After 8 sessions (max) | ~158,000 bytes | All session slots full |
+| Minimum expected | ~155,000 bytes | Steady state with active use |
+
+**Heap budget available for tools:** ~155 KB (LITE mode). This is sufficient for all current tool operations.
+
+---
+
+## PSRAM Board Budget (Full Mode)
+
+PSRAM-equipped boards (ESP32-S3, WROVER) have 8 MB PSRAM in addition to 320 KB internal DRAM.
+
+| Component | Allocation |
+|-----------|-----------|
+| `device_tracker` AP/STA tables | PSRAM |
+| `probe_harvest` SSID ring buffer | PSRAM |
+| `evil_twin` credential buffer (64 entries) | PSRAM |
+| Remaining tools | Internal RAM |
+
+Measured RAM on `doom_s3` (PSRAM build): 36.1% internal DRAM used. PSRAM usage is not reported by PlatformIO size tool.
+
+---
+
+## Flash Partition Layout
+
+Partition table: `partitions.csv`
+
+| Partition | Offset | Size | Contents |
+|-----------|--------|------|----------|
+| nvs | 0x9000 | 20 KB | NVS (credentials, config) |
+| otadata | 0xe000 | 8 KB | OTA slot data (unused) |
+| app0 | 0x10000 | 1.75 MB | Firmware |
+| spiffs | 0x1C0000 | 2 MB | LittleFS filesystem |
+
+Firmware occupies 1,559,309 of 1,835,008 bytes available in `app0` (85.0%). No OTA is currently implemented; `otadata` exists in the partition table for future use.
+
+---
+
+## CI Budget Enforcement
+
+The CI build matrix enforces:
+- **RAM ≤ 85%** on all 13 board builds (enforced — build fails)
+- **Flash ≤ 90%** on all 13 board builds (enforced — build fails)
+
+Current worst-case board: `doom` (ESP32-WROOM-32D) at 85.0% flash. If flash usage exceeds 90%, the CI build will fail.
+
+---
+
+## Growth Budget
+
+| Resource | Current | Budget | Remaining |
+|----------|---------|--------|-----------|
+| Flash | 85.0% | 90% | ~88 KB |
+| Static RAM | 35.3% | 85% | ~163 KB |
+| Heap | 162 KB free | 80 KB minimum | ~82 KB usable |
+
+The flash budget is the primary constraint for future feature additions.

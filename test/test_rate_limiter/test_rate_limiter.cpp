@@ -339,6 +339,37 @@ void test_tool_inactive_bypasses_per_tool_check() {
   TEST_ASSERT_TRUE(rla_check("lazy_tool"));
 }
 
+void test_find_or_add_tool_returns_existing() {
+  rla_reset();
+  RlaToolEntry *a = rla_find_or_add_tool("my_tool", 5.0f, 1.0f);
+  RlaToolEntry *b = rla_find_or_add_tool("my_tool", 5.0f, 1.0f);
+  // Covers the loop early-return branch in rla_find_or_add_tool
+  TEST_ASSERT_EQUAL_PTR(a, b);
+}
+
+void test_global_bucket_deny_blocks_rla_check() {
+  rla_reset();
+  while (g_global_bucket.consume(1.0f, g_mock_ms)) {}
+  // Covers the if(!g_global_bucket.consume()) return false branch
+  TEST_ASSERT_EQUAL(0, (int)rla_check("any_tool"));
+}
+
+void test_find_or_add_ip_returns_existing() {
+  rla_reset();
+  RlaIpEntry *a = rla_find_or_add_ip("1.2.3.4");
+  RlaIpEntry *b = rla_find_or_add_ip("1.2.3.4");
+  // Covers the loop early-return branch in rla_find_or_add_ip
+  TEST_ASSERT_EQUAL_PTR(a, b);
+}
+
+void test_rla_check_http_inactive_entry_allows() {
+  rla_reset();
+  RlaIpEntry *e = rla_find_or_add_ip("7.7.7.7");
+  e->active = false;
+  // Covers the !e->active branch — inactive entry bypasses rate check
+  TEST_ASSERT_EQUAL(1, (int)rla_check_http("7.7.7.7"));
+}
+
 void test_bucket_exact_tokens_equal_cost() {
   TokenBucket b;
   b.init(1.0f, 0.0f);
@@ -386,6 +417,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_http_check_table_full_allows);
   RUN_TEST(test_tool_inactive_bypasses_per_tool_check);
   RUN_TEST(test_bucket_exact_tokens_equal_cost);
+  RUN_TEST(test_find_or_add_tool_returns_existing);
+  RUN_TEST(test_global_bucket_deny_blocks_rla_check);
+  RUN_TEST(test_find_or_add_ip_returns_existing);
+  RUN_TEST(test_rla_check_http_inactive_entry_allows);
 
   return UNITY_END();
 }

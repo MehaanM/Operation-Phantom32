@@ -1,0 +1,50 @@
+# sdkconfig reference for NVS + Flash Encryption
+#
+# This is a REFERENCE ONLY — not an active build configuration.
+#
+# PlatformIO Arduino framework builds do not support sdkconfig natively.
+# To use these settings, migrate the build to ESP-IDF CMake (idf.py) or
+# use PlatformIO with platform = espressif32 and framework = espidf.
+#
+# See docs/security.md § "NVS / Flash Encryption Support" for context.
+#
+# -----------------------------------------------------------------------
+# STEP 1 — Enable Flash Encryption (required for NVS encryption)
+# -----------------------------------------------------------------------
+
+# Development mode: reversible, for testing on a non-production device.
+# Flash remains readable with known key until eFuses are burned.
+CONFIG_FLASH_ENCRYPTION_ENABLED=y
+CONFIG_FLASH_ENCRYPTION_MODE_DEVELOPMENT=y
+
+# Production mode (IRREVERSIBLE): burns eFuses on first boot.
+# A device that loses its key material is permanently unrecoverable.
+# Uncomment ONE of the two lines above and ONE of the two lines below.
+#CONFIG_FLASH_ENCRYPTION_MODE_RELEASE=y
+
+# -----------------------------------------------------------------------
+# STEP 2 — Enable NVS Encryption
+# NVS encryption uses a hardware-managed key stored in a protected
+# NVS key partition (not in the main NVS namespace).
+# -----------------------------------------------------------------------
+
+CONFIG_NVS_ENCRYPTION=y
+
+# -----------------------------------------------------------------------
+# STEP 3 — Enable Secure Boot V2 (optional, recommended for production)
+# Prevents loading of unsigned firmware images.
+# ALSO IRREVERSIBLE once eFuses are burned.
+# -----------------------------------------------------------------------
+
+# CONFIG_SECURE_BOOT=y
+# CONFIG_SECURE_BOOT_V2_ENABLED=y
+# CONFIG_SECURE_BOOT_SIGNING_KEY=secure_boot_signing_key.pem
+
+# -----------------------------------------------------------------------
+# After enabling the above, build and flash normally:
+#   idf.py build flash
+# The device will burn eFuses on the first boot.
+#
+# To verify encryption is active:
+#   esptool.py --port /dev/ttyUSB0 get_security_info
+# -----------------------------------------------------------------------

@@ -9,6 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Security
+- **API key printed in full on first boot** — first-boot serial log and
+  `auth_print_credentials()` now print the full 64-char API key instead of a
+  truncated 16-char prefix, eliminating the misleading "(full key via /api/auth/status)"
+  comment that pointed to a handler that did not return the full key.
 - **PBKDF2 work factor increased to 100,000 iterations** — raised from 10,000 to
   100,000 (10×) to meet the defensible minimum for constrained hardware. Login latency
   is ~1 s on ESP32 @ 240 MHz; brute-force cost increases proportionally.
@@ -27,6 +31,16 @@ and this project uses [Semantic Versioning](https://semver.org/).
   `X-Phantom32-Key` header accepted.
 
 ### Added
+- `test/test_coverage/test_coverage.cpp` — 83 new branch-coverage tests targeting
+  null-pointer guards, boundary lengths, loop exits, error-message paths, all JSON
+  escape characters, rate-limiter edge cases, MAC address parsing, and IP validation.
+  Raises branch coverage from 54% toward the 70%+ target.
+- `docs/security.md` — Authentication Performance section: PBKDF2 latency table
+  per chip, DoS concern and mitigation (IP lockout bounds per-IP compute at 5×1 s).
+- `docs/sdkconfig-nvs-encryption-example.txt` — Reference sdkconfig for enabling
+  NVS encryption and flash encryption via ESP-IDF CMake builds.
+- `docs/dependency-inventory.md` — DEP-001 concrete resolution process: trigger
+  condition, upgrade candidate criteria, 13-board validation cycle, close criteria.
 - `test_security.cpp` — 48 new security-path unit tests covering: expired/invalid/revoked/
   replayed sessions, unauthorized access, malformed JSON, oversized inputs, rate-limit
   exhaustion, PBKDF2 properties (determinism, salt uniqueness, hex format), API key

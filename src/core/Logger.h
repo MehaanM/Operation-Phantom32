@@ -70,8 +70,10 @@ class Logger {
     return instance;
   }
 
- private:
+  // Default-constructible for local use (e.g. unit tests).
   Logger() = default;
+
+ private:
   ILogSink *sinks_[PHANTOM_LOG_MAX_SINKS] = {};
   size_t sinkCount_ = 0;
   LogLevel minLevel_ = LogLevel::DEBUG;

@@ -248,26 +248,52 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install pip-audit
-        run: pip install pip-audit
+      - name: Install pip-audit and PlatformIO
+        run: pip install pip-audit "platformio==${{ env.PIO_VERSION }}"
 
-      - name: Audit CI security tools
+      - name: Audit CI security tools (must pass — no known CVEs expected)
         run: |
-          # Audit only the security tools this CI pipeline introduces directly.
-          # PlatformIO ($PIO_VERSION) is a pinned build toolchain; its transitive
-          # CVEs require a dedicated 13-board validation cycle to upgrade safely
-          # and are tracked separately. Only packages we control are audited here.
+          # Audit the security tools this CI pipeline introduces directly.
+          # pip-audit itself has no known CVEs and must pass clean.
           echo "pip-audit" > /tmp/ci_security_tools.txt
           pip-audit --requirement /tmp/ci_security_tools.txt --output json \
-            > pip_audit.json
+            > pip_audit_tools.json
           echo "OK: No known vulnerabilities in CI security tooling."
 
-      - name: Upload audit report
+      - name: Audit full PlatformIO dependency tree (findings logged, not gating)
+        run: |
+          # Audit all Python packages installed including PlatformIO's transitive
+          # dependencies. Findings are recorded in pip_audit_full.json and surfaced
+          # here for visibility. This step does NOT gate the build — the unresolved
+          # PlatformIO transitive CVEs are documented in docs/dependency-inventory.md
+          # (DEP-001) with risk assessment and resolution path.
+          pip-audit --output json > pip_audit_full.json || true
+          echo "--- PlatformIO dependency vulnerability summary ---"
+          python3 -c "
+          import json, sys
+          data = json.load(open('pip_audit_full.json'))
+          deps = data.get('dependencies', [])
+          vuln_pkgs = [d for d in deps if d.get('vulns')]
+          if not vuln_pkgs:
+              print('No vulnerabilities found.')
+          else:
+              total = sum(len(d['vulns']) for d in vuln_pkgs)
+              print(f'Found {total} known vulnerabilities across {len(vuln_pkgs)} package(s):')
+              for d in vuln_pkgs:
+                  for v in d['vulns']:
+                      print(f\"  {d['name']}=={d['version']}: {v['id']}\")
+              print()
+              print('See docs/dependency-inventory.md for risk assessment.')
+          " || true
+
+      - name: Upload audit reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pip-audit-report
-          path: pip_audit.json
+          path: |
+            pip_audit_tools.json
+            pip_audit_full.json
           retention-days: 14
 
   # ----------------------------------------------------------------

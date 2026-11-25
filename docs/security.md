@@ -14,7 +14,7 @@ are in and out of scope.
 |---|---|
 | Generation | 12-char alphanumeric (charset excludes confusable chars: `0 1 i l o O`) |
 | Storage | PBKDF2-HMAC-SHA256 hex + random salt in NVS; plaintext never stored |
-| KDF | PBKDF2-HMAC-SHA256, 10,000 iterations, 128-bit (16-byte) random salt |
+| KDF | PBKDF2-HMAC-SHA256, 100,000 iterations, 128-bit (16-byte) random salt |
 | Salt | Generated on first boot; regenerated on every password reset or change |
 | Disclosed | Once, on UART serial at first boot |
 
@@ -118,11 +118,46 @@ PSRAM variants have sufficient heap; HTTPS is planned.
 Credentials are stored in the ESP32's NVS (Non-Volatile Storage) partition
 with wear-leveling. NVS is not exposed via any HTTP endpoint.
 
-**Note:** NVS is not encrypted by default on ESP-IDF 4.x / Arduino 2.x.
-Physical flash dump with `esptool.py read_flash` can expose the stored API key
-and AP WiFi password. The dashboard password is stored as a PBKDF2 hash and
-salt — an attacker with a flash dump must crack PBKDF2 offline (10,000 rounds)
-to recover the dashboard password.
+**Without NVS encryption:** A physical flash dump with `esptool.py read_flash`
+exposes the API key and AP WiFi password in plaintext. The dashboard password
+is stored only as a PBKDF2-HMAC-SHA256 hash and salt — recovery requires
+cracking PBKDF2 offline (100,000 iterations), which provides meaningful
+brute-force resistance even after a flash dump.
+
+### NVS / Flash Encryption Support
+
+ESP-IDF supports hardware-backed flash encryption and Secure Boot V2, which
+protect NVS contents against physical flash extraction. Configuration varies
+by chip:
+
+| Chip | Flash Encryption | Secure Boot V2 | NVS Encryption |
+|------|-----------------|----------------|----------------|
+| ESP32 (original) | Yes (eFuse-based, AES-256) | Yes | Yes (requires flash encryption) |
+| ESP32-S3 | Yes | Yes | Yes |
+| ESP32-C3 | Yes | Yes | Yes |
+| ESP32-WROVER | Yes (same as ESP32) | Yes | Yes |
+
+**To enable flash encryption on ESP32/S3/C3:**
+
+1. Enable in `sdkconfig`: `CONFIG_FLASH_ENCRYPTION_ENABLED=y`
+2. For development mode (reversible): `CONFIG_FLASH_ENCRYPTION_MODE_DEVELOPMENT=y`
+3. For production (one-way, irreversible): `CONFIG_FLASH_ENCRYPTION_MODE_RELEASE=y`
+4. Enable NVS encryption: `CONFIG_NVS_ENCRYPTION=y`
+5. Build and flash; the device burns eFuses on first boot.
+
+**Warning:** Production flash encryption is irreversible. A device with release-mode
+encryption that loses its key material is permanently unrecoverable. Test
+in development mode first on a non-production device.
+
+**Current status:** Flash encryption and NVS encryption are **not enabled** in the
+default Phantom32 builds. This is documented here as a known gap — users who require
+protection against physical flash extraction should enable it in their build
+configuration. This is consistent with the threat model: the primary threat surface
+is network-based (web UI exploitation), not physical hardware access.
+
+Enabling flash encryption requires ESP-IDF `sdkconfig` changes that are outside the
+scope of the PlatformIO Arduino framework build used by this project. A future release
+targeting ESP-IDF CMake builds will include hardened NVS encryption support.
 
 ---
 
@@ -141,7 +176,7 @@ The full threat model is documented in [`docs/threat-model.md`](./threat-model.m
 
 ### Out of scope
 
-- Physical flash dump (NVS encryption requires ESP-IDF Secure Boot, out of scope)
+- Physical flash dump (NVS encryption is documented but not enabled by default; see NVS Security section)
 - RF side-channels (the device is itself a radio research tool)
 - Attacks requiring physical reset (press BOOT + EN = factory state, as designed)
 - Independent 802.11 frame injection (the tool is designed to inject frames)

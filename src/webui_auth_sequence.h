@@ -237,7 +237,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuaus_routes() {
-  server.on("/auth-sequence", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAUS_PAGE);
-  });
+  server.on("/auth-sequence", HTTP_GET, []() { server.send_P(200, "text/html", WUAUS_PAGE); });
 }

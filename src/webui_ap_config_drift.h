@@ -210,7 +210,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuacd_routes() {
-  server.on("/ap-config-drift", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUACD_PAGE);
-  });
+  server.on("/ap-config-drift", HTTP_GET, []() { server.send_P(200, "text/html", WUACD_PAGE); });
 }

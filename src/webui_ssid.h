@@ -272,7 +272,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuss_routes() {
-  server.on("/ssids", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSS_PAGE);
-  });
+  server.on("/ssids", HTTP_GET, []() { server.send_P(200, "text/html", WUSS_PAGE); });
 }

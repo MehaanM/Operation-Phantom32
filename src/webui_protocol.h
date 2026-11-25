@@ -224,7 +224,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuprs_routes() {
-  server.on("/protocol", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPRS_PAGE);
-  });
+  server.on("/protocol", HTTP_GET, []() { server.send_P(200, "text/html", WUPRS_PAGE); });
 }

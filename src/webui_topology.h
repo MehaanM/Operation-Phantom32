@@ -305,7 +305,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wunto_routes() {
-  server.on("/topology", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUNTO_PAGE);
-  });
+  server.on("/topology", HTTP_GET, []() { server.send_P(200, "text/html", WUNTO_PAGE); });
 }

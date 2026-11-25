@@ -195,7 +195,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wulbm_routes() {
-  server.on("/load-balance", HTTP_GET, []() {
-    server.send_P(200, "text/html", WULBM_PAGE);
-  });
+  server.on("/load-balance", HTTP_GET, []() { server.send_P(200, "text/html", WULBM_PAGE); });
 }

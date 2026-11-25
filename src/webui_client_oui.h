@@ -229,7 +229,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wucot_routes() {
-  server.on("/client-devices", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCOT_PAGE);
-  });
+  server.on("/client-devices", HTTP_GET, []() { server.send_P(200, "text/html", WUCOT_PAGE); });
 }

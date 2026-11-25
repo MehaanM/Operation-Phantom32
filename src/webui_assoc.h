@@ -225,7 +225,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuasc_routes() {
-  server.on("/associations", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUASC_PAGE);
-  });
+  server.on("/associations", HTTP_GET, []() { server.send_P(200, "text/html", WUASC_PAGE); });
 }

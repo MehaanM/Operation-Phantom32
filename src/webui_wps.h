@@ -212,7 +212,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuwps_routes() {
-  server.on("/wps", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUWPS_PAGE);
-  });
+  server.on("/wps", HTTP_GET, []() { server.send_P(200, "text/html", WUWPS_PAGE); });
 }

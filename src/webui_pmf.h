@@ -225,7 +225,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wupmf_routes() {
-  server.on("/pmf", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPMF_PAGE);
-  });
+  server.on("/pmf", HTTP_GET, []() { server.send_P(200, "text/html", WUPMF_PAGE); });
 }

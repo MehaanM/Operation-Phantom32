@@ -256,7 +256,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wualt_routes() {
-  server.on("/ap-load", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUALT_PAGE);
-  });
+  server.on("/ap-load", HTTP_GET, []() { server.send_P(200, "text/html", WUALT_PAGE); });
 }

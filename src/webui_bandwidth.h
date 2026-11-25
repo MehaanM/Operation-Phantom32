@@ -191,7 +191,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wubw_routes() {
-  server.on("/bandwidth", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBW_PAGE);
-  });
+  server.on("/bandwidth", HTTP_GET, []() { server.send_P(200, "text/html", WUBW_PAGE); });
 }

@@ -150,7 +150,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wunbr_routes() {
-  server.on("/neighbor-report", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUNBR_PAGE);
-  });
+  server.on("/neighbor-report", HTTP_GET, []() { server.send_P(200, "text/html", WUNBR_PAGE); });
 }

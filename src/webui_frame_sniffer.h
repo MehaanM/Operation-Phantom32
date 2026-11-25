@@ -228,7 +228,5 @@ setInterval(refresh, 1500);
 )rawhtml";
 
 inline void wufrs_routes() {
-  server.on("/frame-sniffer", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFRS_PAGE);
-  });
+  server.on("/frame-sniffer", HTTP_GET, []() { server.send_P(200, "text/html", WUFRS_PAGE); });
 }

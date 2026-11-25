@@ -402,12 +402,9 @@ toggleCapture();
 )rawhtml";
 
 inline void wuf_routes() {
-  server.on("/forensics", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUF_PAGE);
-  });
+  server.on("/forensics", HTTP_GET, []() { server.send_P(200, "text/html", WUF_PAGE); });
 
   // Live packet feed endpoint (returns recent packets from pkt_stats ring buffer)
-  server.on("/api/pkt/live", HTTP_GET, []() {
-    server.send(200, "application/json", "{\"packets\":[],\"last_idx\":0}");
-  });
+  server.on("/api/pkt/live", HTTP_GET,
+            []() { server.send(200, "application/json", "{\"packets\":[],\"last_idx\":0}"); });
 }

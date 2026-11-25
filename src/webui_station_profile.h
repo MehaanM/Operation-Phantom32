@@ -231,7 +231,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wustp_routes() {
-  server.on("/stations", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSTP_PAGE);
-  });
+  server.on("/stations", HTTP_GET, []() { server.send_P(200, "text/html", WUSTP_PAGE); });
 }

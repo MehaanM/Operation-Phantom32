@@ -257,7 +257,5 @@ setInterval(refresh, 1000);
 )rawhtml";
 
 inline void wuptl_routes() {
-  server.on("/timeline", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPTL_PAGE);
-  });
+  server.on("/timeline", HTTP_GET, []() { server.send_P(200, "text/html", WUPTL_PAGE); });
 }

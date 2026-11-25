@@ -229,7 +229,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuff_routes() {
-  server.on("/filters", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFF_PAGE);
-  });
+  server.on("/filters", HTTP_GET, []() { server.send_P(200, "text/html", WUFF_PAGE); });
 }

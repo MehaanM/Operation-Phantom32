@@ -174,7 +174,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wutsf_routes() {
-  server.on("/tsf", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUTSF_PAGE);
-  });
+  server.on("/tsf", HTTP_GET, []() { server.send_P(200, "text/html", WUTSF_PAGE); });
 }

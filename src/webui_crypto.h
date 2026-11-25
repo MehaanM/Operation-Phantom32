@@ -227,7 +227,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wucra_routes() {
-  server.on("/crypto", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCRA_PAGE);
-  });
+  server.on("/crypto", HTTP_GET, []() { server.send_P(200, "text/html", WUCRA_PAGE); });
 }

@@ -206,7 +206,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuaut_routes() {
-  server.on("/ap-uptime", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAUT_PAGE);
-  });
+  server.on("/ap-uptime", HTTP_GET, []() { server.send_P(200, "text/html", WUAUT_PAGE); });
 }

@@ -183,7 +183,5 @@ setInterval(refresh, 1500);
 )rawhtml";
 
 inline void wudat_routes() {
-  server.on("/deauth", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUDAT_PAGE);
-  });
+  server.on("/deauth", HTTP_GET, []() { server.send_P(200, "text/html", WUDAT_PAGE); });
 }

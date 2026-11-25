@@ -154,7 +154,5 @@ setInterval(refresh, 1000);
 )rawhtml";
 
 inline void wufhp_routes() {
-  server.on("/hopper", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFHP_PAGE);
-  });
+  server.on("/hopper", HTTP_GET, []() { server.send_P(200, "text/html", WUFHP_PAGE); });
 }

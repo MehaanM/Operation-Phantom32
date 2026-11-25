@@ -234,7 +234,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wusrc_routes() {
-  server.on("/scan-cache", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSRC_PAGE);
-  });
+  server.on("/scan-cache", HTTP_GET, []() { server.send_P(200, "text/html", WUSRC_PAGE); });
 }

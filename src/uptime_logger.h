@@ -11,30 +11,30 @@
 
 extern WebServer server;
 
-#define ULG_MAX_EVENTS  128
-#define ULG_MSG_LEN     80
+#define ULG_MAX_EVENTS 128
+#define ULG_MSG_LEN 80
 
 enum UlgLevel : uint8_t {
-  ULG_INFO  = 0,
-  ULG_WARN  = 1,
+  ULG_INFO = 0,
+  ULG_WARN = 1,
   ULG_ERROR = 2,
   ULG_DEBUG = 3,
 };
 
-static const char* const ULG_LEVEL_STR[] = { "INFO","WARN","ERR","DBG" };
+static const char *const ULG_LEVEL_STR[] = {"INFO", "WARN", "ERR", "DBG"};
 
 struct UlgEvent {
-  uint32_t  ms;
-  UlgLevel  level;
-  char      msg[ULG_MSG_LEN];
+  uint32_t ms;
+  UlgLevel level;
+  char msg[ULG_MSG_LEN];
 };
 
 static struct {
-  UlgEvent  buf[ULG_MAX_EVENTS];
-  uint16_t  head;
-  uint32_t  total;
-  uint32_t  boot_ms;
-  uint32_t  per_level[4];
+  UlgEvent buf[ULG_MAX_EVENTS];
+  uint16_t head;
+  uint32_t total;
+  uint32_t boot_ms;
+  uint32_t per_level[4];
 } g_ulg = {};
 
 static inline void ulg_init() {
@@ -44,7 +44,7 @@ static inline void ulg_init() {
 
 static inline void ulg_log(UlgLevel level, const char *fmt, ...) {
   UlgEvent &e = g_ulg.buf[g_ulg.head % ULG_MAX_EVENTS];
-  e.ms    = millis();
+  e.ms = millis();
   e.level = level;
   va_list ap;
   va_start(ap, fmt);
@@ -56,8 +56,8 @@ static inline void ulg_log(UlgLevel level, const char *fmt, ...) {
   Serial.printf("[%s] %s\n", ULG_LEVEL_STR[level], e.msg);
 }
 
-#define ULG_INFO(...)  ulg_log(ULG_INFO,  __VA_ARGS__)
-#define ULG_WARN(...)  ulg_log(ULG_WARN,  __VA_ARGS__)
+#define ULG_INFO(...) ulg_log(ULG_INFO, __VA_ARGS__)
+#define ULG_WARN(...) ulg_log(ULG_WARN, __VA_ARGS__)
 #define ULG_ERROR(...) ulg_log(ULG_ERROR, __VA_ARGS__)
 #define ULG_DEBUG(...) ulg_log(ULG_DEBUG, __VA_ARGS__)
 
@@ -215,9 +215,7 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void ulg_routes() {
-  server.on("/syslog", HTTP_GET, []() {
-    server.send_P(200, "text/html", ULG_PAGE);
-  });
+  server.on("/syslog", HTTP_GET, []() { server.send_P(200, "text/html", ULG_PAGE); });
 
   server.on("/api/syslog", HTTP_GET, []() {
     uint16_t count = (g_ulg.total < ULG_MAX_EVENTS) ? g_ulg.total : ULG_MAX_EVENTS;
@@ -225,20 +223,29 @@ inline void ulg_routes() {
 
     String out;
     out.reserve(4096);
-    out += "{\"total\":";     out += g_ulg.total;
-    out += ",\"warns\":";     out += g_ulg.per_level[ULG_WARN];
-    out += ",\"errors\":";    out += g_ulg.per_level[ULG_ERROR];
-    out += ",\"uptime_ms\":"; out += millis() - g_ulg.boot_ms;
+    out += "{\"total\":";
+    out += g_ulg.total;
+    out += ",\"warns\":";
+    out += g_ulg.per_level[ULG_WARN];
+    out += ",\"errors\":";
+    out += g_ulg.per_level[ULG_ERROR];
+    out += ",\"uptime_ms\":";
+    out += millis() - g_ulg.boot_ms;
     out += ",\"events\":[";
     for (uint16_t i = 0; i < count; i++) {
       const UlgEvent &e = g_ulg.buf[(start + i) % ULG_MAX_EVENTS];
-      if (i > 0) out += ',';
-      out += "{\"ms\":"; out += e.ms;
-      out += ",\"level\":\""; out += ULG_LEVEL_STR[e.level]; out += '"';
+      if (i > 0)
+        out += ',';
+      out += "{\"ms\":";
+      out += e.ms;
+      out += ",\"level\":\"";
+      out += ULG_LEVEL_STR[e.level];
+      out += '"';
       out += ",\"msg\":\"";
       // Escape quotes in message
       for (uint8_t c = 0; e.msg[c]; c++) {
-        if (e.msg[c] == '"') out += '\\';
+        if (e.msg[c] == '"')
+          out += '\\';
         out += e.msg[c];
       }
       out += "\"}";

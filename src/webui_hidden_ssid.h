@@ -171,7 +171,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wuhss_routes() {
-  server.on("/hidden-ssid", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUHSS_PAGE);
-  });
+  server.on("/hidden-ssid", HTTP_GET, []() { server.send_P(200, "text/html", WUHSS_PAGE); });
 }

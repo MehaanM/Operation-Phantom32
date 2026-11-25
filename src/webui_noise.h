@@ -269,7 +269,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wunf_routes() {
-  server.on("/noise", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUNF_PAGE);
-  });
+  server.on("/noise", HTTP_GET, []() { server.send_P(200, "text/html", WUNF_PAGE); });
 }

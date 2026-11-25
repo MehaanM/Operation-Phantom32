@@ -191,7 +191,5 @@ loadInfo();
 )rawhtml";
 
 inline void wuvnd_routes() {
-  server.on("/vendor-lookup", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUVND_PAGE);
-  });
+  server.on("/vendor-lookup", HTTP_GET, []() { server.send_P(200, "text/html", WUVND_PAGE); });
 }

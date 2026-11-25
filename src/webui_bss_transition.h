@@ -200,7 +200,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wubst_routes() {
-  server.on("/bss-transition", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBST_PAGE);
-  });
+  server.on("/bss-transition", HTTP_GET, []() { server.send_P(200, "text/html", WUBST_PAGE); });
 }

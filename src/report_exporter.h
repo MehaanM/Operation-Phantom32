@@ -8,43 +8,43 @@
 
 extern WebServer server;
 
-#define REP_MAX_TEMPLATES  8
-#define REP_NAME_LEN       32
+#define REP_MAX_TEMPLATES 8
+#define REP_NAME_LEN 32
 
 // ─── Report format ────────────────────────────────────────────────────────────
-enum RepFormat { REP_FMT_JSON=0, REP_FMT_CSV, REP_FMT_TEXT };
+enum RepFormat { REP_FMT_JSON = 0, REP_FMT_CSV, REP_FMT_TEXT };
 
 // ─── Report section flags ─────────────────────────────────────────────────────
-#define REP_SEC_APS       0x0001
-#define REP_SEC_STAS      0x0002
-#define REP_SEC_BLE       0x0004
-#define REP_SEC_ALERTS    0x0008
-#define REP_SEC_EVENTS    0x0010
-#define REP_SEC_VULNS     0x0020
-#define REP_SEC_THREATS   0x0040
-#define REP_SEC_PCAP      0x0080
-#define REP_SEC_SYSTEM    0x0100
-#define REP_SEC_ALL       0xFFFF
+#define REP_SEC_APS 0x0001
+#define REP_SEC_STAS 0x0002
+#define REP_SEC_BLE 0x0004
+#define REP_SEC_ALERTS 0x0008
+#define REP_SEC_EVENTS 0x0010
+#define REP_SEC_VULNS 0x0020
+#define REP_SEC_THREATS 0x0040
+#define REP_SEC_PCAP 0x0080
+#define REP_SEC_SYSTEM 0x0100
+#define REP_SEC_ALL 0xFFFF
 
 // ─── Report template ─────────────────────────────────────────────────────────
 struct RepTemplate {
-  bool   used;
-  char   name[REP_NAME_LEN];
+  bool used;
+  char name[REP_NAME_LEN];
   RepFormat format;
-  uint16_t  sections;   // bitmask
-  bool   include_raw;   // include raw hex data
-  bool   include_hist;  // include time-series history
+  uint16_t sections;  // bitmask
+  bool include_raw;   // include raw hex data
+  bool include_hist;  // include time-series history
 };
 
 // ─── Report job state ─────────────────────────────────────────────────────────
 static struct {
   RepTemplate templates[REP_MAX_TEMPLATES];
-  uint8_t     template_count;
-  uint32_t    total_reports;
-  uint32_t    last_report_ts;
-  uint32_t    last_report_bytes;
-  bool        generating;
-  char        last_path[64];
+  uint8_t template_count;
+  uint32_t total_reports;
+  uint32_t last_report_ts;
+  uint32_t last_report_bytes;
+  bool generating;
+  char last_path[64];
 } g_rep = {};
 
 // ─── Template management ─────────────────────────────────────────────────────
@@ -110,19 +110,27 @@ static String rep_build_json(uint16_t sections) {
   s += ",\"sections\":[";
   bool first = true;
   if (sections & REP_SEC_APS) {
-    if (!first) s += ","; first = false;
+    if (!first)
+      s += ",";
+    first = false;
     s += "\"aps\"";
   }
   if (sections & REP_SEC_STAS) {
-    if (!first) s += ","; first = false;
+    if (!first)
+      s += ",";
+    first = false;
     s += "\"stas\"";
   }
   if (sections & REP_SEC_BLE) {
-    if (!first) s += ","; first = false;
+    if (!first)
+      s += ",";
+    first = false;
     s += "\"ble\"";
   }
   if (sections & REP_SEC_ALERTS) {
-    if (!first) s += ","; first = false;
+    if (!first)
+      s += ",";
+    first = false;
     s += "\"alerts\"";
   }
   s += "]}";
@@ -173,9 +181,11 @@ static String rep_build_text(uint16_t sections) {
 
 // ─── Save to LittleFS ─────────────────────────────────────────────────────────
 static bool rep_save(const char *path, const String &content) {
-  if (!LittleFS.begin()) return false;
+  if (!LittleFS.begin())
+    return false;
   File f = LittleFS.open(path, "w");
-  if (!f) return false;
+  if (!f)
+    return false;
   f.print(content);
   f.close();
   g_rep.last_report_bytes = content.length();
@@ -188,9 +198,12 @@ static bool rep_save(const char *path, const String &content) {
 // ─── Generate report ─────────────────────────────────────────────────────────
 static String rep_generate(RepFormat fmt, uint16_t sections) {
   switch (fmt) {
-    case REP_FMT_CSV:  return rep_build_csv(sections);
-    case REP_FMT_TEXT: return rep_build_text(sections);
-    default:            return rep_build_json(sections);
+    case REP_FMT_CSV:
+      return rep_build_csv(sections);
+    case REP_FMT_TEXT:
+      return rep_build_text(sections);
+    default:
+      return rep_build_json(sections);
   }
 }
 
@@ -200,17 +213,19 @@ inline void rep_routes() {
     RepFormat fmt = REP_FMT_JSON;
     if (server.hasArg("format")) {
       String f = server.arg("format");
-      if (f == "csv")  fmt = REP_FMT_CSV;
-      if (f == "text") fmt = REP_FMT_TEXT;
+      if (f == "csv")
+        fmt = REP_FMT_CSV;
+      if (f == "text")
+        fmt = REP_FMT_TEXT;
     }
     uint16_t sections = REP_SEC_ALL;
     if (server.hasArg("sections"))
       sections = (uint16_t)server.arg("sections").toInt();
 
     String report = rep_generate(fmt, sections);
-    const char *ctype = (fmt == REP_FMT_CSV) ? "text/csv" :
-                        (fmt == REP_FMT_TEXT) ? "text/plain" :
-                        "application/json";
+    const char *ctype = (fmt == REP_FMT_CSV)    ? "text/csv"
+                        : (fmt == REP_FMT_TEXT) ? "text/plain"
+                                                : "application/json";
     server.send(200, ctype, report);
     g_rep.total_reports++;
   });
@@ -219,22 +234,27 @@ inline void rep_routes() {
     RepFormat fmt = REP_FMT_JSON;
     if (server.hasArg("format")) {
       String f = server.arg("format");
-      if (f == "csv")  fmt = REP_FMT_CSV;
-      if (f == "text") fmt = REP_FMT_TEXT;
+      if (f == "csv")
+        fmt = REP_FMT_CSV;
+      if (f == "text")
+        fmt = REP_FMT_TEXT;
     }
     uint16_t sections = REP_SEC_ALL;
     if (server.hasArg("sections"))
       sections = (uint16_t)server.arg("sections").toInt();
 
     String path = "/report_" + String(millis() / 1000) + ".json";
-    if (fmt == REP_FMT_CSV)  path = "/report_" + String(millis() / 1000) + ".csv";
-    if (fmt == REP_FMT_TEXT) path = "/report_" + String(millis() / 1000) + ".txt";
+    if (fmt == REP_FMT_CSV)
+      path = "/report_" + String(millis() / 1000) + ".csv";
+    if (fmt == REP_FMT_TEXT)
+      path = "/report_" + String(millis() / 1000) + ".txt";
 
     String report = rep_generate(fmt, sections);
     bool ok = rep_save(path.c_str(), report);
     if (ok) {
-      server.send(200, "application/json",
-        "{\"ok\":true,\"path\":\"" + path + "\",\"bytes\":" + String(report.length()) + "}");
+      server.send(
+          200, "application/json",
+          "{\"ok\":true,\"path\":\"" + path + "\",\"bytes\":" + String(report.length()) + "}");
     } else {
       server.send(500, "application/json", "{\"error\":\"save failed\"}");
     }
@@ -252,7 +272,8 @@ inline void rep_routes() {
 
   server.on("/api/rep/list_saved", HTTP_GET, []() {
     if (!LittleFS.begin()) {
-      server.send(500, "application/json", "{\"error\":\"fs failed\"}"); return;
+      server.send(500, "application/json", "{\"error\":\"fs failed\"}");
+      return;
     }
     String s = "[";
     bool first = true;
@@ -261,7 +282,8 @@ inline void rep_routes() {
     while (file) {
       String name = file.name();
       if (name.startsWith("/report_")) {
-        if (!first) s += ",";
+        if (!first)
+          s += ",";
         first = false;
         s += "{\"path\":\"" + name + "\",\"size\":" + String(file.size()) + "}";
       }
@@ -273,14 +295,17 @@ inline void rep_routes() {
 
   server.on("/api/rep/delete", HTTP_POST, []() {
     if (!server.hasArg("path")) {
-      server.send(400, "application/json", "{\"error\":\"missing path\"}"); return;
+      server.send(400, "application/json", "{\"error\":\"missing path\"}");
+      return;
     }
     String path = server.arg("path");
     if (!path.startsWith("/report_")) {
-      server.send(400, "application/json", "{\"error\":\"invalid path\"}"); return;
+      server.send(400, "application/json", "{\"error\":\"invalid path\"}");
+      return;
     }
     if (!LittleFS.begin()) {
-      server.send(500, "application/json", "{\"error\":\"fs failed\"}"); return;
+      server.send(500, "application/json", "{\"error\":\"fs failed\"}");
+      return;
     }
     bool ok = LittleFS.remove(path.c_str());
     server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"error\":\"remove failed\"}");

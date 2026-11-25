@@ -221,7 +221,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuart_routes() {
-  server.on("/rssi-tracker", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUART_PAGE);
-  });
+  server.on("/rssi-tracker", HTTP_GET, []() { server.send_P(200, "text/html", WUART_PAGE); });
 }

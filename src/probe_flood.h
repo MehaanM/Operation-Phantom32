@@ -13,23 +13,23 @@
 extern WebServer server;
 
 #ifdef PHANTOM32_LITE
-#define PFL_MAX_CLIENTS  8
-#define PFL_MAX_TARGETS  4    // unique SSIDs probed per client (lite)
+#define PFL_MAX_CLIENTS 8
+#define PFL_MAX_TARGETS 4  // unique SSIDs probed per client (lite)
 #else
-#define PFL_MAX_CLIENTS  48
-#define PFL_MAX_TARGETS  32   // unique SSIDs probed per client
+#define PFL_MAX_CLIENTS 48
+#define PFL_MAX_TARGETS 32  // unique SSIDs probed per client
 #endif
-#define PFL_HIST_LEN     30
-#define PFL_FLOOD_THRESH  8   // probes/sec threshold
+#define PFL_HIST_LEN 30
+#define PFL_FLOOD_THRESH 8  // probes/sec threshold
 
 struct PflTarget {
-  char    ssid[33];
+  char ssid[33];
   uint16_t count;
   uint32_t last_ts;
 };
 
 struct PflClient {
-  bool    active;
+  bool active;
   uint8_t mac[6];
 
   uint32_t total_probes;
@@ -38,70 +38,78 @@ struct PflClient {
 
   // Rolling 30s rate
   uint16_t hist[PFL_HIST_LEN];
-  uint8_t  hist_head;
+  uint8_t hist_head;
   uint16_t cur_count;
   uint32_t last_tick_s;
 
-  bool     flood_active;
+  bool flood_active;
   uint32_t flood_start_ts;
 
   // Top SSID targets
   PflTarget targets[PFL_MAX_TARGETS];
-  uint8_t   target_count;
+  uint8_t target_count;
 
-  int8_t   rssi;
+  int8_t rssi;
   uint32_t first_ts;
   uint32_t last_ts;
 };
 
 typedef struct {
   PflClient clients[PFL_MAX_CLIENTS];
-  uint8_t   count;
-  uint32_t  total_probes;
+  uint8_t count;
+  uint32_t total_probes;
 } G_PflState;
 #ifdef BOARD_HAS_PSRAM
-static G_PflState* _g_pfl_raw;
+static G_PflState *_g_pfl_raw;
 #define g_pfl (*_g_pfl_raw)
 #else
 static G_PflState g_pfl;
 #endif
 
-static bool pfl_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
+static bool pfl_mac_eq(const uint8_t *a, const uint8_t *b) {
+  return memcmp(a, b, 6) == 0;
+}
 
-static PflClient* pfl_find(const uint8_t *mac) {
+static PflClient *pfl_find(const uint8_t *mac) {
   for (int i = 0; i < PFL_MAX_CLIENTS; i++)
     if (g_pfl.clients[i].active && pfl_mac_eq(g_pfl.clients[i].mac, mac))
       return &g_pfl.clients[i];
   return nullptr;
 }
 
-static PflClient* pfl_alloc(const uint8_t *mac) {
+static PflClient *pfl_alloc(const uint8_t *mac) {
   for (int i = 0; i < PFL_MAX_CLIENTS; i++) {
     if (!g_pfl.clients[i].active) {
       PflClient &c = g_pfl.clients[i];
       memset(&c, 0, sizeof(c));
       c.active = true;
       memcpy(c.mac, mac, 6);
-      c.first_ts = millis()/1000;
+      c.first_ts = millis() / 1000;
       g_pfl.count++;
       return &c;
     }
   }
-  uint32_t oldest = UINT32_MAX; int idx = 0;
+  uint32_t oldest = UINT32_MAX;
+  int idx = 0;
   for (int i = 0; i < PFL_MAX_CLIENTS; i++)
-    if (g_pfl.clients[i].last_ts < oldest) { oldest = g_pfl.clients[i].last_ts; idx = i; }
+    if (g_pfl.clients[i].last_ts < oldest) {
+      oldest = g_pfl.clients[i].last_ts;
+      idx = i;
+    }
   memset(&g_pfl.clients[idx], 0, sizeof(g_pfl.clients[0]));
   g_pfl.clients[idx].active = true;
   memcpy(g_pfl.clients[idx].mac, mac, 6);
-  g_pfl.clients[idx].first_ts = millis()/1000;
+  g_pfl.clients[idx].first_ts = millis() / 1000;
   return &g_pfl.clients[idx];
 }
 
 static void pfl_tick(PflClient &c) {
-  uint32_t now_s = millis()/1000;
-  if (now_s == c.last_tick_s) return;
+  uint32_t now_s = millis() / 1000;
+  if (now_s == c.last_tick_s)
+    return;
   uint32_t elapsed = now_s - c.last_tick_s;
-  if (elapsed > PFL_HIST_LEN) elapsed = PFL_HIST_LEN;
+  if (elapsed > PFL_HIST_LEN)
+    elapsed = PFL_HIST_LEN;
   for (uint32_t i = 0; i < elapsed; i++) {
     c.hist[c.hist_head % PFL_HIST_LEN] = (i == 0) ? c.cur_count : 0;
     c.hist_head = (c.hist_head + 1) % PFL_HIST_LEN;
@@ -112,11 +120,14 @@ static void pfl_tick(PflClient &c) {
 
 void pfl_ingest(const uint8_t *client_mac, const char *ssid, int8_t rssi) {
   PflClient *c = pfl_find(client_mac);
-  if (!c) c = pfl_alloc(client_mac);
-  if (!c) return;
+  if (!c)
+    c = pfl_alloc(client_mac);
+  if (!c)
+    return;
 
-  c->last_ts = millis()/1000;
-  if (rssi < 0) c->rssi = rssi;
+  c->last_ts = millis() / 1000;
+  if (rssi < 0)
+    c->rssi = rssi;
   c->total_probes++;
   g_pfl.total_probes++;
 
@@ -146,9 +157,13 @@ void pfl_ingest(const uint8_t *client_mac, const char *ssid, int8_t rssi) {
         t.last_ts = c->last_ts;
       } else {
         // Replace oldest
-        uint32_t oldest = UINT32_MAX; int idx = 0;
+        uint32_t oldest = UINT32_MAX;
+        int idx = 0;
         for (int i = 0; i < PFL_MAX_TARGETS; i++)
-          if (c->targets[i].last_ts < oldest) { oldest = c->targets[i].last_ts; idx = i; }
+          if (c->targets[i].last_ts < oldest) {
+            oldest = c->targets[i].last_ts;
+            idx = i;
+          }
         strncpy(c->targets[idx].ssid, ssid, 32);
         c->targets[idx].count = 1;
         c->targets[idx].last_ts = c->last_ts;
@@ -158,7 +173,8 @@ void pfl_ingest(const uint8_t *client_mac, const char *ssid, int8_t rssi) {
 
   // Check flood
   uint32_t ws = 0;
-  for (int i = 0; i < PFL_HIST_LEN; i++) ws += c->hist[i];
+  for (int i = 0; i < PFL_HIST_LEN; i++)
+    ws += c->hist[i];
   float rate = (float)ws / PFL_HIST_LEN;
   if (rate >= PFL_FLOOD_THRESH) {
     if (!c->flood_active) {
@@ -171,8 +187,7 @@ void pfl_ingest(const uint8_t *client_mac, const char *ssid, int8_t rssi) {
 }
 
 static void pfl_mac_str(const uint8_t *m, char *out) {
-  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-           m[0],m[1],m[2],m[3],m[4],m[5]);
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 static String pfl_json_all() {
@@ -180,17 +195,23 @@ static String pfl_json_all() {
   s += ",\"total_probes\":" + String(g_pfl.total_probes);
   int floods = 0;
   for (int i = 0; i < PFL_MAX_CLIENTS; i++)
-    if (g_pfl.clients[i].active && g_pfl.clients[i].flood_active) floods++;
+    if (g_pfl.clients[i].active && g_pfl.clients[i].flood_active)
+      floods++;
   s += ",\"active_floods\":" + String(floods);
   s += ",\"clients\":[";
-  char mac[18]; bool first = true;
+  char mac[18];
+  bool first = true;
   for (int i = 0; i < PFL_MAX_CLIENTS; i++) {
     PflClient &c = g_pfl.clients[i];
-    if (!c.active) continue;
-    if (!first) s += ","; first = false;
+    if (!c.active)
+      continue;
+    if (!first)
+      s += ",";
+    first = false;
     pfl_mac_str(c.mac, mac);
     uint32_t ws = 0;
-    for (int j = 0; j < PFL_HIST_LEN; j++) ws += c.hist[j];
+    for (int j = 0; j < PFL_HIST_LEN; j++)
+      ws += c.hist[j];
     float rate = (float)ws / PFL_HIST_LEN;
     s += "{\"mac\":\"" + String(mac) + "\"";
     s += ",\"rssi\":" + String(c.rssi);
@@ -202,19 +223,23 @@ static String pfl_json_all() {
     s += ",\"targets\":[";
     bool ft = true;
     for (int j = 0; j < c.target_count; j++) {
-      if (!ft) s += ","; ft = false;
+      if (!ft)
+        s += ",";
+      ft = false;
       // Escape SSID
       s += "{\"ssid\":\"";
       for (int k = 0; k < 32 && c.targets[j].ssid[k]; k++) {
         char ch = c.targets[j].ssid[k];
-        if (ch == '"' || ch == '\\') s += '\\';
+        if (ch == '"' || ch == '\\')
+          s += '\\';
         s += ch;
       }
       s += "\",\"count\":" + String(c.targets[j].count) + "}";
     }
     s += "],\"hist\":[";
     for (int j = 0; j < PFL_HIST_LEN; j++) {
-      if (j) s += ",";
+      if (j)
+        s += ",";
       int idx = (c.hist_head + j) % PFL_HIST_LEN;
       s += String(c.hist[idx]);
     }
@@ -225,9 +250,8 @@ static String pfl_json_all() {
 }
 
 inline void pfl_routes() {
-  server.on("/api/pfl/all", HTTP_GET, []() {
-    server.send(200, "application/json", pfl_json_all());
-  });
+  server.on("/api/pfl/all", HTTP_GET,
+            []() { server.send(200, "application/json", pfl_json_all()); });
   server.on("/api/pfl/clear", HTTP_POST, []() {
     memset(&g_pfl, 0, sizeof(g_pfl));
     server.send(200, "application/json", "{\"ok\":true}");

@@ -176,7 +176,5 @@ setInterval(refresh, 1500);
 )rawhtml";
 
 inline void wuart_routes() {
-  server.on("/aprates", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUART_PAGE);
-  });
+  server.on("/aprates", HTTP_GET, []() { server.send_P(200, "text/html", WUART_PAGE); });
 }

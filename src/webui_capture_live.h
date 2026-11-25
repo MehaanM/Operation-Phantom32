@@ -159,7 +159,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wupcl_routes() {
-  server.on("/capture-live", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPCL_PAGE);
-  });
+  server.on("/capture-live", HTTP_GET, []() { server.send_P(200, "text/html", WUPCL_PAGE); });
 }

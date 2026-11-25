@@ -170,7 +170,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuwpb_routes() {
-  server.on("/wps-brute", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUWPB_PAGE);
-  });
+  server.on("/wps-brute", HTTP_GET, []() { server.send_P(200, "text/html", WUWPB_PAGE); });
 }

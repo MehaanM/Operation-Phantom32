@@ -412,7 +412,5 @@ setInterval(loadVulns, 15000);
 )rawhtml";
 
 inline void wuv_routes() {
-  server.on("/vulns", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUV_PAGE);
-  });
+  server.on("/vulns", HTTP_GET, []() { server.send_P(200, "text/html", WUV_PAGE); });
 }

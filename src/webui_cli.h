@@ -498,7 +498,5 @@ fetch('/api/cli/commands').then(r => r.json()).then(data => {
 )rawhtml";
 
 inline void wucli_routes() {
-  server.on("/cli", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCLI_PAGE);
-  });
+  server.on("/cli", HTTP_GET, []() { server.send_P(200, "text/html", WUCLI_PAGE); });
 }

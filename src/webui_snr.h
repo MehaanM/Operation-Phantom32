@@ -211,7 +211,5 @@ setInterval(refresh, 2500);
 )rawhtml";
 
 inline void wusnr_routes() {
-  server.on("/snr", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSNR_PAGE);
-  });
+  server.on("/snr", HTTP_GET, []() { server.send_P(200, "text/html", WUSNR_PAGE); });
 }

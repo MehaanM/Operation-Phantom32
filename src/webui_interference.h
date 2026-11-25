@@ -189,7 +189,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuchi_routes() {
-  server.on("/interference", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCHI_PAGE);
-  });
+  server.on("/interference", HTTP_GET, []() { server.send_P(200, "text/html", WUCHI_PAGE); });
 }

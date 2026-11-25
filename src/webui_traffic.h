@@ -263,7 +263,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wutfc_routes() {
-  server.on("/traffic", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUTFC_PAGE);
-  });
+  server.on("/traffic", HTTP_GET, []() { server.send_P(200, "text/html", WUTFC_PAGE); });
 }

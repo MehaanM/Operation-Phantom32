@@ -269,7 +269,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wucaz_routes() {
-  server.on("/channel-analyzer", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCAZ_PAGE);
-  });
+  server.on("/channel-analyzer", HTTP_GET, []() { server.send_P(200, "text/html", WUCAZ_PAGE); });
 }

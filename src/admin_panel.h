@@ -14,14 +14,14 @@
 extern WebServer server;
 
 // Forward declarations for globals defined in main.cpp
-extern bool     g_promisc_active;
-extern uint8_t  g_current_ch;
+extern bool g_promisc_active;
+extern uint8_t g_current_ch;
 extern uint32_t g_frames_rx;
 extern uint32_t g_fps_current;
-extern bool     g_ext_modules_enabled;
-extern bool     g_hop_enabled;
+extern bool g_ext_modules_enabled;
+extern bool g_hop_enabled;
 extern uint16_t g_hop_dwell_ms;
-extern const char* const PHANTOM32_VERSION;
+extern const char *const PHANTOM32_VERSION;
 
 static const char ADM_PAGE[] PROGMEM = R"rawhtml(
 <!DOCTYPE html>
@@ -369,7 +369,5 @@ setInterval(refreshAll, 5000);
 )rawhtml";
 
 inline void adm_routes() {
-  server.on("/admin", HTTP_GET, []() {
-    server.send_P(200, "text/html", ADM_PAGE);
-  });
+  server.on("/admin", HTTP_GET, []() { server.send_P(200, "text/html", ADM_PAGE); });
 }

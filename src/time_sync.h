@@ -9,46 +9,46 @@
 
 extern WebServer server;
 
-#define NTP_PACKET_SIZE    48
-#define NTP_PORT           123
-#define NTP_TIMEOUT_MS     5000
-#define NTP_RETRY_MAX      3
-#define NTP_SYNC_INTERVAL  3600  // seconds between syncs
+#define NTP_PACKET_SIZE 48
+#define NTP_PORT 123
+#define NTP_TIMEOUT_MS 5000
+#define NTP_RETRY_MAX 3
+#define NTP_SYNC_INTERVAL 3600  // seconds between syncs
 
 // NTP epoch is Jan 1 1900; Unix epoch is Jan 1 1970
-#define NTP_UNIX_OFFSET    2208988800UL
+#define NTP_UNIX_OFFSET 2208988800UL
 
-static const char* NTP_SERVERS[] = {
-  "pool.ntp.org",
-  "time.google.com",
-  "time.cloudflare.com",
-  "time.windows.com",
+static const char *NTP_SERVERS[] = {
+    "pool.ntp.org",
+    "time.google.com",
+    "time.cloudflare.com",
+    "time.windows.com",
 };
 #define NTP_SERVER_COUNT 4
 
 // ─── State ────────────────────────────────────────────────────────────────────
 static struct {
-  bool     synced;
-  uint32_t epoch;          // Unix timestamp at last sync
-  uint32_t sync_millis;    // millis() value at last sync
-  uint32_t last_sync_ts;   // millis() of last successful sync
+  bool synced;
+  uint32_t epoch;         // Unix timestamp at last sync
+  uint32_t sync_millis;   // millis() value at last sync
+  uint32_t last_sync_ts;  // millis() of last successful sync
   uint32_t sync_count;
   uint32_t fail_count;
-  char     server_used[32];
-  int32_t  offset_ms;      // accumulated drift estimate
-  int8_t   retry_count;
-  int8_t   current_server_idx;
-  WiFiUDP  udp;
-  bool     udp_started;
+  char server_used[32];
+  int32_t offset_ms;  // accumulated drift estimate
+  int8_t retry_count;
+  int8_t current_server_idx;
+  WiFiUDP udp;
+  bool udp_started;
 } g_ntp = {};
 
 // ─── NTP packet builder ───────────────────────────────────────────────────────
 static void ntp_build_packet(uint8_t *buf) {
   memset(buf, 0, NTP_PACKET_SIZE);
-  buf[0] = 0b11100011; // LI=3 (unsynchronized), VN=4, Mode=3 (client)
-  buf[1] = 0;          // Stratum (unspecified)
-  buf[2] = 6;          // Polling interval
-  buf[3] = 0xEC;       // Precision
+  buf[0] = 0b11100011;  // LI=3 (unsynchronized), VN=4, Mode=3 (client)
+  buf[1] = 0;           // Stratum (unspecified)
+  buf[2] = 6;           // Polling interval
+  buf[3] = 0xEC;        // Precision
   // Root delay, root dispersion, reference ID: left as 0
 }
 
@@ -56,7 +56,7 @@ static void ntp_build_packet(uint8_t *buf) {
 static bool ntp_send_request(const char *server_host) {
   uint8_t pkt[NTP_PACKET_SIZE];
   ntp_build_packet(pkt);
-  g_ntp.udp.begin(NTP_PORT + 1); // local port
+  g_ntp.udp.begin(NTP_PORT + 1);  // local port
   g_ntp.udp.beginPacket(server_host, NTP_PORT);
   g_ntp.udp.write(pkt, NTP_PACKET_SIZE);
   return g_ntp.udp.endPacket() == 1;
@@ -73,8 +73,9 @@ static bool ntp_parse_response(uint32_t *epoch_out) {
       g_ntp.udp.stop();
       // Transmit timestamp is bytes 40-43
       uint32_t secs = ((uint32_t)pkt[40] << 24) | ((uint32_t)pkt[41] << 16) |
-                      ((uint32_t)pkt[42] << 8)  |  (uint32_t)pkt[43];
-      if (secs == 0) return false;
+                      ((uint32_t)pkt[42] << 8) | (uint32_t)pkt[43];
+      if (secs == 0)
+        return false;
       *epoch_out = secs - NTP_UNIX_OFFSET;
       return true;
     }
@@ -113,25 +114,28 @@ inline bool ntp_sync(const char *server_host = nullptr) {
     g_ntp.offset_ms += drift_ms;
   }
 
-  g_ntp.epoch       = epoch;
+  g_ntp.epoch = epoch;
   g_ntp.sync_millis = sync_ms;
   g_ntp.last_sync_ts = sync_ms;
-  g_ntp.synced      = true;
+  g_ntp.synced = true;
   g_ntp.sync_count++;
   return true;
 }
 
 // ─── Get current time ─────────────────────────────────────────────────────────
 inline uint32_t ntp_epoch() {
-  if (!g_ntp.synced) return 0;
+  if (!g_ntp.synced)
+    return 0;
   uint32_t elapsed_ms = millis() - g_ntp.sync_millis;
   return g_ntp.epoch + elapsed_ms / 1000;
 }
 
 // Convert a millis()-based timestamp to epoch
 inline uint32_t ntp_ms_to_epoch(uint32_t ts_ms) {
-  if (!g_ntp.synced) return 0;
-  if (ts_ms <= g_ntp.sync_millis) return g_ntp.epoch;
+  if (!g_ntp.synced)
+    return 0;
+  if (ts_ms <= g_ntp.sync_millis)
+    return g_ntp.epoch;
   return g_ntp.epoch + (ts_ms - g_ntp.sync_millis) / 1000;
 }
 
@@ -145,11 +149,11 @@ static void ntp_format(uint32_t epoch, char *buf, int buflen) {
   int ss = secs_today % 60;
 
   // Gregorian calendar
-  uint32_t a = days + 2440588; // JDN for 1970-01-01
-  uint32_t f = a + 1401 + (((4*a + 274277) / 146097) * 3) / 4 - 38;
-  uint32_t e = 4*f + 3;
+  uint32_t a = days + 2440588;  // JDN for 1970-01-01
+  uint32_t f = a + 1401 + (((4 * a + 274277) / 146097) * 3) / 4 - 38;
+  uint32_t e = 4 * f + 3;
   uint32_t g = (e % 1461) / 4;
-  uint32_t h = 5*g + 2;
+  uint32_t h = 5 * g + 2;
   int D = (h % 153) / 5 + 1;
   int M = (h / 153 + 2) % 12 + 1;
   int Y = e / 1461 - 4716 + (14 - M) / 12;
@@ -171,7 +175,8 @@ inline void ntp_tick() {
 inline void ntp_routes() {
   server.on("/api/ntp/status", HTTP_GET, []() {
     char time_str[32] = "not synced";
-    if (g_ntp.synced) ntp_format(ntp_epoch(), time_str, sizeof(time_str));
+    if (g_ntp.synced)
+      ntp_format(ntp_epoch(), time_str, sizeof(time_str));
     String s = "{\"synced\":" + String(g_ntp.synced ? "true" : "false");
     s += ",\"epoch\":" + String(ntp_epoch());
     s += ",\"time\":\"" + String(time_str) + "\"";
@@ -186,17 +191,23 @@ inline void ntp_routes() {
   server.on("/api/ntp/sync", HTTP_POST, []() {
     bool ok = ntp_sync(server.hasArg("server") ? server.arg("server").c_str() : nullptr);
     char time_str[32] = "";
-    if (ok) ntp_format(ntp_epoch(), time_str, sizeof(time_str));
+    if (ok)
+      ntp_format(ntp_epoch(), time_str, sizeof(time_str));
     String s = String("{\"ok\":") + (ok ? "true" : "false") + ",\"time\":\"" + time_str + "\"}";
     server.send(200, "application/json", s);
   });
 
   server.on("/api/ntp/convert", HTTP_GET, []() {
-    if (!server.hasArg("ms")) { server.send(400, "application/json", "{\"error\":\"missing ms\"}"); return; }
+    if (!server.hasArg("ms")) {
+      server.send(400, "application/json", "{\"error\":\"missing ms\"}");
+      return;
+    }
     uint32_t ms = (uint32_t)server.arg("ms").toInt();
     uint32_t ep = ntp_ms_to_epoch(ms);
     char buf[32] = "";
-    if (ep) ntp_format(ep, buf, sizeof(buf));
-    server.send(200, "application/json", "{\"epoch\":" + String(ep) + ",\"time\":\"" + String(buf) + "\"}");
+    if (ep)
+      ntp_format(ep, buf, sizeof(buf));
+    server.send(200, "application/json",
+                "{\"epoch\":" + String(ep) + ",\"time\":\"" + String(buf) + "\"}");
   });
 }

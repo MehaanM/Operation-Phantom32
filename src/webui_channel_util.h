@@ -166,7 +166,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wucut_routes() {
-  server.on("/channel-util", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCUT_PAGE);
-  });
+  server.on("/channel-util", HTTP_GET, []() { server.send_P(200, "text/html", WUCUT_PAGE); });
 }

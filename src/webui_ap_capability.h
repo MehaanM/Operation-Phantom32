@@ -213,7 +213,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuapc_routes() {
-  server.on("/ap-capabilities", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAPC_PAGE);
-  });
+  server.on("/ap-capabilities", HTTP_GET, []() { server.send_P(200, "text/html", WUAPC_PAGE); });
 }

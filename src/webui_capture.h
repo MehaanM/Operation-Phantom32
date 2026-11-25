@@ -388,7 +388,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wucap_routes() {
-  server.on("/capture", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCAP_PAGE);
-  });
+  server.on("/capture", HTTP_GET, []() { server.send_P(200, "text/html", WUCAP_PAGE); });
 }

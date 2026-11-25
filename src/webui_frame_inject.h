@@ -165,7 +165,5 @@ setInterval(refresh, 1000);
 )rawhtml";
 
 inline void wufil_routes() {
-  server.on("/frame-inject-log", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFIL_PAGE);
-  });
+  server.on("/frame-inject-log", HTTP_GET, []() { server.send_P(200, "text/html", WUFIL_PAGE); });
 }

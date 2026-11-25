@@ -284,7 +284,5 @@ window.addEventListener('resize', () => { drawSpectrum(); drawWaterfall(); });
 )rawhtml";
 
 inline void wusps_routes() {
-  server.on("/spectrum", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSPS_PAGE);
-  });
+  server.on("/spectrum", HTTP_GET, []() { server.send_P(200, "text/html", WUSPS_PAGE); });
 }

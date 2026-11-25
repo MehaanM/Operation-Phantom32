@@ -154,7 +154,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuapa_routes() {
-  server.on("/anomaly", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAPA_PAGE);
-  });
+  server.on("/anomaly", HTTP_GET, []() { server.send_P(200, "text/html", WUAPA_PAGE); });
 }

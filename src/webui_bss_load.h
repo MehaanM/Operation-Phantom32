@@ -187,7 +187,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wubsl_routes() {
-  server.on("/bss-load", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBSL_PAGE);
-  });
+  server.on("/bss-load", HTTP_GET, []() { server.send_P(200, "text/html", WUBSL_PAGE); });
 }

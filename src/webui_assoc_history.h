@@ -235,7 +235,5 @@ setInterval(refresh, 2500);
 )rawhtml";
 
 inline void wuash_routes() {
-  server.on("/assoc-history", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUASH_PAGE);
-  });
+  server.on("/assoc-history", HTTP_GET, []() { server.send_P(200, "text/html", WUASH_PAGE); });
 }

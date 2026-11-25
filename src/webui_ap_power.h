@@ -164,7 +164,5 @@ setInterval(refresh, 2500);
 )rawhtml";
 
 inline void wuapp_routes() {
-  server.on("/ap-power", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAPP_PAGE);
-  });
+  server.on("/ap-power", HTTP_GET, []() { server.send_P(200, "text/html", WUAPP_PAGE); });
 }

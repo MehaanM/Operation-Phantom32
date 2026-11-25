@@ -182,7 +182,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuplt_routes() {
-  server.on("/pkt-loss", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPLT_PAGE);
-  });
+  server.on("/pkt-loss", HTTP_GET, []() { server.send_P(200, "text/html", WUPLT_PAGE); });
 }

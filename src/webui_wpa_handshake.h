@@ -204,7 +204,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuwht_routes() {
-  server.on("/wpa-handshake", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUWHT_PAGE);
-  });
+  server.on("/wpa-handshake", HTTP_GET, []() { server.send_P(200, "text/html", WUWHT_PAGE); });
 }

@@ -230,7 +230,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuwl_routes() {
-  server.on("/watchlist", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUWL_PAGE);
-  });
+  server.on("/watchlist", HTTP_GET, []() { server.send_P(200, "text/html", WUWL_PAGE); });
 }

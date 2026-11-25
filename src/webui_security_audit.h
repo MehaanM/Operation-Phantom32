@@ -226,7 +226,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wusau_routes() {
-  server.on("/security-audit", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSAU_PAGE);
-  });
+  server.on("/security-audit", HTTP_GET, []() { server.send_P(200, "text/html", WUSAU_PAGE); });
 }

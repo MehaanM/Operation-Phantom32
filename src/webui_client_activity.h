@@ -209,7 +209,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wucac_routes() {
-  server.on("/client-activity", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCAC_PAGE);
-  });
+  server.on("/client-activity", HTTP_GET, []() { server.send_P(200, "text/html", WUCAC_PAGE); });
 }

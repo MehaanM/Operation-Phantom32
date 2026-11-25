@@ -607,7 +607,5 @@ loadSettings();
 )rawhtml";
 
 inline void wuset_routes() {
-  server.on("/settings", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSET_PAGE);
-  });
+  server.on("/settings", HTTP_GET, []() { server.send_P(200, "text/html", WUSET_PAGE); });
 }

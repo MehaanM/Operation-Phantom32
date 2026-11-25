@@ -171,7 +171,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wubcq_routes() {
-  server.on("/beacon-quality", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBCQ_PAGE);
-  });
+  server.on("/beacon-quality", HTTP_GET, []() { server.send_P(200, "text/html", WUBCQ_PAGE); });
 }

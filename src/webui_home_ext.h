@@ -309,7 +309,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuhe_routes() {
-  server.on("/dashboard", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUHE_PAGE);
-  });
+  server.on("/dashboard", HTTP_GET, []() { server.send_P(200, "text/html", WUHE_PAGE); });
 }

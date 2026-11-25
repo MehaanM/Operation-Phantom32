@@ -443,7 +443,5 @@ setInterval(loadData, 10000);
 )rawhtml";
 
 inline void wudev_routes() {
-  server.on("/devices", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUDEV_PAGE);
-  });
+  server.on("/devices", HTTP_GET, []() { server.send_P(200, "text/html", WUDEV_PAGE); });
 }

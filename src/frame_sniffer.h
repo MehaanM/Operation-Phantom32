@@ -8,14 +8,14 @@
 
 extern WebServer server;
 
-#define FRS_HIST_LEN        60   // 1-minute rolling window
-#define FRS_MAX_SSID_TABLE  64
+#define FRS_HIST_LEN 60  // 1-minute rolling window
+#define FRS_MAX_SSID_TABLE 64
 
 enum FrsDirection : uint8_t {
-  FRS_DIR_FROMDS = 0, // FromDS=1, ToDS=0
-  FRS_DIR_TODS   = 1, // FromDS=0, ToDS=1
-  FRS_DIR_BSSDS  = 2, // Both DS bits set (WDS)
-  FRS_DIR_IBSS   = 3, // Both DS bits clear
+  FRS_DIR_FROMDS = 0,  // FromDS=1, ToDS=0
+  FRS_DIR_TODS = 1,    // FromDS=0, ToDS=1
+  FRS_DIR_BSSDS = 2,   // Both DS bits set (WDS)
+  FRS_DIR_IBSS = 3,    // Both DS bits clear
 };
 
 struct FrsBucket {
@@ -41,74 +41,127 @@ struct FrsBucket {
 
 static struct {
   FrsBucket hist[FRS_HIST_LEN];
-  uint32_t  hist_head;
+  uint32_t hist_head;
   FrsBucket total;
-  uint32_t  dir_counts[4];
-  uint32_t  per_channel[14];  // ch 1-13
-  uint32_t  last_tick_s;
+  uint32_t dir_counts[4];
+  uint32_t per_channel[14];  // ch 1-13
+  uint32_t last_tick_s;
   FrsBucket cur;
 } g_frs = {};
 
 void frs_ingest(const uint8_t *data, uint16_t len, uint8_t ch) {
-  if (!data || len < 10) return;
+  if (!data || len < 10)
+    return;
   uint8_t fc0 = data[0];
   uint8_t fc1 = data[1];
-  uint8_t type    = (fc0 >> 2) & 0x03;
+  uint8_t type = (fc0 >> 2) & 0x03;
   uint8_t subtype = (fc0 >> 4) & 0x0f;
-  bool to_ds   = fc1 & 0x01;
+  bool to_ds = fc1 & 0x01;
   bool from_ds = (fc1 >> 1) & 0x01;
 
   FrsBucket &b = g_frs.cur;
   FrsBucket &t = g_frs.total;
-  b.total++; t.total++;
-  b.bytes += len; t.bytes += len;
+  b.total++;
+  t.total++;
+  b.bytes += len;
+  t.bytes += len;
 
   if (ch >= 1 && ch <= 13) {
     g_frs.per_channel[ch - 1]++;
   }
 
   FrsDirection dir;
-  if (!from_ds && !to_ds) dir = FRS_DIR_IBSS;
-  else if (!from_ds && to_ds) dir = FRS_DIR_TODS;
-  else if (from_ds && !to_ds) dir = FRS_DIR_FROMDS;
-  else dir = FRS_DIR_BSSDS;
+  if (!from_ds && !to_ds)
+    dir = FRS_DIR_IBSS;
+  else if (!from_ds && to_ds)
+    dir = FRS_DIR_TODS;
+  else if (from_ds && !to_ds)
+    dir = FRS_DIR_FROMDS;
+  else
+    dir = FRS_DIR_BSSDS;
   g_frs.dir_counts[dir]++;
 
   switch (type) {
-    case 0: // management
-      b.mgmt++; t.mgmt++;
+    case 0:  // management
+      b.mgmt++;
+      t.mgmt++;
       switch (subtype) {
-        case 8:  b.beacon++;    t.beacon++;    break;
-        case 4:  b.probe_req++; t.probe_req++; break;
-        case 5:  b.probe_rsp++; t.probe_rsp++; break;
-        case 0:  b.assoc_req++; t.assoc_req++; break;
-        case 1:  b.assoc_rsp++; t.assoc_rsp++; break;
-        case 10: b.disassoc++;  t.disassoc++;  break;
-        case 12: b.deauth++;    t.deauth++;    break;
+        case 8:
+          b.beacon++;
+          t.beacon++;
+          break;
+        case 4:
+          b.probe_req++;
+          t.probe_req++;
+          break;
+        case 5:
+          b.probe_rsp++;
+          t.probe_rsp++;
+          break;
+        case 0:
+          b.assoc_req++;
+          t.assoc_req++;
+          break;
+        case 1:
+          b.assoc_rsp++;
+          t.assoc_rsp++;
+          break;
+        case 10:
+          b.disassoc++;
+          t.disassoc++;
+          break;
+        case 12:
+          b.deauth++;
+          t.deauth++;
+          break;
         case 11:
-        case 1:  b.auth++;      t.auth++;      break;
-        case 13: b.action++;    t.action++;    break;
+        case 1:
+          b.auth++;
+          t.auth++;
+          break;
+        case 13:
+          b.action++;
+          t.action++;
+          break;
       }
       break;
-    case 1: // control
-      b.ctrl++; t.ctrl++;
+    case 1:  // control
+      b.ctrl++;
+      t.ctrl++;
       switch (subtype) {
-        case 11: b.rts_cts++; t.rts_cts++; break;
-        case 12: b.rts_cts++; t.rts_cts++; break;
-        case 13: b.ack++;     t.ack++;     break;
+        case 11:
+          b.rts_cts++;
+          t.rts_cts++;
+          break;
+        case 12:
+          b.rts_cts++;
+          t.rts_cts++;
+          break;
+        case 13:
+          b.ack++;
+          t.ack++;
+          break;
       }
       break;
-    case 2: // data
-      b.data++; t.data++;
-      if (subtype == 4)  { b.null_data++; t.null_data++; }
-      if (subtype & 0x8) { b.qos_data++;  t.qos_data++;  }
+    case 2:  // data
+      b.data++;
+      t.data++;
+      if (subtype == 4) {
+        b.null_data++;
+        t.null_data++;
+      }
+      if (subtype & 0x8) {
+        b.qos_data++;
+        t.qos_data++;
+      }
       break;
   }
 }
 
 void frs_tick() {
-  uint32_t now_s = millis()/1000;
-  if (now_s == g_frs.last_tick_s) return;
+  uint32_t now_s = millis() / 1000;
+  if (now_s == g_frs.last_tick_s)
+    return;
   g_frs.last_tick_s = now_s;
   g_frs.hist[g_frs.hist_head % FRS_HIST_LEN] = g_frs.cur;
   g_frs.hist_head = (g_frs.hist_head + 1) % FRS_HIST_LEN;
@@ -119,7 +172,8 @@ static String frs_hist_array(uint32_t FrsBucket::*field) {
   String s = "[";
   for (int i = 0; i < FRS_HIST_LEN; i++) {
     int idx = (g_frs.hist_head + i) % FRS_HIST_LEN;
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_frs.hist[idx].*field);
   }
   s += "]";
@@ -152,13 +206,14 @@ static String frs_json_all() {
   s += ",\"dir_ibss\":" + String(g_frs.dir_counts[3]);
   s += ",\"per_channel\":[";
   for (int i = 0; i < 13; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_frs.per_channel[i]);
   }
   s += "],\"hist_total\":" + frs_hist_array(&FrsBucket::total);
-  s += ",\"hist_mgmt\":"   + frs_hist_array(&FrsBucket::mgmt);
-  s += ",\"hist_data\":"   + frs_hist_array(&FrsBucket::data);
-  s += ",\"hist_ctrl\":"   + frs_hist_array(&FrsBucket::ctrl);
+  s += ",\"hist_mgmt\":" + frs_hist_array(&FrsBucket::mgmt);
+  s += ",\"hist_data\":" + frs_hist_array(&FrsBucket::data);
+  s += ",\"hist_ctrl\":" + frs_hist_array(&FrsBucket::ctrl);
   s += "}";
   return s;
 }

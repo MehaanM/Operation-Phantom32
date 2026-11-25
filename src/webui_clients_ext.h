@@ -204,7 +204,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wucte_routes() {
-  server.on("/clients-ext", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCTE_PAGE);
-  });
+  server.on("/clients-ext", HTTP_GET, []() { server.send_P(200, "text/html", WUCTE_PAGE); });
 }

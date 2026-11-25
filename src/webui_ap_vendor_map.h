@@ -201,7 +201,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wuavm_routes() {
-  server.on("/ap-vendors", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAVM_PAGE);
-  });
+  server.on("/ap-vendors", HTTP_GET, []() { server.send_P(200, "text/html", WUAVM_PAGE); });
 }

@@ -680,3 +680,91 @@ jobs:
             exit 1
           fi
           echo "All 13 board builds passed and coverage thresholds met."
+
+  # ----------------------------------------------------------------
+  # Job 5: Compatibility matrix — generate pass/fail artifact
+  # ----------------------------------------------------------------
+  compatibility-matrix:
+    name: Compatibility matrix
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build_results/
+          pattern: phantom32-*
+          merge-multiple: false
+
+      - name: Generate compatibility matrix
+        run: |
+          declare -A BOARDS=(
+            [doom]="ESP32-WROOM-32D   | LITE  | ESP32"
+            [doom_nodemcu]="NodeMCU-32S    | LITE  | ESP32"
+            [doom_m5stack]="M5Stack Basic  | LITE  | ESP32"
+            [doom_m5core2]="M5Stack Core2  | LITE  | ESP32"
+            [doom_ttgo]="TTGO T-Display | LITE  | ESP32"
+            [doom_tcall]="TTGO T-Call    | LITE  | ESP32"
+            [doom_heltec]="Heltec Kit 32  | LITE  | ESP32"
+            [doom_s3_devkit]="ESP32-S3 DevKitC | LITE | ESP32-S3"
+            [doom_c3]="ESP32-C3 DevKit | LITE  | ESP32-C3"
+            [doom_wrover]="ESP-WROVER-KIT | PSRAM | ESP32"
+            [doom_s3]="XIAO ESP32-S3  | PSRAM | ESP32-S3"
+            [doom_tdisplay_s3]="T-Display S3  | PSRAM | ESP32-S3"
+            [doom_m5cores3]="M5Stack CoreS3 | PSRAM | ESP32-S3"
+          )
+
+          echo "# Compatibility Matrix" > matrix.md
+          echo "" >> matrix.md
+          echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")  " >> matrix.md
+          echo "Commit: \`${{ github.sha }}\`  " >> matrix.md
+          echo "" >> matrix.md
+          echo "| Board | Tier | Chip | Build |" >> matrix.md
+          echo "|-------|------|------|-------|" >> matrix.md
+
+          PASS=0; FAIL=0
+          for env in doom doom_nodemcu doom_m5stack doom_m5core2 doom_ttgo doom_tcall doom_heltec doom_s3_devkit doom_c3 doom_wrover doom_s3 doom_tdisplay_s3 doom_m5cores3; do
+            info="${BOARDS[$env]}"
+            # Check if the artifact directory (and firmware.bin) exists
+            if ls build_results/phantom32-${env}-*/firmware.bin >/dev/null 2>&1; then
+              status="✅ Pass"
+              PASS=$((PASS+1))
+            else
+              status="❌ Fail"
+              FAIL=$((FAIL+1))
+            fi
+            echo "| ${info} | ${status} |" >> matrix.md
+          done
+
+          echo "" >> matrix.md
+          echo "**${PASS}/13 passed, ${FAIL} failed**" >> matrix.md
+          cat matrix.md
+
+          # Also emit JSON for tooling
+          python3 - <<'PYEOF'
+          import json, os, glob
+          boards = ["doom","doom_nodemcu","doom_m5stack","doom_m5core2","doom_ttgo",
+                    "doom_tcall","doom_heltec","doom_s3_devkit","doom_c3",
+                    "doom_wrover","doom_s3","doom_tdisplay_s3","doom_m5cores3"]
+          results = {}
+          for b in boards:
+              matches = glob.glob(f"build_results/phantom32-{b}-*/firmware.bin")
+              results[b] = "pass" if matches else "fail"
+          print(json.dumps({"boards": results}, indent=2))
+          with open("matrix.json", "w") as f:
+              json.dump({"boards": results}, f, indent=2)
+          PYEOF
+
+      - name: Upload compatibility matrix
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with:
+          name: compatibility-matrix
+          path: |
+            matrix.md
+            matrix.json
+          retention-days: 90

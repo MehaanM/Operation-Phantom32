@@ -369,8 +369,7 @@ static void am_load_or_generate_creds() {
     Serial.printf("[AUTH] First-boot credentials (record now — will not be shown again):\n");
     Serial.printf("[AUTH]   Dashboard password : %s\n", plaintext);
     Serial.printf("[AUTH]   AP WiFi password   : %s\n", g_am_ap_wifi_password);
-    Serial.printf("[AUTH]   API key            : %.16s... (full key via /api/auth/status)\n",
-                  g_am_api_key);
+    Serial.printf("[AUTH]   API key            : %s\n", g_am_api_key);
     memset(plaintext, 0, sizeof(plaintext));
   } else {
     // Load stored credentials — plaintext is never stored in NVS.
@@ -832,6 +831,6 @@ static void auth_print_credentials() {
                 g_am_ap_wifi_password[0] ? g_am_ap_wifi_password : "(not loaded)");
   Serial.printf("Dashboard user:   admin\n");
   Serial.printf("Dashboard pass:   not recoverable — use /api/auth/reset-creds\n");
-  Serial.printf("API key:          %.16s...\n", g_am_api_key);
+  Serial.printf("API key:          %s\n", g_am_api_key);
   Serial.printf("=============================\n");
 }

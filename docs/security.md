@@ -102,6 +102,31 @@ All web UI arguments are validated by `src/input_validator.h` before use:
 
 ---
 
+## Authentication Performance
+
+PBKDF2-HMAC-SHA256 at 100,000 iterations adds deliberate latency to password
+verification, which is the intended defense against offline brute-force attacks
+after a flash dump. The practical impact on the web login flow:
+
+| Board / Clock | PBKDF2 time (est.) | Note |
+|---|---|---|
+| ESP32 @ 240 MHz | ~900 ms – 1,100 ms | hardware AES + SHA acceleration |
+| ESP32-S3 @ 240 MHz | ~700 ms – 900 ms | faster SHA256 unit |
+| ESP32-C3 @ 160 MHz | ~1,400 ms – 1,700 ms | single-core RISC-V |
+
+One PBKDF2 invocation per login attempt is the intended behavior — it makes
+offline dictionary attacks expensive without meaningfully affecting legitimate use.
+
+**DoS concern:** A sustained login-request flood could saturate the PBKDF2
+compute budget and block legitimate access. This is mitigated by the IP lockout:
+after 5 failed attempts from an IP, subsequent requests return HTTP 403 immediately
+*without* running PBKDF2, so the per-IP compute cost is bounded at 5 × ~1 s = 5 s
+regardless of how many further requests arrive. The combined lockout + single-threaded
+server model means a single IP cannot trigger more than 5 PBKDF2 derivations per
+lockout window (5 minutes).
+
+---
+
 ## Transport Security
 
 The HTTP server listens **only** on the ESP32's own AP (192.168.4.1). The AP

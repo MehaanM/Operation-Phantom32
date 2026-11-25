@@ -255,8 +255,10 @@ jobs:
         run: |
           # Audit the security tools this CI pipeline introduces directly.
           # pip-audit itself has no known CVEs and must pass clean.
+          # Note: pip-audit 2.7+ separates --format (json/columns) from
+          # --output (file path). Use -f json to set format; stdout → file.
           echo "pip-audit" > /tmp/ci_security_tools.txt
-          pip-audit --requirement /tmp/ci_security_tools.txt --output json \
+          pip-audit --requirement /tmp/ci_security_tools.txt -f json \
             > pip_audit_tools.json
           echo "OK: No known vulnerabilities in CI security tooling."
 
@@ -267,24 +269,35 @@ jobs:
           # here for visibility. This step does NOT gate the build — the unresolved
           # PlatformIO transitive CVEs are documented in docs/dependency-inventory.md
           # (DEP-001) with risk assessment and resolution path.
-          pip-audit --output json > pip_audit_full.json || true
+          pip-audit -f json > pip_audit_full.json || true
           echo "--- PlatformIO dependency vulnerability summary ---"
-          python3 -c "
+          python3 - <<'PYEOF'
           import json, sys
-          data = json.load(open('pip_audit_full.json'))
-          deps = data.get('dependencies', [])
+          try:
+              data = json.load(open('pip_audit_full.json'))
+          except (json.JSONDecodeError, FileNotFoundError) as e:
+              print(f'WARNING: Could not parse audit output: {e}')
+              sys.exit(0)
+          # pip-audit -f json outputs a list of {name, version, vulns}
+          if isinstance(data, list):
+              deps = data
+          elif isinstance(data, dict):
+              deps = data.get('dependencies', data.get('results', []))
+          else:
+              deps = []
           vuln_pkgs = [d for d in deps if d.get('vulns')]
           if not vuln_pkgs:
-              print('No vulnerabilities found.')
+              print('No vulnerabilities found in full dependency tree.')
           else:
               total = sum(len(d['vulns']) for d in vuln_pkgs)
-              print(f'Found {total} known vulnerabilities across {len(vuln_pkgs)} package(s):')
+              print(f'Found {total} known CVE(s) across {len(vuln_pkgs)} package(s):')
               for d in vuln_pkgs:
                   for v in d['vulns']:
-                      print(f\"  {d['name']}=={d['version']}: {v['id']}\")
+                      ids = ', '.join(v.get('aliases', [v['id']]))
+                      print(f"  {d['name']}=={d['version']}: {v['id']} ({ids})")
               print()
-              print('See docs/dependency-inventory.md for risk assessment.')
-          " || true
+              print('See docs/dependency-inventory.md for risk assessment and tracking.')
+          PYEOF
 
       - name: Upload audit reports
         if: always()

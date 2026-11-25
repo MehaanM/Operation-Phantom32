@@ -9,7 +9,7 @@
 //     Authorization: Bearer <token> header. Tokens expire after AM_SESSION_TTL_S.
 //   - All HTTP routes except /login and /health are gated by auth_check().
 //   - API key: a separate long-lived key for scripted/automated access,
-//     sent via X-Phantom32-Key header or ?apikey= query param.
+//     sent via X-Phantom32-Key header only (not query param — prevents log leakage).
 //   - After AM_LOCKOUT_ATTEMPTS failed logins the IP is locked for AM_LOCKOUT_S.
 //   - Tokens are invalidated on logout or reboot (stored in RAM only).
 //
@@ -22,6 +22,8 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include <esp_random.h>
+#include <esp_mac.h>
+#include <mbedtls/md.h>
 #include <string.h>
 #include <time.h>
 
@@ -41,7 +43,7 @@ extern WebServer server;
 #define AM_LOCKOUT_S         300        // lockout duration in seconds
 #define AM_ADMIN_USER        "admin"    // fixed username
 #define AM_NVS_NS            "phantom32"
-#define AM_NVS_PASS_KEY      "ap_pass"
+#define AM_NVS_PASS_HASH_KEY "ap_pass_h"    // HMAC-SHA256 hex of password
 #define AM_NVS_APIKEY_KEY    "api_key"
 #define AM_NVS_INITIALIZED   "am_init"
 
@@ -70,7 +72,7 @@ struct AmIpRecord {
 
 static AmSession  g_am_sessions[AM_SESSION_MAX] = {};
 static AmIpRecord g_am_ips[AM_MAX_IPS] = {};
-static char       g_am_password[AM_PASS_LEN + 1] = {};
+static char       g_am_password_hash[65] = {};  // HMAC-SHA256 hex (64 chars + NUL)
 static char       g_am_api_key[AM_API_KEY_LEN * 2 + 1] = {};
 static bool       g_am_initialized = false;
 
@@ -143,6 +145,24 @@ static void am_derive_password_from_mac(const uint8_t *mac, char *out) {
     out[i] = CHARSET[seed % (sizeof(CHARSET) - 1)];
   }
   out[AM_PASS_LEN] = '\0';
+}
+
+// HMAC-SHA256 of password using device MAC as key → hex output (64 chars + NUL).
+// Using MAC as the HMAC key ties the hash to this physical device so a NVS dump
+// from one board cannot be replayed on another.
+static void am_hmac_password(const char *password, char *hash_hex_out) {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+  uint8_t digest[32];
+  mbedtls_md_context_t ctx;
+  const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, info, 1);  // 1 = HMAC mode
+  mbedtls_md_hmac_starts(&ctx, mac, sizeof(mac));
+  mbedtls_md_hmac_update(&ctx, (const uint8_t *)password, strlen(password));
+  mbedtls_md_hmac_finish(&ctx, digest);
+  mbedtls_md_free(&ctx);
+  am_bytes_to_hex(digest, 32, hash_hex_out);
 }
 
 // Constant-time string comparison to prevent timing attacks.
@@ -306,43 +326,56 @@ static void am_load_or_generate_creds() {
   bool initialized = prefs.getBool(AM_NVS_INITIALIZED, false);
 
   if (!initialized) {
-    // First boot: generate random password and API key.
-    am_gen_password(g_am_password, AM_PASS_LEN);
+    // First boot: generate random password, show it ONCE on serial, store hash only.
+    char plaintext[AM_PASS_LEN + 1];
+    am_gen_password(plaintext, AM_PASS_LEN);
+    am_hmac_password(plaintext, g_am_password_hash);
     uint8_t key_raw[AM_API_KEY_LEN];
     esp_fill_random(key_raw, AM_API_KEY_LEN);
     am_bytes_to_hex(key_raw, AM_API_KEY_LEN, g_am_api_key);
-    prefs.putString(AM_NVS_PASS_KEY, g_am_password);
+    prefs.putString(AM_NVS_PASS_HASH_KEY, g_am_password_hash);
     prefs.putString(AM_NVS_APIKEY_KEY, g_am_api_key);
     prefs.putBool(AM_NVS_INITIALIZED, true);
-    Serial.printf("[AUTH] Generated credentials. Password: %s\n", g_am_password);
-    Serial.printf("[AUTH] API key: %s\n", g_am_api_key);
+    // Print plaintext password ONCE — this is the only time it is recoverable.
+    Serial.printf("[AUTH] First-boot credentials (record now):\n");
+    Serial.printf("[AUTH]   Password: %s\n", plaintext);
+    Serial.printf("[AUTH]   API key:  %.16s... (full key via /api/auth/status)\n",
+                  g_am_api_key);
+    memset(plaintext, 0, sizeof(plaintext));  // zero plaintext after print
   } else {
-    // Existing credentials.
-    String p = prefs.getString(AM_NVS_PASS_KEY, "");
+    // Load stored hash — plaintext is never stored in NVS.
+    String h = prefs.getString(AM_NVS_PASS_HASH_KEY, "");
     String k = prefs.getString(AM_NVS_APIKEY_KEY, "");
-    strncpy(g_am_password, p.c_str(), AM_PASS_LEN);
-    g_am_password[AM_PASS_LEN] = '\0';
+    strncpy(g_am_password_hash, h.c_str(), 64);
+    g_am_password_hash[64] = '\0';
     strncpy(g_am_api_key, k.c_str(), AM_API_KEY_LEN * 2);
     g_am_api_key[AM_API_KEY_LEN * 2] = '\0';
-    Serial.printf("[AUTH] Loaded credentials. Password: %s\n", g_am_password);
+    Serial.printf("[AUTH] Credentials loaded from NVS\n");
   }
   prefs.end();
 }
 
 // Reset to new random credentials (called from /api/auth/reset-creds).
-static void am_reset_credentials() {
-  Preferences prefs;
-  prefs.begin(AM_NVS_NS, false);
-  am_gen_password(g_am_password, AM_PASS_LEN);
+// Returns the new plaintext password via out_plaintext (caller zeroes after use).
+static void am_reset_credentials(char *out_plaintext) {
+  char plaintext[AM_PASS_LEN + 1];
+  am_gen_password(plaintext, AM_PASS_LEN);
+  am_hmac_password(plaintext, g_am_password_hash);
   uint8_t key_raw[AM_API_KEY_LEN];
   esp_fill_random(key_raw, AM_API_KEY_LEN);
   am_bytes_to_hex(key_raw, AM_API_KEY_LEN, g_am_api_key);
-  prefs.putString(AM_NVS_PASS_KEY, g_am_password);
+  Preferences prefs;
+  prefs.begin(AM_NVS_NS, false);
+  prefs.putString(AM_NVS_PASS_HASH_KEY, g_am_password_hash);
   prefs.putString(AM_NVS_APIKEY_KEY, g_am_api_key);
   prefs.end();
-  // Invalidate all sessions.
   memset(g_am_sessions, 0, sizeof(g_am_sessions));
-  Serial.printf("[AUTH] Credentials reset. New password: %s\n", g_am_password);
+  Serial.printf("[AUTH] Credentials reset (new password shown once in response)\n");
+  if (out_plaintext) {
+    strncpy(out_plaintext, plaintext, AM_PASS_LEN);
+    out_plaintext[AM_PASS_LEN] = '\0';
+  }
+  memset(plaintext, 0, sizeof(plaintext));
 }
 
 // ============================================================
@@ -381,16 +414,9 @@ static String am_extract_token_from_request() {
 }
 
 static String am_extract_api_key() {
-  // 1. X-Phantom32-Key header
+  // Header only — query param was removed to prevent key leakage in server logs.
   String hdr = server.header("X-Phantom32-Key");
   if (hdr.length() == AM_API_KEY_LEN * 2) return hdr;
-
-  // 2. ?apikey= query parameter
-  if (server.hasArg("apikey")) {
-    String k = server.arg("apikey");
-    if (k.length() == AM_API_KEY_LEN * 2) return k;
-  }
-
   return "";
 }
 
@@ -545,7 +571,9 @@ static void am_handle_login() {
     return;
   }
 
-  if (!am_ct_strcmp(password.c_str(), g_am_password)) {
+  char submitted_hash[65];
+  am_hmac_password(password.c_str(), submitted_hash);
+  if (!am_ct_strcmp(submitted_hash, g_am_password_hash)) {
     am_ip_record_fail(client_ip.c_str());
     g_am_total_failures++;
     Serial.printf("[AUTH] Login FAILED from %s\n", client_ip.c_str());
@@ -566,13 +594,12 @@ static void am_handle_login() {
   Serial.printf("[AUTH] Login OK from %s. Token: %.8s...\n",
                 client_ip.c_str(), s->token);
 
-  // Set cookie and return token.
+  // Set HttpOnly cookie — do NOT return token in body (browser JS cannot read it).
   String cookie = "phantom32_token=";
   cookie += s->token;
   cookie += "; Path=/; HttpOnly; SameSite=Strict";
   server.sendHeader("Set-Cookie", cookie);
-  server.send(200, "application/json",
-    "{\"ok\":true,\"token\":\"" + String(s->token) + "\"}");
+  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 static void am_handle_logout() {
@@ -610,9 +637,15 @@ static void am_handle_status() {
 
 static void am_handle_reset_creds() {
   if (!auth_check()) { auth_reject(); return; }
-  am_reset_credentials();
-  server.send(200, "application/json",
-    "{\"ok\":true,\"password\":\"" + String(g_am_password) + "\"}");
+  char new_pass[AM_PASS_LEN + 1];
+  am_reset_credentials(new_pass);
+  // Return new password ONCE in this authenticated response — the only time
+  // it appears in plaintext outside of serial at first boot.
+  String resp = "{\"ok\":true,\"password\":\"";
+  resp += new_pass;
+  resp += "\"}";
+  memset(new_pass, 0, sizeof(new_pass));
+  server.send(200, "application/json", resp);
 }
 
 static void am_handle_change_password() {
@@ -638,7 +671,9 @@ static void am_handle_change_password() {
     return;
   }
 
-  if (!am_ct_strcmp(old_pass.c_str(), g_am_password)) {
+  char old_hash[65];
+  am_hmac_password(old_pass.c_str(), old_hash);
+  if (!am_ct_strcmp(old_hash, g_am_password_hash)) {
     server.send(401, "application/json", "{\"error\":\"Wrong current password\"}");
     return;
   }
@@ -649,11 +684,10 @@ static void am_handle_change_password() {
     return;
   }
 
+  am_hmac_password(new_pass.c_str(), g_am_password_hash);
   Preferences prefs;
   prefs.begin(AM_NVS_NS, false);
-  strncpy(g_am_password, new_pass.c_str(), AM_PASS_LEN);
-  g_am_password[AM_PASS_LEN] = '\0';
-  prefs.putString(AM_NVS_PASS_KEY, g_am_password);
+  prefs.putString(AM_NVS_PASS_HASH_KEY, g_am_password_hash);
   prefs.end();
 
   // Invalidate all existing sessions (force re-login with new password).
@@ -682,7 +716,7 @@ inline void auth_init() {
   server.on("/api/auth/reset-creds",    HTTP_POST, am_handle_reset_creds);
   server.on("/api/auth/change-password",HTTP_POST, am_handle_change_password);
 
-  Serial.printf("[AUTH] Initialized. Device password: %s\n", g_am_password);
+  Serial.printf("[AUTH] Initialized\n");
 }
 
 // Redirect to login page (use in handlers that serve HTML, not JSON).
@@ -699,12 +733,12 @@ static bool auth_check_or_redirect(bool is_html = false) {
   return false;
 }
 
-// Expose current password on serial (for recovery via physical access).
+// Print credential recovery info on serial (password is not recoverable from hash).
 static void auth_print_credentials() {
   Serial.printf("=== Phantom32 Credentials ===\n");
-  Serial.printf("URL:      http://192.168.4.1/\n");
-  Serial.printf("User:     admin\n");
-  Serial.printf("Password: %s\n", g_am_password);
-  Serial.printf("API Key:  %.16s...\n", g_am_api_key);
+  Serial.printf("URL:     http://192.168.4.1/\n");
+  Serial.printf("User:    admin\n");
+  Serial.printf("Password: not recoverable — use /api/auth/reset-creds to generate a new one\n");
+  Serial.printf("API Key: %.16s...\n", g_am_api_key);
   Serial.printf("=============================\n");
 }

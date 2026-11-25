@@ -28,8 +28,9 @@ to report a vulnerability privately. We will respond within 72 hours.
 
 The following are intentional design choices, not vulnerabilities:
 
-- The device broadcasts an open AP named `Phantom32` — this is by design; the
-  Web UI behind it requires authentication
+- The device broadcasts a WPA2-protected AP named `Phantom32` with default
+  password `phantom32` — this is by design; the Web UI behind it also requires
+  a session login
 - Frame injection capabilities — the device is a security research tool
 - Default credentials printed to UART on first boot — console access is
   assumed to be the owner's access

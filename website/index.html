@@ -1,26 +1,26 @@
 <title>Operation Phantom32</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 
 <style>
-/* ── Design tokens ─────────────────────────────────────── */
+/* ── Tokens ──────────────────────────────────────────────── */
 :root {
-  --bg:         #040810;
-  --surface:    #090f1c;
-  --surface2:   #0e1826;
-  --border:     #1a2840;
-  --border-hi:  #243550;
+  --bg:         #03060f;
+  --surface:    #080e1c;
+  --surface2:   #0c1526;
+  --border:     #172035;
+  --border-hi:  #223050;
   --accent:     #00d4ff;
-  --accent-dim: #007a94;
+  --accent-dim: #005f72;
   --accent2:    #7b2fff;
-  --fg:         #c8dff0;
-  --fg-muted:   #4a6080;
-  --fg-dim:     #2a3d55;
+  --fg:         #c0d8f0;
+  --fg-muted:   #3d5570;
+  --fg-dim:     #1e3048;
   --green:      #00ff9f;
-  --green-dim:  #00704a;
-  --chip-lite:  #0d2a40;
-  --chip-psram: #0d2a1e;
+  --green-dim:  #005e3a;
+  --chip-lite:  #071d2e;
+  --chip-psram: #07201a;
   color-scheme: dark;
 }
 
@@ -32,71 +32,63 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 0;
-  min-height: 100vh;
 }
 
-/* ── Scanline overlay ──────────────────────────────────── */
-body::after {
-  content: "";
+/* ── Animated canvas background ─────────────────────────── */
+#bg-canvas {
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,212,255,.012) 2px,
-    rgba(0,212,255,.012) 4px
-  );
-  pointer-events: none;
   z-index: 0;
+  pointer-events: none;
+  opacity: .55;
 }
 
-/* ── Header / Nav ──────────────────────────────────────── */
+/* ── All content above canvas ────────────────────────────── */
+.site-wrap { position: relative; z-index: 1; }
+
+/* ── Header ──────────────────────────────────────────────── */
 .site-header {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
   z-index: 10;
-  background: rgba(4,8,16,.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(3,6,15,.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
-  padding-block: 0;
 }
 
 .header-inner {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 14px max(16px, env(safe-area-inset-left, 0px));
+  padding: 0 max(16px, env(safe-area-inset-left, 0px));
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 0;
 }
 
+/* logo */
 .logo {
   display: flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
+  padding: 14px 0;
+  margin-right: 32px;
 }
-
-.logo-mark {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
+.logo-mark { width: 30px; height: 30px; flex-shrink: 0; }
 .logo-text {
   font-family: 'Space Mono', monospace;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: .02em;
   line-height: 1.1;
 }
-
 .logo-text span {
   display: block;
   font-size: 9px;
@@ -104,6 +96,33 @@ body::after {
   letter-spacing: .15em;
   text-transform: uppercase;
   margin-top: 1px;
+}
+
+/* tabs */
+.nav-tabs {
+  display: flex;
+  gap: 0;
+  flex: 1;
+}
+.nav-tab {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 18px 20px;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.nav-tab:hover { color: var(--fg); }
+.nav-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .header-badge {
@@ -115,18 +134,21 @@ body::after {
   border: 1px solid var(--green-dim);
   padding: 3px 8px;
   border-radius: 3px;
-  background: rgba(0,255,159,.06);
+  background: rgba(0,255,159,.05);
+  white-space: nowrap;
 }
 
-/* ── Hero ──────────────────────────────────────────────── */
+/* ── Tab panels ──────────────────────────────────────────── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Hero ────────────────────────────────────────────────── */
 .hero {
   max-width: 1100px;
   margin: 0 auto;
   padding: 72px 0 56px;
   text-align: center;
-  position: relative;
 }
-
 .hero-eyebrow {
   font-family: 'Space Mono', monospace;
   font-size: 11px;
@@ -135,51 +157,40 @@ body::after {
   color: var(--accent-dim);
   margin-bottom: 20px;
 }
-
 .hero h1 {
   font-family: 'Space Mono', monospace;
-  font-size: clamp(28px, 5vw, 52px);
+  font-size: clamp(26px, 5vw, 50px);
   font-weight: 700;
   line-height: 1.1;
   color: #fff;
   text-wrap: balance;
   margin-bottom: 20px;
 }
-
 .hero h1 em {
   font-style: normal;
   color: var(--accent);
-  text-shadow: 0 0 24px rgba(0,212,255,.4);
+  text-shadow: 0 0 32px rgba(0,212,255,.5);
 }
-
 .hero-desc {
   font-size: 17px;
   color: var(--fg-muted);
-  max-width: 540px;
+  max-width: 520px;
   margin: 0 auto 36px;
   line-height: 1.65;
 }
-
 .hero-stats {
   display: flex;
   justify-content: center;
   gap: 40px;
   flex-wrap: wrap;
 }
-
-.hero-stat {
-  text-align: center;
-}
-
 .hero-stat-num {
   font-family: 'Space Mono', monospace;
   font-size: 28px;
   font-weight: 700;
   color: var(--accent);
   display: block;
-  font-variant-numeric: tabular-nums;
 }
-
 .hero-stat-label {
   font-size: 11px;
   color: var(--fg-muted);
@@ -187,12 +198,12 @@ body::after {
   text-transform: uppercase;
 }
 
-/* ── Notice banner ─────────────────────────────────────── */
+/* ── Notice ──────────────────────────────────────────────── */
 .notice {
   max-width: 1100px;
   margin: 0 auto 32px;
-  background: rgba(0,212,255,.05);
-  border: 1px solid rgba(0,212,255,.2);
+  background: rgba(0,212,255,.04);
+  border: 1px solid rgba(0,212,255,.18);
   border-left: 3px solid var(--accent);
   border-radius: 4px;
   padding: 12px 16px;
@@ -202,24 +213,11 @@ body::after {
   align-items: flex-start;
   gap: 10px;
 }
+.notice-icon { color: var(--accent); font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.notice a { color: var(--accent); text-decoration: none; }
+.notice a:hover { text-decoration: underline; }
 
-.notice-icon {
-  color: var(--accent);
-  font-size: 15px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.notice a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.notice a:hover {
-  text-decoration: underline;
-}
-
-/* ── Section headers ───────────────────────────────────── */
+/* ── Section label ───────────────────────────────────────── */
 .section-label {
   max-width: 1100px;
   margin: 0 auto 24px;
@@ -227,7 +225,6 @@ body::after {
   align-items: center;
   gap: 12px;
 }
-
 .section-label h2 {
   font-family: 'Space Mono', monospace;
   font-size: 11px;
@@ -235,8 +232,8 @@ body::after {
   text-transform: uppercase;
   color: var(--fg-muted);
   font-weight: 400;
+  white-space: nowrap;
 }
-
 .section-label::after {
   content: "";
   flex: 1;
@@ -244,19 +241,9 @@ body::after {
   background: var(--border);
 }
 
-/* ── Board group ───────────────────────────────────────── */
-.board-group {
-  max-width: 1100px;
-  margin: 0 auto 48px;
-}
-
-.board-group-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
+/* ── Board group ─────────────────────────────────────────── */
+.board-group { max-width: 1100px; margin: 0 auto 48px; }
+.board-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .board-group-title {
   font-family: 'Space Mono', monospace;
   font-size: 12px;
@@ -264,23 +251,16 @@ body::after {
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-
-.board-group-title.lite { color: var(--accent); }
+.board-group-title.lite  { color: var(--accent); }
 .board-group-title.psram { color: var(--green); }
-
-.board-group-count {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  color: var(--fg-dim);
-}
-
+.board-group-count { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--fg-dim); }
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
   gap: 12px;
 }
 
-/* ── Board card ────────────────────────────────────────── */
+/* ── Board card ──────────────────────────────────────────── */
 .board-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -293,7 +273,6 @@ body::after {
   position: relative;
   overflow: hidden;
 }
-
 .board-card::before {
   content: "";
   position: absolute;
@@ -302,47 +281,15 @@ body::after {
   opacity: 0;
   transition: opacity .2s;
 }
-
 .board-card.lite::before  { background: linear-gradient(90deg, var(--accent), transparent); }
 .board-card.psram::before { background: linear-gradient(90deg, var(--green), transparent); }
-
-.board-card:hover {
-  border-color: var(--border-hi);
-  background: var(--surface2);
-}
-
+.board-card:hover { border-color: var(--border-hi); background: var(--surface2); }
 .board-card:hover::before { opacity: 1; }
 
-.board-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.board-name {
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.3;
-  min-width: 0;
-}
-
-.board-module {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  color: var(--fg-muted);
-  margin-top: 2px;
-}
-
-.badge-row {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
+.board-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.board-name { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.3; }
+.board-module { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--fg-muted); margin-top: 2px; }
+.badge-row { display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
 .badge {
   font-family: 'Space Mono', monospace;
   font-size: 9px;
@@ -353,30 +300,13 @@ body::after {
   font-weight: 700;
   white-space: nowrap;
 }
-
 .badge.lite  { background: var(--chip-lite);  color: var(--accent); border: 1px solid var(--accent-dim); }
 .badge.psram { background: var(--chip-psram); color: var(--green);  border: 1px solid var(--green-dim); }
 .badge.chip  { background: rgba(123,47,255,.12); color: #a07bff; border: 1px solid rgba(123,47,255,.3); }
+.board-desc { font-size: 12px; color: var(--fg-muted); line-height: 1.55; }
+.board-flash-btn { margin-top: auto; display: block; width: 100%; }
 
-.board-desc {
-  font-size: 12px;
-  color: var(--fg-muted);
-  line-height: 1.55;
-  min-width: 0;
-}
-
-.board-flash-btn {
-  margin-top: auto;
-  display: block;
-  width: 100%;
-}
-
-/* esp-web-install-button styling */
-esp-web-install-button {
-  display: block;
-  width: 100%;
-}
-
+esp-web-install-button { display: block; width: 100%; }
 esp-web-install-button button,
 esp-web-install-button [slot="activate"] {
   width: 100%;
@@ -392,99 +322,244 @@ esp-web-install-button [slot="activate"] {
   border: 1px solid;
   background: transparent;
 }
-
 .board-card.lite esp-web-install-button button,
 .board-card.lite esp-web-install-button [slot="activate"] {
-  color: var(--accent);
-  border-color: var(--accent-dim);
+  color: var(--accent); border-color: var(--accent-dim);
 }
-
 .board-card.lite esp-web-install-button button:hover,
 .board-card.lite esp-web-install-button [slot="activate"]:hover {
-  background: rgba(0,212,255,.12);
-  border-color: var(--accent);
+  background: rgba(0,212,255,.1); border-color: var(--accent);
 }
-
 .board-card.psram esp-web-install-button button,
 .board-card.psram esp-web-install-button [slot="activate"] {
-  color: var(--green);
-  border-color: var(--green-dim);
+  color: var(--green); border-color: var(--green-dim);
 }
-
 .board-card.psram esp-web-install-button button:hover,
 .board-card.psram esp-web-install-button [slot="activate"]:hover {
-  background: rgba(0,255,159,.1);
-  border-color: var(--green);
+  background: rgba(0,255,159,.08); border-color: var(--green);
 }
 
-/* Fallback flash button (before esp-web-tools loads) */
-.flash-btn-fallback {
-  width: 100%;
-  padding: 9px 16px;
-  border-radius: 4px;
+/* ── Instructions tab ────────────────────────────────────── */
+.instr-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 60px 0 80px;
+}
+.instr-title {
   font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all .15s;
-  border: 1px solid;
-  background: transparent;
-}
-
-.board-card.lite  .flash-btn-fallback { color: var(--accent); border-color: var(--accent-dim); }
-.board-card.psram .flash-btn-fallback { color: var(--green);  border-color: var(--green-dim); }
-
-.flash-btn-fallback:hover { opacity: .8; }
-
-/* ── How to flash ──────────────────────────────────────── */
-.how-to {
-  max-width: 1100px;
-  margin: 0 auto 64px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.how-step {
-  background: var(--surface);
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.how-num {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  color: var(--accent);
-  letter-spacing: .15em;
-}
-
-.how-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
+  font-size: clamp(22px, 4vw, 36px);
   font-weight: 700;
   color: #fff;
+  margin-bottom: 8px;
+}
+.instr-title em { font-style: normal; color: var(--accent); }
+.instr-subtitle { font-size: 15px; color: var(--fg-muted); margin-bottom: 48px; }
+
+.step-list { display: flex; flex-direction: column; gap: 0; }
+.step {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 0 20px;
+  position: relative;
+}
+.step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 23px;
+  top: 48px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.step-num-col { display: flex; flex-direction: column; align-items: center; }
+.step-num {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-dim);
+  background: rgba(0,212,255,.07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.step-body { padding: 10px 0 40px; }
+.step-heading {
+  font-family: 'Space Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-text { font-size: 14px; color: var(--fg-muted); line-height: 1.7; }
+.step-text strong { color: var(--fg); }
+.step-text code {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--accent);
 }
 
-.how-desc {
+.instr-tip {
+  margin-top: 8px;
+  background: rgba(0,212,255,.04);
+  border: 1px solid rgba(0,212,255,.15);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.instr-tip strong { color: var(--accent); }
+
+.compat-box {
+  margin-top: 48px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 24px;
+}
+.compat-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin-bottom: 16px;
+}
+.compat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.compat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.compat-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.compat-dot.yes { background: var(--green); box-shadow: 0 0 6px rgba(0,255,159,.5); }
+.compat-dot.no  { background: #ff4455; box-shadow: 0 0 6px rgba(255,68,85,.4); }
+
+/* ── About tab ───────────────────────────────────────────── */
+.about-wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 60px 0 80px;
+}
+
+.about-hero {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+.about-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-dim);
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.about-name {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(20px, 4vw, 30px);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.about-name em { font-style: normal; color: var(--accent); }
+.about-school {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.about-school::before {
+  content: "◈";
+  color: var(--accent-dim);
+  font-size: 10px;
+}
+
+.about-section { margin-bottom: 40px; }
+.about-section-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent-dim);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.about-section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.about-p { font-size: 15px; color: var(--fg-muted); line-height: 1.75; margin-bottom: 14px; }
+.about-p strong { color: var(--fg); }
+.about-p em { font-style: normal; color: var(--accent); }
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.compare-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 18px;
+}
+.compare-card.phantom { border-color: var(--accent-dim); background: rgba(0,212,255,.04); }
+.compare-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.compare-card.phantom .compare-label { color: var(--accent); }
+.compare-card:not(.phantom) .compare-label { color: var(--fg-dim); }
+.compare-item {
   font-size: 12px;
   color: var(--fg-muted);
-  line-height: 1.6;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
 }
+.compare-item:last-child { border-bottom: none; }
+.compare-item::before { content: "✓"; color: var(--green); font-size: 11px; flex-shrink: 0; }
+.compare-card:not(.phantom) .compare-item::before { content: "✗"; color: #ff4455; }
 
-/* ── Footer ────────────────────────────────────────────── */
+/* ── Footer ──────────────────────────────────────────────── */
 .site-footer {
   border-top: 1px solid var(--border);
   padding-block: 24px;
 }
-
 .footer-inner {
   max-width: 1100px;
   margin: 0 auto;
@@ -494,296 +569,405 @@ esp-web-install-button [slot="activate"] {
   gap: 16px;
   flex-wrap: wrap;
 }
-
-.footer-text {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  color: var(--fg-dim);
-}
-
-.footer-link {
-  color: var(--accent-dim);
-  text-decoration: none;
-  font-size: 11px;
-  font-family: 'Space Mono', monospace;
-}
-
+.footer-text { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--fg-dim); }
+.footer-link { color: var(--accent-dim); text-decoration: none; font-size: 11px; font-family: 'Space Mono', monospace; }
 .footer-link:hover { color: var(--accent); }
 
-/* ── Responsive ────────────────────────────────────────── */
+/* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 600px) {
+  .nav-tab { padding: 16px 12px; font-size: 10px; letter-spacing: .08em; }
   .hero { padding: 48px 0 40px; }
   .hero-stats { gap: 24px; }
   .board-grid { grid-template-columns: 1fr; }
-  .how-to { grid-template-columns: 1fr; }
+  .compat-grid { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 36px 1fr; }
+  .step-num { width: 36px; height: 36px; font-size: 12px; }
+  .step:not(:last-child)::after { left: 17px; }
   .footer-inner { flex-direction: column; align-items: flex-start; }
+  .about-hero { gap: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition: none !important; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 </style>
 
-<!-- ── Header ─────────────────────────────────────────── -->
+<!-- ── Canvas background ──────────────────────────────────── -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="site-wrap">
+
+<!-- ── Header ────────────────────────────────────────────── -->
 <header class="site-header">
   <div class="header-inner">
-    <a href="#" class="logo">
-      <svg class="logo-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="32" height="32" rx="6" fill="#090f1c"/>
-        <rect x="0.5" y="0.5" width="31" height="31" rx="5.5" stroke="#1a2840"/>
-        <path d="M7 16L16 7L25 16L16 25L7 16Z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-        <circle cx="16" cy="16" r="3" fill="#00d4ff" opacity=".9"/>
-        <path d="M16 10V7M16 25V22M22 16H25M7 16H10" stroke="#00d4ff" stroke-width="1" opacity=".4"/>
+    <a href="#" class="logo" onclick="switchTab('flash');return false;">
+      <svg class="logo-mark" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="30" height="30" rx="5" fill="#080e1c"/>
+        <rect x=".5" y=".5" width="29" height="29" rx="4.5" stroke="#172035"/>
+        <path d="M6 15L15 6L24 15L15 24L6 15Z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+        <circle cx="15" cy="15" r="2.5" fill="#00d4ff"/>
+        <path d="M15 9V6M15 24V21M21 15H24M6 15H9" stroke="#00d4ff" stroke-width="1" opacity=".35"/>
       </svg>
-      <span class="logo-text">
-        PHANTOM32
-        <span>OPERATION</span>
-      </span>
+      <span class="logo-text">PHANTOM32<span>OPERATION</span></span>
     </a>
-    <span class="header-badge">v3.2.0</span>
+
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" role="tab" onclick="switchTab('flash')">Flash</button>
+      <button class="nav-tab" role="tab" onclick="switchTab('instructions')">Instructions</button>
+      <button class="nav-tab" role="tab" onclick="switchTab('about')">About</button>
+    </nav>
+
+    <span class="header-badge">v3.2.1</span>
   </div>
 </header>
 
-<!-- ── Hero ───────────────────────────────────────────── -->
-<section class="hero">
-  <p class="hero-eyebrow">Web Firmware Installer</p>
-  <h1>Flash <em>any ESP32</em><br>from your browser</h1>
-  <p class="hero-desc">
-    One click. No drivers. No IDE. Connect your board over USB and install
-    Phantom32 directly from this page — works on Chrome and Edge on any OS.
-  </p>
-  <div class="hero-stats">
-    <div class="hero-stat">
-      <span class="hero-stat-num">13</span>
-      <span class="hero-stat-label">Supported boards</span>
+<!-- ══════════════════════════════════════════════════════════
+     TAB: FLASH
+══════════════════════════════════════════════════════════ -->
+<div id="tab-flash" class="tab-panel active">
+
+  <section class="hero">
+    <p class="hero-eyebrow">Web Firmware Installer</p>
+    <h1>Flash <em>any ESP32</em><br>from your browser</h1>
+    <p class="hero-desc">One click. No drivers. No IDE. Connect your board over USB and install
+      Phantom32 directly — works on Chrome and Edge on any OS.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-num">13</span>
+        <span class="hero-stat-label">Supported boards</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">3</span>
+        <span class="hero-stat-label">Chip families</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">0</span>
+        <span class="hero-stat-label">Drivers needed</span>
+      </div>
     </div>
-    <div class="hero-stat">
-      <span class="hero-stat-num">3</span>
-      <span class="hero-stat-label">Chip families</span>
+  </section>
+
+  <div class="notice">
+    <span class="notice-icon">◈</span>
+    <span>Requires <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>. Firefox is not supported.
+      Plug in your ESP32 before clicking Flash.
+      <a href="#" onclick="switchTab('instructions');return false;">Need help? See the instructions →</a></span>
+  </div>
+
+  <div class="section-label"><h2>Firmware builds</h2></div>
+
+  <div class="board-group">
+    <div class="board-group-header">
+      <span class="board-group-title lite">◈ LITE builds</span>
+      <span class="board-group-count">— 9 boards · core toolkit · ≤ 85% flash</span>
     </div>
-    <div class="hero-stat">
-      <span class="hero-stat-num">0</span>
-      <span class="hero-stat-label">Drivers needed</span>
+    <div class="board-grid" id="lite-grid"></div>
+  </div>
+
+  <div class="board-group">
+    <div class="board-group-header">
+      <span class="board-group-title psram">◈ PSRAM builds</span>
+      <span class="board-group-count">— 4 boards · all 13 analytics modules · 8 MB PSRAM required</span>
     </div>
+    <div class="board-grid" id="psram-grid"></div>
   </div>
-</section>
 
-<!-- ── Notice ─────────────────────────────────────────── -->
-<div class="notice">
-  <span class="notice-icon">◈</span>
-  <span>
-    Requires <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> with Web Serial API support.
-    Firefox is not supported. Connect your ESP32 via USB before clicking Flash.
-    Firmware files are served from
-    <a href="https://github.com/MehaanM/Operation-Phantom32_Protocol/releases" target="_blank">GitHub Releases</a>
-    — a release must be published for flashing to work.
-  </span>
-</div>
+</div><!-- /tab-flash -->
 
-<!-- ── How it works ───────────────────────────────────── -->
-<div class="section-label"><h2>How it works</h2></div>
-<div class="how-to">
-  <div class="how-step">
-    <span class="how-num">01 —</span>
-    <span class="how-title">Connect</span>
-    <p class="how-desc">Plug your ESP32 into your computer via USB. Hold BOOT if your board requires it for flashing.</p>
+<!-- ══════════════════════════════════════════════════════════
+     TAB: INSTRUCTIONS
+══════════════════════════════════════════════════════════ -->
+<div id="tab-instructions" class="tab-panel">
+  <div class="instr-wrap">
+    <h1 class="instr-title">How to <em>flash</em> your board</h1>
+    <p class="instr-subtitle">Three steps. Takes about 60 seconds from start to done.</p>
+
+    <div class="step-list">
+
+      <div class="step">
+        <div class="step-num-col"><div class="step-num">1</div></div>
+        <div class="step-body">
+          <div class="step-heading">Use the right browser</div>
+          <p class="step-text">Web flashing requires the <strong>Web Serial API</strong>, which is only
+            available in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (desktop).
+            Firefox, Safari, and mobile browsers will not work. If you are already in Chrome or Edge,
+            you're good — move on to step 2.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num-col"><div class="step-num">2</div></div>
+        <div class="step-body">
+          <div class="step-heading">Connect your ESP32 via USB</div>
+          <p class="step-text">Plug your board into your computer with a <strong>data-capable USB
+            cable</strong> (charge-only cables will not work). Most boards will be detected
+            automatically. If you are on a newer ESP32 (S3, C3) with native USB, use the <strong>USB
+            port labelled UART</strong>, not the native USB port, for flashing.</p>
+          <div class="instr-tip">
+            <strong>Tip:</strong> Some boards (NodeMCU, generic WROOM) need you to hold the
+            <code>BOOT</code> button when clicking Flash, then release it once "Erasing…" appears.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num-col"><div class="step-num">3</div></div>
+        <div class="step-body">
+          <div class="step-heading">Pick your board and click Flash</div>
+          <p class="step-text">Go to the <strong>Flash</strong> tab and find your exact board — LITE
+            if it doesn't have PSRAM, PSRAM build if it does. Click
+            <strong>⚡ Flash [Board Name]</strong>, approve the serial port picker that
+            Chrome shows, and wait. The installer downloads the firmware and writes three partitions
+            (bootloader, partition table, app). The whole process takes <strong>20–40 seconds</strong>.</p>
+          <div class="instr-tip">
+            <strong>After flashing:</strong> Press the <code>RST</code> (reset) button on your board
+            or unplug and replug. Phantom32 will boot and start its own WiFi access point within a
+            few seconds.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num-col"><div class="step-num">4</div></div>
+        <div class="step-body">
+          <div class="step-heading">Connect and configure</div>
+          <p class="step-text">On your phone or laptop, connect to the WiFi network
+            <code>Phantom32</code>. Open a browser and go to <code>192.168.4.1</code>. Log in with
+            the default credentials (see your board's first boot output on a serial monitor for the
+            generated password). From the dashboard you can configure all 13 modules, set channels,
+            and manage everything wirelessly.</p>
+        </div>
+      </div>
+
+    </div><!-- /step-list -->
+
+    <div class="compat-box">
+      <div class="compat-title">◈ Browser compatibility</div>
+      <div class="compat-grid">
+        <div class="compat-item"><div class="compat-dot yes"></div> Google Chrome (desktop)</div>
+        <div class="compat-item"><div class="compat-dot yes"></div> Microsoft Edge (desktop)</div>
+        <div class="compat-item"><div class="compat-dot no"></div>  Mozilla Firefox</div>
+        <div class="compat-item"><div class="compat-dot no"></div>  Safari (any platform)</div>
+        <div class="compat-item"><div class="compat-dot no"></div>  Chrome for iOS / Android</div>
+        <div class="compat-item"><div class="compat-dot yes"></div> Chrome on Android (some devices)</div>
+      </div>
+    </div>
+
   </div>
-  <div class="how-step">
-    <span class="how-num">02 —</span>
-    <span class="how-title">Select board</span>
-    <p class="how-desc">Pick your exact board from the list below. LITE builds suit most boards; PSRAM builds unlock all 13 analytics modules.</p>
-  </div>
-  <div class="how-step">
-    <span class="how-num">03 —</span>
-    <span class="how-title">Flash</span>
-    <p class="how-desc">Click Flash, approve the serial port, and wait ~30 seconds. The page handles download and write automatically.</p>
-  </div>
-</div>
+</div><!-- /tab-instructions -->
 
-<!-- ── LITE boards ────────────────────────────────────── -->
-<div class="section-label"><h2>Firmware builds</h2></div>
+<!-- ══════════════════════════════════════════════════════════
+     TAB: ABOUT
+══════════════════════════════════════════════════════════ -->
+<div id="tab-about" class="tab-panel">
+  <div class="about-wrap">
 
-<div class="board-group">
-  <div class="board-group-header">
-    <span class="board-group-title lite">◈ LITE builds</span>
-    <span class="board-group-count">— 9 boards · core toolkit · ≤ 85% flash</span>
+    <div class="about-hero">
+      <div class="about-avatar">M</div>
+      <div>
+        <div class="about-name"><em>Mehaan</em> Minocha</div>
+        <div class="about-school">Eagle Ridge Middle School</div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <div class="about-section-label">About me</div>
+      <p class="about-p">
+        I'm <strong>Mehaan Minocha</strong>, a student at <strong>Eagle Ridge Middle School</strong>
+        who builds embedded security tools in my free time. Operation Phantom32 started as a
+        personal project to understand how WiFi and Bluetooth work at a low level — and turned into
+        something much bigger.
+      </p>
+      <p class="about-p">
+        I designed, wrote, and tested every line of code in this project myself, from the
+        <em>auth manager</em> and rate limiter to the CI pipeline that enforces 85% test coverage
+        across all 13 supported boards.
+      </p>
+    </div>
+
+    <div class="about-section">
+      <div class="about-section-label">What is Operation Phantom32</div>
+      <p class="about-p">
+        Operation Phantom32 is a <strong>WiFi and Bluetooth security research toolkit</strong>
+        for ESP32 microcontrollers. It runs entirely on a $5–$15 chip, requires no PC once flashed,
+        and gives you a full web dashboard over its own access point. It's built for
+        <em>education, security research, and authorized network testing</em>.
+      </p>
+      <p class="about-p">
+        The firmware supports <strong>13 different ESP32 boards</strong> across three chip families
+        (ESP32, S3, C3), has a hardened auth system, a hardware-enforced transmit-power safety cap,
+        and ships with a full unit test suite and sanitizer runs in CI.
+      </p>
+    </div>
+
+    <div class="about-section">
+      <div class="about-section-label">Why Phantom32 is different</div>
+      <p class="about-p">Most ESP32 security tools are unmaintained hobby sketches with no security
+        on the tool itself. Phantom32 is built to a professional standard from day one.</p>
+
+      <div class="compare-grid">
+        <div class="compare-card phantom">
+          <div class="compare-label">Phantom32</div>
+          <div class="compare-item">Auth manager with lockout + sessions</div>
+          <div class="compare-item">Hardware safety cap on TX power</div>
+          <div class="compare-item">13 boards, 3 chip families</div>
+          <div class="compare-item">CI: tests, sanitizers, coverage</div>
+          <div class="compare-item">Browser-based web flasher</div>
+          <div class="compare-item">SBOM + secret scanning</div>
+          <div class="compare-item">Rate limiter on all HTTP routes</div>
+        </div>
+        <div class="compare-card">
+          <div class="compare-label">Typical alternatives</div>
+          <div class="compare-item">No authentication at all</div>
+          <div class="compare-item">No TX power limits</div>
+          <div class="compare-item">1–3 boards supported</div>
+          <div class="compare-item">No tests or CI</div>
+          <div class="compare-item">Manual esptool flashing only</div>
+          <div class="compare-item">No supply chain security</div>
+          <div class="compare-item">No rate limiting</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <div class="about-section-label">Source code</div>
+      <p class="about-p">
+        The full source code, CI configuration, and documentation are available on
+        <a href="https://github.com/MehaanM/Operation-Phantom32_Protocol" target="_blank"
+           style="color:var(--accent);text-decoration:none;">GitHub ↗</a>.
+        Issues, pull requests, and feedback are welcome.
+      </p>
+    </div>
+
   </div>
-  <div class="board-grid" id="lite-grid"></div>
-</div>
+</div><!-- /tab-about -->
 
-<div class="board-group">
-  <div class="board-group-header">
-    <span class="board-group-title psram">◈ PSRAM builds</span>
-    <span class="board-group-count">— 4 boards · all 13 analytics modules · 8 MB PSRAM required</span>
-  </div>
-  <div class="board-grid" id="psram-grid"></div>
-</div>
-
-<!-- ── Footer ─────────────────────────────────────────── -->
+<!-- ── Footer ────────────────────────────────────────────── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span class="footer-text">© 2026 Operation Phantom32 · v3.2.0 · ESP32 WiFi/BLE toolkit</span>
-    <a class="footer-link"
-       href="https://github.com/MehaanM/Operation-Phantom32_Protocol"
-       target="_blank">github ↗</a>
+    <span class="footer-text">© 2026 Mehaan Minocha · Operation Phantom32 v3.2.1</span>
+    <a class="footer-link" href="https://github.com/MehaanM/Operation-Phantom32_Protocol" target="_blank">github ↗</a>
   </div>
 </footer>
 
+</div><!-- /site-wrap -->
+
 <script>
+// ── Animated particle background ───────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  const ACCENT = '0,212,255';
+  const COUNT  = 70;
+  const SPEED  = 0.3;
+  const CONNECT_DIST = 140;
+  let W, H, particles;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function mkParticle() {
+    return {
+      x:  Math.random() * W,
+      y:  Math.random() * H,
+      vx: (Math.random() - .5) * SPEED,
+      vy: (Math.random() - .5) * SPEED,
+      r:  Math.random() * 1.5 + .5,
+    };
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: COUNT }, mkParticle);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    for (let i = 0; i < COUNT; i++) {
+      const a = particles[i];
+      a.x += a.vx; a.y += a.vy;
+      if (a.x < 0 || a.x > W) a.vx *= -1;
+      if (a.y < 0 || a.y > H) a.vy *= -1;
+
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${ACCENT},.7)`;
+      ctx.fill();
+
+      for (let j = i + 1; j < COUNT; j++) {
+        const b = particles[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < CONNECT_DIST) {
+          const alpha = (1 - dist / CONNECT_DIST) * .18;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.strokeStyle = `rgba(${ACCENT},${alpha})`;
+          ctx.lineWidth = .6;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); });
+  init();
+  draw();
+})();
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const tabs = ['flash','instructions','about'];
+  document.querySelectorAll('.nav-tab')[tabs.indexOf(name)].classList.add('active');
+  window.scrollTo(0, 0);
+}
+
 // ── Board definitions ──────────────────────────────────────────────────────
 const GITHUB_BASE =
   'https://github.com/MehaanM/Operation-Phantom32_Protocol/releases/latest/download/';
 
 const BOARDS = [
-  // LITE ─────────────────────────────────────────────────────────────────────
-  {
-    id: 'doom',
-    name: 'ESP32 Generic',
-    module: 'WROOM-32D / WROOM-32',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'Universal build for most ESP32 development boards with 4 MB flash.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_nodemcu',
-    name: 'NodeMCU-32S',
-    module: 'NodeMCU 32S',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'NodeMCU ESP32 with USB-to-serial bridge; 30-pin DIP form factor.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_m5stack',
-    name: 'M5Stack Basic',
-    module: 'M5Stack Core',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'M5Stack Basic / Gray with built-in 320×240 LCD and Grove connector.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_m5core2',
-    name: 'M5Stack Core2',
-    module: 'M5Core2',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'M5Stack Core2 with capacitive touch display and PMU.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_ttgo',
-    name: 'TTGO T-Display',
-    module: 'T-Display v1.1',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'LilyGo TTGO T-Display with 1.14" ST7789 color LCD (135×240).',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_tcall',
-    name: 'TTGO T-Call',
-    module: 'T-Call SIM800L',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'TTGO T-Call with integrated SIM800L GSM modem for cellular.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_heltec',
-    name: 'Heltec WiFi Kit 32',
-    module: 'WiFi Kit 32',
-    chip: 'ESP32',
-    tier: 'lite',
-    desc: 'Heltec WiFi Kit 32 with 0.96" SSD1306 OLED display on board.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_s3_devkit',
-    name: 'ESP32-S3 DevKitC',
-    module: 'DevKitC-1 N8',
-    chip: 'ESP32-S3',
-    tier: 'lite',
-    desc: 'Official Espressif ESP32-S3 DevKitC-1; dual USB (native + UART).',
-    offsets: [0x0, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_c3',
-    name: 'ESP32-C3 DevKit',
-    module: 'C3 RISC-V',
-    chip: 'ESP32-C3',
-    tier: 'lite',
-    desc: 'ESP32-C3 RISC-V core. Ultra-low-power LITE build; native USB CDC.',
-    offsets: [0x0, 0x8000, 0x10000],
-  },
-
-  // PSRAM ────────────────────────────────────────────────────────────────────
-  {
-    id: 'doom_wrover',
-    name: 'ESP-WROVER-KIT',
-    module: 'WROVER-B / WROVER-IB',
-    chip: 'ESP32',
-    tier: 'psram',
-    desc: 'Official Espressif WROVER kit with 8 MB PSRAM. Full 13-module build.',
-    offsets: [0x1000, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_s3',
-    name: 'XIAO ESP32-S3',
-    module: 'Seeed XIAO S3',
-    chip: 'ESP32-S3',
-    tier: 'psram',
-    desc: 'Seeed Studio XIAO ESP32-S3 with 8 MB PSRAM. Stamp-sized form factor.',
-    offsets: [0x0, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_tdisplay_s3',
-    name: 'T-Display S3',
-    module: 'LilyGo T-Display-S3',
-    chip: 'ESP32-S3',
-    tier: 'psram',
-    desc: 'LilyGo T-Display-S3 with 1.9" color LCD and 8 MB PSRAM.',
-    offsets: [0x0, 0x8000, 0x10000],
-  },
-  {
-    id: 'doom_m5cores3',
-    name: 'M5Stack CoreS3',
-    module: 'M5CoreS3',
-    chip: 'ESP32-S3',
-    tier: 'psram',
-    desc: 'M5Stack CoreS3 with 2" touch display, 16 MB flash and 8 MB PSRAM.',
-    offsets: [0x0, 0x8000, 0x10000],
-  },
+  { id:'doom',         name:'ESP32 Generic',      module:'WROOM-32D / WROOM-32',  chip:'ESP32',    tier:'lite',  desc:'Universal build for most ESP32 development boards with 4 MB flash.',                    offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_nodemcu', name:'NodeMCU-32S',         module:'NodeMCU 32S',           chip:'ESP32',    tier:'lite',  desc:'NodeMCU ESP32 with USB-to-serial bridge; 30-pin DIP form factor.',                      offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_m5stack', name:'M5Stack Basic',       module:'M5Stack Core',          chip:'ESP32',    tier:'lite',  desc:'M5Stack Basic / Gray with built-in 320×240 LCD and Grove connector.',                   offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_m5core2', name:'M5Stack Core2',       module:'M5Core2',               chip:'ESP32',    tier:'lite',  desc:'M5Stack Core2 with capacitive touch display and PMU.',                                  offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_ttgo',    name:'TTGO T-Display',      module:'T-Display v1.1',        chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T-Display with 1.14" ST7789 color LCD (135×240).',                          offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_tcall',   name:'TTGO T-Call',         module:'T-Call SIM800L',        chip:'ESP32',    tier:'lite',  desc:'TTGO T-Call with integrated SIM800L GSM modem for cellular.',                           offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_heltec',  name:'Heltec WiFi Kit 32',  module:'WiFi Kit 32',           chip:'ESP32',    tier:'lite',  desc:'Heltec WiFi Kit 32 with 0.96" SSD1306 OLED display on board.',                          offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_s3_devkit',name:'ESP32-S3 DevKitC',  module:'DevKitC-1 N8',          chip:'ESP32-S3', tier:'lite',  desc:'Official Espressif ESP32-S3 DevKitC-1; dual USB (native + UART).',                      offsets:[0x0,0x8000,0x10000] },
+  { id:'doom_c3',      name:'ESP32-C3 DevKit',     module:'C3 RISC-V',             chip:'ESP32-C3', tier:'lite',  desc:'ESP32-C3 RISC-V core. Ultra-low-power LITE build; native USB CDC.',                     offsets:[0x0,0x8000,0x10000] },
+  { id:'doom_wrover',  name:'ESP-WROVER-KIT',      module:'WROVER-B / WROVER-IB',  chip:'ESP32',    tier:'psram', desc:'Official Espressif WROVER kit with 8 MB PSRAM. Full 13-module build.',                  offsets:[0x1000,0x8000,0x10000] },
+  { id:'doom_s3',      name:'XIAO ESP32-S3',       module:'Seeed XIAO S3',         chip:'ESP32-S3', tier:'psram', desc:'Seeed Studio XIAO ESP32-S3 with 8 MB PSRAM. Stamp-sized form factor.',                 offsets:[0x0,0x8000,0x10000] },
+  { id:'doom_tdisplay_s3',name:'T-Display S3',     module:'LilyGo T-Display-S3',  chip:'ESP32-S3', tier:'psram', desc:'LilyGo T-Display-S3 with 1.9" color LCD and 8 MB PSRAM.',                              offsets:[0x0,0x8000,0x10000] },
+  { id:'doom_m5cores3',name:'M5Stack CoreS3',      module:'M5CoreS3',              chip:'ESP32-S3', tier:'psram', desc:'M5Stack CoreS3 with 2" touch display, 16 MB flash and 8 MB PSRAM.',                    offsets:[0x0,0x8000,0x10000] },
 ];
 
-// ── Manifest builder ───────────────────────────────────────────────────────
 function createManifestURL(board) {
   const manifest = {
     name: `Phantom32 for ${board.name}`,
-    version: '3.2.0',
+    version: '3.2.1',
     new_install_improv_wait_time: 0,
-    builds: [{
-      chipFamily: board.chip,
-      parts: [
-        { path: `${GITHUB_BASE}firmware_${board.id}_bootloader.bin`, offset: board.offsets[0] },
-        { path: `${GITHUB_BASE}firmware_${board.id}_partitions.bin`, offset: board.offsets[1] },
-        { path: `${GITHUB_BASE}firmware_${board.id}.bin`,            offset: board.offsets[2] },
-      ],
-    }],
+    builds: [{ chipFamily: board.chip, parts: [
+      { path: `${GITHUB_BASE}firmware_${board.id}_bootloader.bin`, offset: board.offsets[0] },
+      { path: `${GITHUB_BASE}firmware_${board.id}_partitions.bin`, offset: board.offsets[1] },
+      { path: `${GITHUB_BASE}firmware_${board.id}.bin`,            offset: board.offsets[2] },
+    ]}],
   };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-  return URL.createObjectURL(blob);
+  return URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
 }
 
-// ── Card builder ───────────────────────────────────────────────────────────
 function buildCard(board) {
   const manifestURL = createManifestURL(board);
   const card = document.createElement('div');
   card.className = `board-card ${board.tier}`;
-
-  const chipColor = board.chip === 'ESP32-S3' ? 'chip' : board.chip === 'ESP32-C3' ? 'chip' : 'chip';
-
   card.innerHTML = `
     <div class="board-card-top">
       <div>
@@ -800,17 +984,11 @@ function buildCard(board) {
       <esp-web-install-button manifest="${manifestURL}">
         <button slot="activate">⚡ Flash ${board.name}</button>
       </esp-web-install-button>
-    </div>
-  `;
+    </div>`;
   return card;
 }
 
-// ── Render grids ───────────────────────────────────────────────────────────
 const liteGrid  = document.getElementById('lite-grid');
 const psramGrid = document.getElementById('psram-grid');
-
-BOARDS.forEach(b => {
-  const card = buildCard(b);
-  (b.tier === 'lite' ? liteGrid : psramGrid).appendChild(card);
-});
+BOARDS.forEach(b => (b.tier === 'lite' ? liteGrid : psramGrid).appendChild(buildCard(b)));
 </script>

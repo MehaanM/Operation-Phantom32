@@ -201,7 +201,7 @@ jobs:
                 failed=1
               fi
             fi
-            [ "$failed" = "1" ] && exit 1
+            if [ "$failed" = "1" ]; then exit 1; fi
           else
             echo "ERROR: Coverage data not generated." >&2
             exit 1

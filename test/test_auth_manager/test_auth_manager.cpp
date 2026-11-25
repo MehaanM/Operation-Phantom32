@@ -404,6 +404,132 @@ void test_password_error_message() {
 // TESTS: Token format
 // ============================================================
 
+// ============================================================
+// TESTS: Uncovered branches (null/boundary/full-table paths)
+// ============================================================
+
+void test_find_session_null_token() {
+  reset_all();
+  am_create_session("1.2.3.4");
+  TEST_ASSERT_NULL(am_find_session(nullptr));
+}
+
+void test_find_session_short_token() {
+  reset_all();
+  am_create_session("1.2.3.4");
+  TEST_ASSERT_NULL(am_find_session("tooshort"));
+}
+
+void test_find_session_one_over_len() {
+  reset_all();
+  am_create_session("1.2.3.4");
+  char tok[AM_TOKEN_LEN + 2];
+  memset(tok, 'a', AM_TOKEN_LEN + 1);
+  tok[AM_TOKEN_LEN + 1] = '\0';
+  TEST_ASSERT_NULL(am_find_session(tok));
+}
+
+void test_create_session_null_ip() {
+  reset_all();
+  AmSession *s = am_create_session(nullptr);
+  TEST_ASSERT_NOT_NULL(s);
+  TEST_ASSERT_TRUE(s->valid);
+}
+
+void test_invalidate_session_not_found() {
+  reset_all();
+  char bad[AM_TOKEN_LEN + 1];
+  memset(bad, 'z', AM_TOKEN_LEN);
+  bad[AM_TOKEN_LEN] = '\0';
+  TEST_ASSERT_FALSE(am_invalidate_session(bad));
+}
+
+void test_session_valid_null_token() {
+  reset_all();
+  TEST_ASSERT_FALSE(am_session_valid(nullptr));
+}
+
+void test_session_valid_at_exact_ttl() {
+  reset_all();
+  AmSession *s = am_create_session("1.2.3.4");
+  char tok[AM_TOKEN_LEN + 1];
+  strncpy(tok, s->token, AM_TOKEN_LEN);
+  tok[AM_TOKEN_LEN] = '\0';
+  g_mock_time_s += AM_SESSION_TTL_S; // exactly at TTL — NOT expired (> not >=)
+  TEST_ASSERT_TRUE(am_session_valid(tok));
+}
+
+void test_lockout_table_full() {
+  reset_all();
+  char ip[16];
+  for (int i = 0; i < 16; i++) {
+    snprintf(ip, sizeof(ip), "10.0.%d.1", i);
+    TEST_ASSERT_NOT_NULL(am_ensure_lockout(ip));
+  }
+  // 17th entry must fail — table full
+  TEST_ASSERT_NULL(am_ensure_lockout("99.99.99.99"));
+}
+
+void test_record_success_ip_not_in_table() {
+  reset_all();
+  // Should be a no-op without crash — IP has no lockout entry
+  am_record_success("192.168.100.100");
+  TEST_ASSERT_FALSE(am_is_locked("192.168.100.100"));
+}
+
+void test_password_too_long() {
+  char pw[AM_MAX_PASS_LEN + 2];
+  memset(pw, 'a', AM_MAX_PASS_LEN + 1);
+  pw[0] = 'A'; pw[1] = '1';
+  pw[AM_MAX_PASS_LEN + 1] = '\0';
+  TEST_ASSERT_FALSE(am_validate_password(pw));
+}
+
+void test_password_error_msg_null() {
+  char err[64] = {0};
+  am_validate_password(nullptr, err);
+  TEST_ASSERT_EQUAL_STRING("null", err);
+}
+
+void test_password_error_msg_too_long() {
+  char pw[AM_MAX_PASS_LEN + 2];
+  memset(pw, 'a', AM_MAX_PASS_LEN + 1);
+  pw[0] = 'A'; pw[1] = '1';
+  pw[AM_MAX_PASS_LEN + 1] = '\0';
+  char err[64] = {0};
+  am_validate_password(pw, err);
+  TEST_ASSERT_NOT_NULL(strstr(err, "too long"));
+}
+
+void test_password_error_msg_needs_digit() {
+  char err[64] = {0};
+  am_validate_password("PhantomPass", err);
+  TEST_ASSERT_EQUAL_STRING("needs digit", err);
+}
+
+void test_session_last_used_updated() {
+  reset_all();
+  AmSession *s = am_create_session("1.2.3.4");
+  char tok[AM_TOKEN_LEN + 1];
+  strncpy(tok, s->token, AM_TOKEN_LEN);
+  tok[AM_TOKEN_LEN] = '\0';
+  g_mock_time_s += 100;
+  am_session_valid(tok);
+  TEST_ASSERT_EQUAL(g_mock_time_s, s->last_used_s);
+}
+
+void test_lockout_at_exact_expiry_time() {
+  reset_all();
+  for (int i = 0; i < AM_MAX_ATTEMPTS; i++) am_record_fail("10.1.2.3");
+  g_mock_time_s += AM_LOCKOUT_S; // exactly at locked_until_s — not locked (< not <=)
+  TEST_ASSERT_FALSE(am_is_locked("10.1.2.3"));
+}
+
+void test_session_count_all_invalid() {
+  reset_all(); // all sessions invalid after reset
+  TEST_ASSERT_EQUAL(0, am_session_count());
+}
+
 void test_token_hex_chars_only() {
   reset_all();
   AmSession *s = am_create_session("1.2.3.4");
@@ -466,6 +592,24 @@ int main(int argc, char **argv) {
 
   RUN_TEST(test_token_hex_chars_only);
   RUN_TEST(test_token_length_exact);
+
+  // Uncovered branch tests
+  RUN_TEST(test_find_session_null_token);
+  RUN_TEST(test_find_session_short_token);
+  RUN_TEST(test_find_session_one_over_len);
+  RUN_TEST(test_create_session_null_ip);
+  RUN_TEST(test_invalidate_session_not_found);
+  RUN_TEST(test_session_valid_null_token);
+  RUN_TEST(test_session_valid_at_exact_ttl);
+  RUN_TEST(test_lockout_table_full);
+  RUN_TEST(test_record_success_ip_not_in_table);
+  RUN_TEST(test_password_too_long);
+  RUN_TEST(test_password_error_msg_null);
+  RUN_TEST(test_password_error_msg_too_long);
+  RUN_TEST(test_password_error_msg_needs_digit);
+  RUN_TEST(test_session_last_used_updated);
+  RUN_TEST(test_lockout_at_exact_expiry_time);
+  RUN_TEST(test_session_count_all_invalid);
 
   return UNITY_END();
 }

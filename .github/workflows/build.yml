@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PIO_VERSION: "6.1.16"
+  PIO_VERSION: "6.2.0"
 
 jobs:
   # ----------------------------------------------------------------
@@ -36,7 +36,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-native-${{ hashFiles('platformio.ini') }}-v3
+          key: pio-native-${{ hashFiles('platformio.ini') }}-v4
           restore-keys: pio-native-
 
       - name: Install PlatformIO
@@ -92,7 +92,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-asan-${{ hashFiles('platformio.ini') }}-v3
+          key: pio-asan-${{ hashFiles('platformio.ini') }}-v4
           restore-keys: pio-asan-
 
       - name: Install PlatformIO + GCC
@@ -141,7 +141,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-cov-${{ hashFiles('platformio.ini') }}-v3
+          key: pio-cov-${{ hashFiles('platformio.ini') }}-v4
           restore-keys: pio-cov-
 
       - name: Install PlatformIO + lcov
@@ -504,7 +504,7 @@ jobs:
           path: |
             ~/.platformio/.cache
             ~/.platformio/packages
-          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v3
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v4
           restore-keys: |
             pio-${{ matrix.env }}-
             pio-

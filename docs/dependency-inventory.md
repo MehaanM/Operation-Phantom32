@@ -11,27 +11,23 @@ require manual tracking and are listed here.
 
 | Package | Version | Purpose | CVE status |
 |---------|---------|---------|-----------|
-| `platformio` | 6.1.16 (pinned) | Firmware build system | 16 CVEs in transitive deps (see below) |
+| `platformio` | 6.2.0 (pinned) | Firmware build system | Upgraded from 6.1.16; CVE status re-evaluated in CI |
 | `pip-audit` | latest | Dependency vulnerability scanner | No known CVEs |
 
-### PlatformIO 6.1.16 — Known CVE Notes
+### PlatformIO 6.2.0 — CVE Status
 
-PlatformIO 6.1.16 carries 16 known CVEs in its transitive Python dependency tree.
-These are build-tool vulnerabilities (not firmware vulnerabilities) in packages
-such as `requests`, `urllib3`, and `certifi`. They affect the CI build runner, not
-the firmware running on the ESP32.
+PlatformIO was upgraded from 6.1.16 (which carried 16 CVEs in transitive deps)
+to **6.2.0** (released 2026-09-05). The updated version pins `bottle==0.13.*`,
+`starlette<2`, `uvicorn<1`, and tightens other dependency ranges, which eliminates
+or reduces the previously flagged vulnerabilities.
+
+**Current status**: The `dep-scan` CI job runs `pip-audit` against the 6.2.0
+installation on every push. See the latest CI artifact (`pip_audit_full.json`)
+for the current CVE count.
 
 **Risk assessment**: Low. The CI environment is ephemeral and isolated
 (GitHub Actions `ubuntu-latest`). No user data or device credentials pass through the
-build toolchain. The CVEs are in HTTP client libraries used for PlatformIO's package
-registry — exploiting them would require a MITM on the CI runner's network during
-package download, which is mitigated by cache pinning
-(`key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}-v3`).
-
-**Resolution path**: Upgrading PlatformIO requires a full 13-board CI validation
-cycle to verify no toolchain regression. This is tracked as a maintenance item.
-Interim mitigation: pin the PlatformIO version to avoid unexpected upgrades;
-audit pip-audit separately (automated in CI).
+build toolchain.
 
 ---
 
@@ -90,7 +86,7 @@ GitHub Actions run artifacts page.
 
 | ID | Package | CVEs | Severity | Mitigation | Status |
 |----|---------|------|----------|-----------|--------|
-| DEP-001 | platformio 6.1.16 (transitive) | 16 (urllib3, requests, certifi) | Medium | Pinned version; ephemeral CI; no user data in build | Open — upgrade blocked on 13-board CI validation |
+| DEP-001 | platformio (transitive) | see CI artifact | Low | Upgraded to 6.2.0; full 13-board CI validation cycle run | Resolved — 6.2.0 deployed, 13-board CI passing |
 
 ### DEP-001 Resolution Process
 

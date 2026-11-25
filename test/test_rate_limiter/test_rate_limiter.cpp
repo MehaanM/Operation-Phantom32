@@ -306,6 +306,48 @@ void test_rla_many_tools_capacity() {
 }
 
 // ============================================================
+// TESTS: Uncovered branches
+// ============================================================
+
+void test_http_ip_table_full() {
+  rla_reset();
+  for (int i = 0; i < RLA_HTTP_MAX_IPS; i++) {
+    char ip[16]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
+    TEST_ASSERT_NOT_NULL(rla_find_or_add_ip(ip));
+  }
+  // 9th IP must fail — table full
+  TEST_ASSERT_NULL(rla_find_or_add_ip("99.99.99.99"));
+}
+
+void test_http_check_table_full_allows() {
+  rla_reset();
+  for (int i = 0; i < RLA_HTTP_MAX_IPS; i++) {
+    char ip[16]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
+    rla_find_or_add_ip(ip);
+  }
+  // Table full: rla_find_or_add_ip returns null, so rla_check_http returns true
+  TEST_ASSERT_TRUE(rla_check_http("99.99.99.99"));
+}
+
+void test_tool_inactive_bypasses_per_tool_check() {
+  rla_reset();
+  rla_find_or_add_tool("lazy_tool", 1.0f, 0.0f);
+  // Mark tool inactive
+  for (int i = 0; i < g_tool_count; i++)
+    if (strcmp(g_tools[i].name, "lazy_tool") == 0) { g_tools[i].active = false; break; }
+  // !e->active branch: global was consumed but per-tool check skipped → returns true
+  TEST_ASSERT_TRUE(rla_check("lazy_tool"));
+}
+
+void test_bucket_exact_tokens_equal_cost() {
+  TokenBucket b;
+  b.init(1.0f, 0.0f);
+  // tokens == cost (exactly 1.0 == 1.0): should succeed
+  TEST_ASSERT_TRUE(b.consume(1.0f, 0));
+  TEST_ASSERT_FALSE(b.consume(1.0f, 0)); // now empty
+}
+
+// ============================================================
 // ENTRY POINT
 // ============================================================
 
@@ -338,6 +380,12 @@ int main(int argc, char **argv) {
 
   RUN_TEST(test_rla_null_tool_name);
   RUN_TEST(test_rla_many_tools_capacity);
+
+  // Uncovered branch tests
+  RUN_TEST(test_http_ip_table_full);
+  RUN_TEST(test_http_check_table_full_allows);
+  RUN_TEST(test_tool_inactive_bypasses_per_tool_check);
+  RUN_TEST(test_bucket_exact_tokens_equal_cost);
 
   return UNITY_END();
 }

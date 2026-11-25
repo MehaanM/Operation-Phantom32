@@ -121,12 +121,11 @@ jobs:
           retention-days: 7
 
   # ----------------------------------------------------------------
-  # Job 1c: Coverage report (gcov / lcov) — advisory, does not block build
+  # Job 1c: Coverage report (gcov / lcov) — enforced minimums
   # ----------------------------------------------------------------
   native-coverage:
     name: Coverage (gcov)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -178,11 +177,34 @@ jobs:
           if [ -f coverage_filtered.info ]; then
             lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null || true
             # Enforce minimum coverage thresholds.
-            line_cov=$(lcov --summary coverage_filtered.info 2>/dev/null \
+            line_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
                         | grep "lines" | grep -oE "[0-9]+\.[0-9]+" | head -1)
-            echo "Line coverage: ${line_cov}%"
+            branch_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
+                          | grep "branches" | grep -oE "[0-9]+\.[0-9]+" | head -1)
+            echo "Line coverage:   ${line_cov}%  (minimum: 80%)"
+            echo "Branch coverage: ${branch_cov}%  (minimum: 50%)"
+            failed=0
+            if [ -n "$line_cov" ]; then
+              under=$(echo "$line_cov < 80.0" | bc -l 2>/dev/null || echo 0)
+              if [ "$under" = "1" ]; then
+                echo "ERROR: Line coverage ${line_cov}% is below the 80% minimum." >&2
+                failed=1
+              fi
+            else
+              echo "ERROR: Could not parse line coverage." >&2
+              failed=1
+            fi
+            if [ -n "$branch_cov" ]; then
+              under=$(echo "$branch_cov < 50.0" | bc -l 2>/dev/null || echo 0)
+              if [ "$under" = "1" ]; then
+                echo "ERROR: Branch coverage ${branch_cov}% is below the 50% minimum." >&2
+                failed=1
+              fi
+            fi
+            [ "$failed" = "1" ] && exit 1
           else
-            echo "Coverage data not generated (this may be expected on first run)."
+            echo "ERROR: Coverage data not generated." >&2
+            exit 1
           fi
 
       - name: Upload coverage report
@@ -433,7 +455,7 @@ jobs:
   # ----------------------------------------------------------------
   build-summary:
     name: All builds passed
-    needs: [ build ]
+    needs: [ build, native-coverage ]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -447,4 +469,8 @@ jobs:
             echo "One or more board builds failed." >&2
             exit 1
           fi
-          echo "All 13 board builds passed."
+          if [ "$cov_ok" != "success" ]; then
+            echo "Coverage job failed — thresholds not met or report not generated." >&2
+            exit 1
+          fi
+          echo "All 13 board builds passed and coverage thresholds met."

@@ -16,7 +16,7 @@ known limitations, and guidance for multi-protocol coexistence.
 | DRAM | 320 KB (no PSRAM) |
 | Antenna | PCB trace |
 | USB bridge | CP2102 |
-| Build env | `doom` |
+| Build env | `doom` (or `doom_nodemcu`, `doom_m5stack`, `doom_m5core2`, `doom_ttgo`, `doom_tcall`, `doom_heltec`) |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — all tools except those gated on PSRAM.
@@ -48,7 +48,7 @@ The `PHANTOM32_LITE` flag reduces per-module pool sizes to stay inside 320 KB DR
 | DRAM | 520 KB |
 | Antenna | PCB (B) / external IPEX (IE) |
 | USB bridge | CP2102 (most devkits) |
-| Build env | `wrover` |
+| Build env | `doom_wrover` |
 | Build flag | `BOARD_HAS_PSRAM` |
 
 **Available features** — full feature set, no LITE restrictions.
@@ -76,7 +76,7 @@ analytics buffer, full Beacon Spam pool) use it automatically via `ps_malloc()`.
 | DRAM | 512 KB |
 | Antenna | PCB trace |
 | USB bridge | Native USB (CDC) |
-| Build env | `s3` |
+| Build env | `doom_s3` (Seeed XIAO S3) or `doom_s3_devkit` (generic DevKitC) |
 | Build flag | `BOARD_HAS_PSRAM` |
 
 **Available features** — full feature set.
@@ -89,7 +89,7 @@ OPI PSRAM provides higher bandwidth than SPI PSRAM; no bandwidth contention with
   Pin to `espressif32@6.5.0` or later.
 - Native USB CDC requires holding BOOT (GPIO0) on power-on to enter download mode.
   The WebUI's `/api/reboot` endpoint reboots into normal mode; for firmware flash use
-  `pio run -e s3 --target upload` with BOOT held or via DTR/RTS auto-reset if the devkit supports it.
+  `pio run -e doom_s3 --target upload` with BOOT held or via DTR/RTS auto-reset if the devkit supports it.
 - The S3's integrated USB-OTG conflicts with GPIO19/20 which are used by some I2C display shields.
 
 ---
@@ -103,7 +103,7 @@ OPI PSRAM provides higher bandwidth than SPI PSRAM; no bandwidth contention with
 | DRAM | 400 KB |
 | Antenna | PCB trace |
 | USB bridge | Native USB (CDC) |
-| Build env | `c3` |
+| Build env | `doom_c3` |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — partial.
@@ -135,7 +135,7 @@ All passive tools (Device Tracker, Aegis, PCAP export) work normally.
 | DRAM | 320 KB |
 | Antenna | PCB trace |
 | USB bridge | Native USB (CDC) |
-| Build env | `s2` |
+| Build env | `doom` (no dedicated env; S2 is not currently in the build matrix) |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — partial. The S2 is single-core with no Bluetooth hardware.
@@ -164,7 +164,7 @@ Unavailable on S2:
 | DRAM | 320 KB |
 | Display | 1.14" ST7789 TFT (135x240) |
 | USB bridge | CP2102 |
-| Build env | `ttgo` |
+| Build env | `doom_ttgo` |
 | Build flag | `PHANTOM32_LITE`, `HAS_TFT_DISPLAY` |
 
 **Available features** — same as WROOM-32D LITE, plus on-device TFT status display.
@@ -195,7 +195,7 @@ The TFT task is pinned to core 0 at priority 1 (below the main app tasks on core
 | DRAM | 320 KB |
 | Display | 1.14" ST7789 (135x240) |
 | USB bridge | AXP192 PMIC + CP2102 |
-| Build env | `m5stick` |
+| Build env | `doom_m5stack` or `doom_m5core2` |
 | Build flag | `PHANTOM32_LITE`, `HAS_TFT_DISPLAY`, `HAS_AXP192` |
 
 **Available features** — same as TTGO T-Display.
@@ -225,7 +225,7 @@ will not work.
 | DRAM | 320 KB |
 | Antenna | PCB trace |
 | USB bridge | CP2102 (v1) / CH340 (v2) |
-| Build env | `nodemcu` |
+| Build env | `doom_nodemcu` |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — identical to WROOM-32D LITE.
@@ -233,7 +233,7 @@ will not work.
 **Known issues**
 
 - Some CH340G counterfeit chips misreport their baud rate capability.
-  If `pio run -e nodemcu --target upload` fails with timeout errors, force 115200 baud:
+  If `pio run -e doom_nodemcu --target upload` fails with timeout errors, force 115200 baud:
   ```ini
   upload_speed = 115200
   ```
@@ -252,7 +252,7 @@ will not work.
 | DRAM | 320 KB |
 | Antenna | PCB trace |
 | USB bridge | CH340C |
-| Build env | `lolin32` |
+| Build env | `doom` (no dedicated env; use the generic WROOM-32D environment) |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — identical to WROOM-32D LITE.
@@ -276,7 +276,7 @@ will not work.
 | DRAM | 320 KB |
 | Antenna | PCB trace |
 | USB bridge | CP2102N |
-| Build env | `devkitc` |
+| Build env | `doom` |
 | Build flag | `PHANTOM32_LITE` |
 
 **Available features** — identical to WROOM-32D LITE.
@@ -383,9 +383,9 @@ first boot.
 
 | Use case | Recommended board | Reason |
 |---|---|---|
-| General testing / development | AZDelivery ESP32 DevKit C V4 | Widely available, CP2102N, proven layout |
-| Long-range passive capture | WROVER-IE with external antenna | IPEX connector, full PSRAM, 5 dBi external |
-| Portable / battery | M5StickC Plus | Built-in LiPo, AXP192 charging, compact |
-| On-device status display | TTGO T-Display | Built-in TFT, same WROOM form factor |
-| Full feature set + performance | ESP32-S3-WROOM-1 N16R8 | OPI PSRAM, 16 MB flash, 512 KB DRAM |
-| BLE-focused work | Any WROVER variant | PSRAM ensures BLE + Wi-Fi buffers coexist |
+| General testing / development | AZDelivery ESP32 DevKit C V4 | Use env `doom`; widely available, CP2102N |
+| Long-range passive capture | WROVER-IE with external antenna | Use env `doom_wrover`; IPEX connector, PSRAM |
+| Portable / battery | M5StickC Plus | Use env `doom_m5stack`; built-in LiPo, AXP192 |
+| On-device status display | TTGO T-Display | Use env `doom_ttgo`; built-in TFT |
+| Full feature set + performance | Seeed XIAO ESP32-S3 | Use env `doom_s3`; OPI PSRAM, 16 MB flash |
+| BLE-focused work | Any WROVER variant | Use env `doom_wrover`; PSRAM for BLE+Wi-Fi |

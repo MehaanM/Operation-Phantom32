@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -83,7 +84,7 @@ struct EapEvent {
   uint32_t ts;
 };
 
-static struct {
+typedef struct {
   EapSession sessions[EAP_MAX_SESSIONS];
   uint8_t    count;
   EapEvent   events[EAP_MAX_EVENTS];
@@ -95,7 +96,13 @@ static struct {
   uint32_t   total_failed_hs;
   uint32_t   total_pmkid;
   uint32_t   total_mic_fail;
-} g_eap = {};
+} G_EapState;
+#ifdef BOARD_HAS_PSRAM
+static G_EapState* _g_eap_raw;
+#define g_eap (*_g_eap_raw)
+#else
+static G_EapState g_eap;
+#endif
 
 static bool eap_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

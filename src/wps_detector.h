@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -107,7 +108,7 @@ struct WpsSession {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   WpsAP      aps[WPS_MAX_APS];
   uint8_t    ap_count;
   WpsSession sessions[WPS_MAX_SESSIONS];
@@ -115,7 +116,13 @@ static struct {
   uint32_t   total_pbc_sessions;
   uint32_t   total_pin_sessions;
   uint32_t   total_locked_aps;
-} g_wps = {};
+} G_WpsDetState;
+#ifdef BOARD_HAS_PSRAM
+static G_WpsDetState* _g_wps_raw;
+#define g_wps (*_g_wps_raw)
+#else
+static G_WpsDetState g_wps;
+#endif
 
 static bool wps_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -84,7 +85,7 @@ struct BslEvent {
   uint32_t ts;
 };
 
-static struct {
+typedef struct {
   BslAP    aps[BSL_MAX_APS];
   BslEvent events[BSL_MAX_EVENTS];
   uint8_t  ap_count;
@@ -92,7 +93,13 @@ static struct {
   uint16_t total_heavy_events;
   uint8_t  busiest_ch;
   uint8_t  busiest_util;
-} g_bsl = {};
+} G_BslState;
+#ifdef BOARD_HAS_PSRAM
+static G_BslState* _g_bsl_raw;
+#define g_bsl (*_g_bsl_raw)
+#else
+static G_BslState g_bsl;
+#endif
 
 static bool bsl_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

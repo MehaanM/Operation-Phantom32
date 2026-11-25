@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include "psram_attr.h"
 
 // ── Evil Twin AP Module ───────────────────────────────────────────────────────
 // Sets up a rogue Access Point cloning a target SSID/BSSID. Optionally runs
@@ -86,7 +87,12 @@ struct EtStatus {
   uint16_t   log_count;
 };
 
-static EtStatus g_et = {};
+#ifdef BOARD_HAS_PSRAM
+static EtStatus* _g_et_raw;
+#define g_et (*_g_et_raw)
+#else
+static EtStatus g_et;
+#endif
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 static void et_mac_str(const uint8_t* m, char* out) {

@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -78,11 +79,17 @@ struct ShmChannel {
   uint32_t sample_ts;
 };
 
-static struct {
+typedef struct {
   ShmChannel ch[SHM_MAX_CHANNELS + 1]; // index = channel number (1-14 for 2.4G, 36+ not indexed)
   uint32_t   total_frames_all;
   uint32_t   start_ts;
-} g_shm = {};
+} G_ShmState;
+#ifdef BOARD_HAS_PSRAM
+static G_ShmState* _g_shm_raw;
+#define g_shm (*_g_shm_raw)
+#else
+static G_ShmState g_shm;
+#endif
 
 static int shm_ch_idx(uint8_t ch) {
   if (ch >= 1 && ch <= 14) return ch;

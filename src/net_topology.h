@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -77,7 +78,7 @@ struct NttEss {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   NttNode  nodes[NTT_MAX_APS + NTT_MAX_CLIENTS];
   NttEdge  edges[NTT_MAX_EDGES];
   NttEss   ess[NTT_MAX_ESS];
@@ -86,7 +87,13 @@ static struct {
   uint8_t  ess_count;
   uint32_t total_assoc_events;
   uint32_t total_roam_events;
-} g_ntt = {};
+} G_NttState;
+#ifdef BOARD_HAS_PSRAM
+static G_NttState* _g_ntt_raw;
+#define g_ntt (*_g_ntt_raw)
+#else
+static G_NttState g_ntt;
+#endif
 
 static bool ntt_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 static bool ntt_is_random(const uint8_t *m) { return (m[0] & 0x02) != 0; }

@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -76,10 +77,16 @@ struct TsfAP {
   uint32_t  last_seen_ts;
 };
 
-static struct {
+typedef struct {
   TsfAP   aps[TSF_MAX_APS];
   uint8_t count;
-} g_tsf = {};
+} G_TsfState;
+#ifdef BOARD_HAS_PSRAM
+static G_TsfState* _g_tsf_raw;
+#define g_tsf (*_g_tsf_raw)
+#else
+static G_TsfState g_tsf;
+#endif
 
 static bool tsf_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

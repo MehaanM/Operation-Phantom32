@@ -7,6 +7,7 @@
 #include <freertos/semphr.h>
 #include <string.h>
 #include "module.h"
+#include "psram_attr.h"
 
 // ── Device Tracker ────────────────────────────────────────────────────────────
 //
@@ -196,11 +197,23 @@ struct DtAlert {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
+#ifdef BOARD_HAS_PSRAM
+static DtDevice* g_dt_devs;
+#else
 static DtDevice g_dt_devs[DT_MAX_DEVICES];
+#endif
 static volatile int g_dt_dev_count = 0;
+#ifdef BOARD_HAS_PSRAM
+static DtAP*     g_dt_aps;
+#else
 static DtAP     g_dt_aps[DT_MAX_APS];
+#endif
 static volatile int g_dt_ap_count = 0;
+#ifdef BOARD_HAS_PSRAM
+static DtAlert*  g_dt_alerts;
+#else
 static DtAlert  g_dt_alerts[DT_MAX_ALERTS];
+#endif
 static volatile int g_dt_alert_count = 0;
 static volatile int g_dt_alert_head = 0;
 static volatile uint32_t g_dt_rx_total = 0;

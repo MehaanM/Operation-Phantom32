@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -81,14 +82,20 @@ struct MctGlobalStats {
   uint32_t arp_replies;
 };
 
-static struct {
+typedef struct {
   MctGroup      groups[MCT_MAX_GROUPS];
   uint8_t       count;
   MctGlobalStats global;
   uint32_t      last_tick_s;
   uint32_t      cur_bc;
   uint32_t      cur_mc;
-} g_mct = {};
+} G_MctState;
+#ifdef BOARD_HAS_PSRAM
+static G_MctState* _g_mct_raw;
+#define g_mct (*_g_mct_raw)
+#else
+static G_MctState g_mct;
+#endif
 
 static bool mct_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -74,7 +75,7 @@ struct DasClient {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   DasAP     aps[DAS_MAX_APS];
   DasClient clients[DAS_MAX_CLIENTS];
   DasEvent  events[DAS_EVENT_RING];
@@ -82,7 +83,13 @@ static struct {
   uint16_t  total_events;
   uint8_t   ap_count;
   uint8_t   cli_count;
-} g_das = {};
+} G_DasState;
+#ifdef BOARD_HAS_PSRAM
+static G_DasState* _g_das_raw;
+#define g_das (*_g_das_raw)
+#else
+static G_DasState g_das;
+#endif
 
 static bool das_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

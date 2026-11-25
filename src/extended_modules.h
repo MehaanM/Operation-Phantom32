@@ -8,6 +8,8 @@
 //
 // Full analytics (all 13 modules) require PSRAM (WROVER, S3, S3-DEVKIT).
 
+#include "psram_attr.h"
+
 // ===========================================================================
 // ExtFrameInfo — always present so main.cpp promisc_cb can build it
 // ===========================================================================
@@ -274,6 +276,43 @@ inline void ext_dispatch_frame(const ExtFrameInfo &f) {
   }
 }
 
+// ============================================================
+// PSRAM heap allocation for all large analytics state.
+// Call once at the very start of setup() on PSRAM builds.
+// On LITE builds this is a no-op.
+// ============================================================
+static inline bool psram_alloc_all() {
+#ifdef BOARD_HAS_PSRAM
+  _g_mct_raw    = (G_MctState*)   ps_calloc(1, sizeof(G_MctState));
+  _g_eap_raw    = (G_EapState*)   ps_calloc(1, sizeof(G_EapState));
+  _g_wps_raw    = (G_WpsDetState*)ps_calloc(1, sizeof(G_WpsDetState));
+  _g_tad_raw    = (G_TadState*)   ps_calloc(1, sizeof(G_TadState));
+  _g_src_raw    = (G_SrcState*)   ps_calloc(1, sizeof(G_SrcState));
+  _g_pfd_raw    = (G_PfdState*)   ps_calloc(1, sizeof(G_PfdState));
+  _g_tsf_raw    = (G_TsfState*)   ps_calloc(1, sizeof(G_TsfState));
+  _g_bsc_raw    = (G_BscState*)   ps_calloc(1, sizeof(G_BscState));
+  _g_ntt_raw    = (G_NttState*)   ps_calloc(1, sizeof(G_NttState));
+  _g_shm_raw    = (G_ShmState*)   ps_calloc(1, sizeof(G_ShmState));
+  _g_cpd_raw    = (G_CpdState*)   ps_calloc(1, sizeof(G_CpdState));
+  _g_bsl_raw    = (G_BslState*)   ps_calloc(1, sizeof(G_BslState));
+  // Headers included directly in main.cpp before extended_modules.h:
+  _g_pfl_raw    = (G_PflState*)   ps_calloc(1, sizeof(G_PflState));
+  _g_das_raw    = (G_DasState*)   ps_calloc(1, sizeof(G_DasState));
+  _g_et_raw     = (EtStatus*)     ps_calloc(1, sizeof(EtStatus));
+  prh_entries   = (PrhEntry*)     ps_calloc(PRH_MAX_ENTRIES, sizeof(PrhEntry));
+  g_dt_devs     = (DtDevice*)     ps_calloc(DT_MAX_DEVICES, sizeof(DtDevice));
+  g_dt_aps      = (DtAP*)         ps_calloc(DT_MAX_APS, sizeof(DtAP));
+  g_dt_alerts   = (DtAlert*)      ps_calloc(DT_MAX_ALERTS, sizeof(DtAlert));
+  g_cli_scripts = (CliScript*)    ps_calloc(CLI_SCRIPT_MAX, sizeof(CliScript));
+  return _g_mct_raw && _g_eap_raw && _g_wps_raw && _g_tad_raw && _g_src_raw &&
+         _g_pfd_raw && _g_tsf_raw && _g_bsc_raw && _g_ntt_raw && _g_shm_raw &&
+         _g_cpd_raw && _g_bsl_raw && _g_pfl_raw && _g_das_raw && _g_et_raw &&
+         prh_entries && g_dt_devs && g_dt_aps && g_dt_alerts && g_cli_scripts;
+#else
+  return true;
+#endif
+}
+
 #else // PHANTOM32_LITE
 // ===========================================================================
 // LITE BUILD — analytics disabled to fit in 320 KB DRAM (no PSRAM boards)
@@ -301,5 +340,7 @@ inline void ext_register_routes() {
 }
 
 inline void ext_dispatch_frame(const ExtFrameInfo &) {}
+
+static inline bool psram_alloc_all() { return true; }
 
 #endif // PHANTOM32_LITE

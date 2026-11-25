@@ -84,10 +84,10 @@ static uint32_t   g_am_lockout_events = 0;
 // ============================================================
 
 static void am_bytes_to_hex(const uint8_t *b, int len, char *out) {
-  static const char HEX[] = "0123456789abcdef";
+  static const char hex_chars[] = "0123456789abcdef";
   for (int i = 0; i < len; i++) {
-    out[i*2]   = HEX[b[i] >> 4];
-    out[i*2+1] = HEX[b[i] & 0xF];
+    out[i*2]   = hex_chars[b[i] >> 4];
+    out[i*2+1] = hex_chars[b[i] & 0xF];
   }
   out[len*2] = '\0';
 }

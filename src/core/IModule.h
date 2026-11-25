@@ -35,6 +35,12 @@ class IModule {
   virtual const char *version() const = 0;
   virtual const char *description() const = 0;
 
+  // Dependency declaration — optional.
+  // ModuleLifecycle resolves initialization order so every declared dependency
+  // is initialized before this module. Return the name of the i-th dependency.
+  virtual size_t dependencyCount() const { return 0; }
+  virtual const char *dependency(size_t /*i*/) const { return nullptr; }
+
   // Introspection.
   State state() const { return state_; }
   bool isRunning() const { return state_ == State::Running; }

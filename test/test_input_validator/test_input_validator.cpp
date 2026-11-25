@@ -389,6 +389,37 @@ void test_json_escape_control() {
   TEST_ASSERT_EQUAL_STRING("\"\\u0001\"", json_escape(s));
 }
 
+// ============================================================
+// TESTS: Uncovered branches
+// ============================================================
+
+void test_ip_len_above_15() {
+  // "1234.1234.1234.1234" = 19 chars — len > 15 branch
+  TEST_ASSERT_FALSE(check_ip("1234.1234.1234.1234"));
+}
+
+void test_label_null() {
+  TEST_ASSERT_FALSE(check_label(nullptr));
+}
+
+void test_label_high_byte() {
+  char s[3] = {(char)0x80, 'A', '\0'};  // c > 0x7E — high byte
+  TEST_ASSERT_FALSE(check_label(s));
+}
+
+void test_int_null() {
+  TEST_ASSERT_FALSE(check_int_range(nullptr, 0, 100, nullptr));
+}
+
+void test_int_null_out_ptr() {
+  // out == nullptr branch — valid value but nowhere to store it
+  TEST_ASSERT_TRUE(check_int_range("42", 0, 100, nullptr));
+}
+
+void test_json_escape_cr() {
+  TEST_ASSERT_EQUAL_STRING("\"a\\rb\"", json_escape("a\rb"));
+}
+
 void test_json_xss_attempt() {
   const char *result = json_escape("<script>alert(1)</script>");
   // No unescaped angle brackets in JSON — but angle brackets ARE safe in JSON
@@ -511,8 +542,16 @@ int main(int argc, char **argv) {
   RUN_TEST(test_json_escape_newline);
   RUN_TEST(test_json_escape_tab);
   RUN_TEST(test_json_escape_control);
+  RUN_TEST(test_json_escape_cr);
   RUN_TEST(test_json_xss_attempt);
   RUN_TEST(test_json_ssid_with_quotes);
+
+  // Uncovered branch tests
+  RUN_TEST(test_ip_len_above_15);
+  RUN_TEST(test_label_null);
+  RUN_TEST(test_label_high_byte);
+  RUN_TEST(test_int_null);
+  RUN_TEST(test_int_null_out_ptr);
 
   return UNITY_END();
 }

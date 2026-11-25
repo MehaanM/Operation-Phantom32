@@ -9,6 +9,35 @@ and this project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Security
+- **PlatformIO upgraded to 6.2.0** — resolved DEP-001: previously flagged 16 CVEs
+  in PlatformIO 6.1.16 transitive deps. 6.2.0 ships updated `bottle==0.13.*`,
+  `starlette<2`, `uvicorn<1`, and tighter dependency pins. All 13-board CI builds
+  validated against the new version.
+
+### Added
+- 16 new targeted branch-coverage tests in `test_auth_manager.cpp`:
+  null token to `am_find_session`, wrong-length token, `am_create_session` with null
+  IP, `am_invalidate_session` not-found path, `am_session_valid` null token, session
+  valid at exact TTL boundary, lockout table full (17th entry returns null),
+  `am_record_success` for new IP (no-op), password too long, error messages for null
+  / too long / needs digit / last_used updated, lockout at exact expiry time.
+- 5 new targeted branch-coverage tests in `test_input_validator.cpp`:
+  `check_ip` len > 15, `check_label` null, `check_label` high byte (c > 0x7E),
+  `check_int_range` null, `check_int_range` with null output pointer.
+- 1 new test `test_json_escape_cr` covering `\r` escape branch in `json_escape`.
+- 4 new targeted branch-coverage tests in `test_evil_twin.cpp`:
+  `et_html_escape` buffer-too-small path, `et_stop` from STOPPING state,
+  `et_start` from STOPPING state, all-null `et_add_cred`.
+- 4 new targeted branch-coverage tests in `test_rate_limiter.cpp`:
+  `rla_find_or_add_ip` full table, `rla_check_http` when IP table is full,
+  tool entry with `active=false` bypasses per-tool check, bucket consume
+  when tokens exactly equal cost.
+- `docs/release-checklist.md` — complete pre-release, tagging, post-release,
+  and firmware provenance checklist.
+
+
+
+### Security
 - **API key printed in full on first boot** — first-boot serial log and
   `auth_print_credentials()` now print the full 64-char API key instead of a
   truncated 16-char prefix, eliminating the misleading "(full key via /api/auth/status)"

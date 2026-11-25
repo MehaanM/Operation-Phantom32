@@ -9,8 +9,15 @@ and this project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Security
+- **PBKDF2 work factor increased to 100,000 iterations** — raised from 10,000 to
+  100,000 (10×) to meet the defensible minimum for constrained hardware. Login latency
+  is ~1 s on ESP32 @ 240 MHz; brute-force cost increases proportionally.
+- **AP password fail-closed** — `auth_get_ap_wifi_password()` now restarts the device
+  instead of falling back to a known credential if `auth_init()` was not called first.
+- **Session token removed from logs** — login success log no longer prints any portion
+  of the session token; only the client IP is logged.
 - **PBKDF2-HMAC-SHA256 password hashing** — replaced MAC-keyed HMAC with PBKDF2
-  (10,000 iterations, 128-bit random per-device salt). Hash and salt stored in NVS;
+  (100,000 iterations, 128-bit random per-device salt). Hash and salt stored in NVS;
   plaintext never stored. Salt regenerated on every credential reset or password change.
 - **Per-device AP WiFi password** — replaced hardcoded `phantom32` with a device-unique
   12-char random password generated on first boot and stored in NVS.
@@ -28,12 +35,18 @@ and this project uses [Semantic Versioning](https://semver.org/).
 - `.clang-format` — Google-based C++14 style config (100-column, 2-space indent).
   All 359 source files reformatted; CI enforces compliance on every push.
 - CI: **secret scanning** (`gitleaks`) job runs on all pushes/PRs with full git history.
-- CI: **dependency vulnerability scanning** (`pip-audit`) job audits Python CI dependencies.
+- CI: **dependency vulnerability scanning** (`pip-audit`) job audits Python CI dependencies;
+  also generates a full PlatformIO transitive dependency report as a CI artifact.
 - CI: **clang-format compliance** step in `lint` job rejects formatting violations.
 - CI: **BUILD_MANIFEST.txt** added to every firmware artifact (git SHA, ref, PIO version,
   runner OS, build timestamp, workflow run ID).
-- `docs/security.md` — Full security architecture reference.
+- `docs/security.md` — Full security architecture reference including NVS/flash encryption
+  support matrix and configuration guide per chip.
 - `docs/testing.md` — Test strategy, coverage targets, and how to run tests.
+- `docs/dependency-inventory.md` — Firmware and CI dependency inventory with CVE
+  status, risk assessment, and unresolved findings register.
+- `docs/hardware-validation.md` — Hardware validation status, checklist, and outstanding
+  physical testing items.
 
 ### Changed
 - `SECURITY.md`: updated "What NOT to Report" to reflect per-device AP password

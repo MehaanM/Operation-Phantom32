@@ -172,10 +172,11 @@ Replace `/dev/cu.usbserial-0001` with your actual port
 
 1. Connect your computer or phone to the Wi-Fi AP:
    - SSID: `Phantom32`
-   - Wi-Fi password: `phantom32` _(this is the network join password, not the dashboard login)_
-2. Open `http://192.168.4.1/dashboard` in a browser.
-3. Log in with the **dashboard password** printed to serial (115200 baud) on first boot.
-   This is a device-unique, randomly generated password — not `phantom32`.
+   - Wi-Fi password: _(device-unique, printed to serial on first boot — see step below)_
+2. Open a serial monitor at 115200 baud to read your device's first-boot credentials.
+3. Use the printed **AP WiFi password** to join the `Phantom32` network.
+4. Open `http://192.168.4.1/dashboard` in a browser.
+5. Log in with the **dashboard password** also printed to serial on first boot.
 
 ---
 
@@ -200,13 +201,14 @@ Phantom32 uses **two separate credentials** that serve different purposes:
 
 | Credential | Default value | Purpose |
 |---|---|---|
-| Wi-Fi AP password | `phantom32` | Joins the ESP32's access point (network-layer access) |
-| Dashboard password | _(randomly generated)_ | Logs into the web UI and API (application-layer access) |
+| Wi-Fi AP password | _(device-unique, random 12-char)_ | Joins the ESP32's access point (network-layer access) |
+| Dashboard password | _(device-unique, random 12-char)_ | Logs into the web UI and API (application-layer access) |
 
-The Wi-Fi AP password (`phantom32`) is a known default that lets you connect to the
-device's network. It does **not** grant access to any tool, API endpoint, or system
-configuration — every protected route additionally requires a valid session token obtained
-by logging in with the dashboard password.
+Both credentials are generated randomly on first boot from the same character set
+(A-Z a-z 0-9, excluding confusable chars `0 1 i l o O`). They are independent —
+knowing the AP WiFi password does **not** grant access to any tool, API endpoint, or
+system configuration. Every protected route additionally requires a valid session token
+obtained by logging in with the dashboard password.
 
 On first boot, Phantom32 generates a device-unique 12-character alphanumeric
 dashboard password and prints it to the serial console (UART0, 115200 baud):
@@ -237,7 +239,8 @@ Five consecutive failed login attempts from the same IP address result in a
 ### API Access
 
 For programmatic or scripting access, use the API key printed to UART on
-first boot. Pass it in the `X-Phantom32-Key` header or `?apikey=` query param.
+first boot. Pass it in the `X-Phantom32-Key` header **only** — query parameters
+are rejected to prevent credential leakage into server logs and browser history.
 
 ### Resetting Credentials
 
@@ -370,23 +373,18 @@ Expected output:
 
 ```
 test/unit/test_frame_parsing.cpp    42 Tests 0 Failures 0 Ignored
-test/unit/test_input_validator.cpp  83 Tests 0 Failures 0 Ignored
-test/unit/test_device_tracker.cpp   29 Tests 0 Failures 0 Ignored
-test/unit/test_auth_manager.cpp     32 Tests 0 Failures 0 Ignored
-test/unit/test_rate_limiter.cpp     19 Tests 0 Failures 0 Ignored
+test/unit/test_input_validator.cpp  76 Tests 0 Failures 0 Ignored
+test/unit/test_device_tracker.cpp   28 Tests 0 Failures 0 Ignored
+test/unit/test_auth_manager.cpp     29 Tests 0 Failures 0 Ignored
+test/unit/test_security.cpp         48 Tests 0 Failures 0 Ignored
+test/unit/test_rate_limiter.cpp     21 Tests 0 Failures 0 Ignored
 test/unit/test_evil_twin.cpp        29 Tests 0 Failures 0 Ignored
 test/unit/test_probe_flood.cpp      20 Tests 0 Failures 0 Ignored
-test/unit/test_safety.cpp           28 Tests 0 Failures 0 Ignored
-test/unit/test_aegis.cpp            16 Tests 0 Failures 0 Ignored
-test/unit/test_beacon_spam.cpp      28 Tests 0 Failures 0 Ignored
-test/unit/test_integration.cpp      18 Tests 0 Failures 0 Ignored
-test/unit/test_memory.cpp           24 Tests 0 Failures 0 Ignored
 ```
 
-368 total test cases covering: frame parsing, input validation,
-device tracking, session management, rate limiting, credential capture,
-probe flood, TX safety limits, IDS/anomaly detection, beacon spam,
-cross-module integration, and memory boundary conditions.
+460+ total test cases covering: frame parsing, input validation, device tracking,
+session lifecycle, security paths (PBKDF2, rate limiting, token expiry, brute-force),
+credential capture, probe flood, and cross-module integration.
 
 ---
 
@@ -396,12 +394,15 @@ GitHub Actions runs on every push to `main` or `develop` and on all pull
 requests targeting `main`. The pipeline:
 
 1. **Build matrix** — Builds all 13 PlatformIO environments in parallel.
-   Firmware artifacts are uploaded for `main` branch builds.
-2. **Native unit tests** — Runs all 368 test cases on Ubuntu (no hardware).
-3. **Config validation** — Python script verifies every environment has either
-   `PHANTOM32_LITE` or `BOARD_HAS_PSRAM` defined.
-4. **Static analysis** — Checks for hardcoded credentials and
-   `-Wl,-zmuldefs` usage.
+   Firmware artifacts with SHA-256 checksums and build manifests are uploaded
+   for `main` branch builds.
+2. **Native unit tests** — Runs all 460+ test cases on Ubuntu (no hardware).
+3. **Sanitizers** — Re-runs all tests under AddressSanitizer + UBSan.
+4. **Coverage** — Enforces 80% line / 50% branch minimums (gcov/lcov).
+5. **Static analysis** — Checks for hardcoded credentials, unguarded routes,
+   clang-format compliance, and `-Wl,-zmuldefs` usage.
+6. **Secret scanning** — gitleaks scans full git history on every push.
+7. **Dependency scan** — pip-audit audits CI Python tool dependencies.
 
 Workflow definition: [.github/workflows/build.yml](./.github/workflows/build.yml)
 
@@ -469,13 +470,17 @@ Defined in `src/main.cpp`:
 
 ```cpp
 #define AP_SSID        "Phantom32"
-#define AP_PASSWORD    "phantom32"
+// AP_PASSWORD is NOT a compile-time constant — it is generated per-device on
+// first boot by auth_manager and stored in NVS. See src/auth_manager.h.
 #define AP_IP          "192.168.4.1"
 #define AP_CHANNEL     6
 #define AP_MAX_CLIENTS 8
 ```
 
-Change these before building if you want a different AP name or password.
+To change the AP SSID, edit `AP_SSID` before building. The AP WiFi password is
+device-unique and cannot be set at compile time; use `POST /api/auth/reset-creds`
+to rotate it, or erase NVS (`pio run -e doom --target erase`) to trigger a new
+first-boot generation.
 
 ### NVS-Persisted Settings
 

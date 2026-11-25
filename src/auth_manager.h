@@ -3,7 +3,7 @@
 //
 // Security model:
 //   - Per-device random 12-char alphanumeric dashboard password generated on
-//     first boot, stored as PBKDF2-HMAC-SHA256 (10000 iterations, random 128-bit
+//     first boot, stored as PBKDF2-HMAC-SHA256 (100000 iterations, random 128-bit
 //     salt) in NVS. Plaintext shown once on serial; never stored.
 //   - Per-device random 12-char AP WiFi password generated on first boot and
 //     stored in NVS. Different from the dashboard password.
@@ -56,7 +56,8 @@ extern WebServer server;
 
 #define AM_PBKDF2_SALT_LEN 16  // random salt bytes
 #define AM_PBKDF2_KEY_LEN 32   // derived key bytes (256-bit)
-#define AM_PBKDF2_ITER 10000   // work factor (~100 ms on ESP32 @ 240 MHz)
+#define AM_PBKDF2_ITER \
+  100000  // work factor (~1 s on ESP32 @ 240 MHz; defensible minimum for constrained hardware)
 
 // ============================================================
 // DATA STRUCTURES
@@ -645,7 +646,7 @@ static void am_handle_login() {
   }
 
   g_am_total_logins++;
-  Serial.printf("[AUTH] Login OK from %s. Token: %.8s...\n", client_ip.c_str(), s->token);
+  Serial.printf("[AUTH] Login OK from %s\n", client_ip.c_str());
 
   // Set HttpOnly cookie — do NOT return token in body (browser JS cannot read it).
   String cookie = "phantom32_token=";
@@ -794,8 +795,16 @@ inline void auth_init() {
 }
 
 // Return per-device AP WiFi password (must call auth_init() first).
+// FAIL CLOSED: if credentials were not initialized, restart rather than
+// fall back to any known or empty password.
 inline const char *auth_get_ap_wifi_password() {
-  return g_am_ap_wifi_password[0] ? g_am_ap_wifi_password : "phantom32";  // ap-default
+  if (!g_am_ap_wifi_password[0]) {
+    Serial.printf(
+        "[AUTH] FATAL: AP WiFi password not set — auth_init() must be called before WiFi setup\n");
+    Serial.flush();
+    esp_restart();
+  }
+  return g_am_ap_wifi_password;
 }
 
 // Redirect to login page (use in handlers that serve HTML, not JSON).

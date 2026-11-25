@@ -211,7 +211,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wudas_routes() {
-  server.on("/deauth-storm", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUDAS_PAGE);
-  });
+  server.on("/deauth-storm", HTTP_GET, []() { server.send_P(200, "text/html", WUDAS_PAGE); });
 }

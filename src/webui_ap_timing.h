@@ -189,7 +189,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuapt_routes() {
-  server.on("/ap-timing", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAPT_PAGE);
-  });
+  server.on("/ap-timing", HTTP_GET, []() { server.send_P(200, "text/html", WUAPT_PAGE); });
 }

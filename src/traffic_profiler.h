@@ -11,8 +11,8 @@ extern WebServer server;
 #define TRP_MGMT_SUBTYPES 16
 #define TRP_DATA_SUBTYPES 16
 #define TRP_CTRL_SUBTYPES 16
-#define TRP_MAX_FLOWS     64
-#define TRP_WINDOW_S       5
+#define TRP_MAX_FLOWS 64
+#define TRP_WINDOW_S 5
 
 struct TrpFlowKey {
   uint8_t src[6];
@@ -21,29 +21,29 @@ struct TrpFlowKey {
 };
 
 struct TrpFlow {
-  bool        active;
-  TrpFlowKey  key;
+  bool active;
+  TrpFlowKey key;
 
-  uint32_t    pkt_count;
-  uint32_t    byte_count;
-  uint32_t    retry_count;
-  uint32_t    frag_count;
-  uint32_t    prot_count;    // protected (encrypted) frames
-  uint32_t    qos_count;
+  uint32_t pkt_count;
+  uint32_t byte_count;
+  uint32_t retry_count;
+  uint32_t frag_count;
+  uint32_t prot_count;  // protected (encrypted) frames
+  uint32_t qos_count;
 
-  uint8_t     type_dist[3]; // 0=mgmt 1=ctrl 2=data counts (pct)
-  uint8_t     avg_rssi_neg; // stored as positive (negate to get dBm)
+  uint8_t type_dist[3];  // 0=mgmt 1=ctrl 2=data counts (pct)
+  uint8_t avg_rssi_neg;  // stored as positive (negate to get dBm)
 
   // Window-based rate
-  uint32_t    window_pkts;
-  uint32_t    window_bytes;
-  uint32_t    window_start_ts;
+  uint32_t window_pkts;
+  uint32_t window_bytes;
+  uint32_t window_start_ts;
 
-  uint32_t    pkt_rate;     // pkt/s over last window
-  uint32_t    byte_rate;    // bytes/s over last window
+  uint32_t pkt_rate;   // pkt/s over last window
+  uint32_t byte_rate;  // bytes/s over last window
 
-  uint32_t    first_ts;
-  uint32_t    last_ts;
+  uint32_t first_ts;
+  uint32_t last_ts;
 };
 
 // ─── Global distribution counters ─────────────────────────────────────────────
@@ -79,8 +79,8 @@ static struct {
   uint32_t last_rate_ts;
 
   // Per-flow table
-  TrpFlow  flows[TRP_MAX_FLOWS];
-  uint8_t  flow_count;
+  TrpFlow flows[TRP_MAX_FLOWS];
+  uint8_t flow_count;
 } g_trp = {};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -89,14 +89,15 @@ static bool trp_mac_eq(const uint8_t *a, const uint8_t *b) {
 }
 
 static bool trp_is_bcast(const uint8_t *m) {
-  return m[0]==0xFF && m[1]==0xFF && m[2]==0xFF && m[3]==0xFF && m[4]==0xFF && m[5]==0xFF;
+  return m[0] == 0xFF && m[1] == 0xFF && m[2] == 0xFF && m[3] == 0xFF && m[4] == 0xFF &&
+         m[5] == 0xFF;
 }
 
-static TrpFlow* trp_find_or_alloc(const uint8_t *src, const uint8_t *dst, uint8_t ch) {
+static TrpFlow *trp_find_or_alloc(const uint8_t *src, const uint8_t *dst, uint8_t ch) {
   for (int i = 0; i < TRP_MAX_FLOWS; i++) {
-    if (!g_trp.flows[i].active) continue;
-    if (trp_mac_eq(g_trp.flows[i].key.src, src) &&
-        trp_mac_eq(g_trp.flows[i].key.dst, dst) &&
+    if (!g_trp.flows[i].active)
+      continue;
+    if (trp_mac_eq(g_trp.flows[i].key.src, src) && trp_mac_eq(g_trp.flows[i].key.dst, dst) &&
         g_trp.flows[i].key.channel == ch)
       return &g_trp.flows[i];
   }
@@ -108,7 +109,7 @@ static TrpFlow* trp_find_or_alloc(const uint8_t *src, const uint8_t *dst, uint8_
       memcpy(f.key.src, src, 6);
       memcpy(f.key.dst, dst, 6);
       f.key.channel = ch;
-      f.first_ts    = millis()/1000;
+      f.first_ts = millis() / 1000;
       f.window_start_ts = f.first_ts;
       g_trp.flow_count++;
       return &f;
@@ -118,55 +119,65 @@ static TrpFlow* trp_find_or_alloc(const uint8_t *src, const uint8_t *dst, uint8_
   uint32_t oldest = UINT32_MAX;
   int idx = 0;
   for (int i = 0; i < TRP_MAX_FLOWS; i++)
-    if (g_trp.flows[i].last_ts < oldest) { oldest = g_trp.flows[i].last_ts; idx = i; }
+    if (g_trp.flows[i].last_ts < oldest) {
+      oldest = g_trp.flows[i].last_ts;
+      idx = i;
+    }
   TrpFlow &f = g_trp.flows[idx];
   memset(&f, 0, sizeof(f));
   f.active = true;
   memcpy(f.key.src, src, 6);
   memcpy(f.key.dst, dst, 6);
   f.key.channel = ch;
-  f.first_ts = millis()/1000;
+  f.first_ts = millis() / 1000;
   f.window_start_ts = f.first_ts;
   return &f;
 }
 
 // ─── Ingest ───────────────────────────────────────────────────────────────────
-void trp_ingest(const uint8_t *src, const uint8_t *dst,
-                uint8_t type, uint8_t subtype,
-                bool retry, bool frag, bool prot, bool qos,
-                uint8_t channel, uint16_t frame_len, int8_t rssi) {
-  if (!src || !dst) return;
+void trp_ingest(const uint8_t *src, const uint8_t *dst, uint8_t type, uint8_t subtype, bool retry,
+                bool frag, bool prot, bool qos, uint8_t channel, uint16_t frame_len, int8_t rssi) {
+  if (!src || !dst)
+    return;
 
-  uint32_t now = millis()/1000;
+  uint32_t now = millis() / 1000;
   g_trp.total_frames++;
   g_trp.total_bytes += frame_len;
 
   // Type distribution
   if (type == 0) {
     g_trp.mgmt_total++;
-    if (subtype < TRP_MGMT_SUBTYPES) g_trp.mgmt_sub[subtype]++;
+    if (subtype < TRP_MGMT_SUBTYPES)
+      g_trp.mgmt_sub[subtype]++;
   } else if (type == 1) {
     g_trp.ctrl_total++;
-    if (subtype < TRP_CTRL_SUBTYPES) g_trp.ctrl_sub[subtype]++;
+    if (subtype < TRP_CTRL_SUBTYPES)
+      g_trp.ctrl_sub[subtype]++;
   } else {
     g_trp.data_total++;
-    if (subtype < TRP_DATA_SUBTYPES) g_trp.data_sub[subtype]++;
+    if (subtype < TRP_DATA_SUBTYPES)
+      g_trp.data_sub[subtype]++;
   }
 
   // Quality metrics
-  if (retry) g_trp.retry_total++;
-  if (frag)  g_trp.frag_total++;
-  if (prot)  g_trp.prot_total++;
-  if (qos)   g_trp.qos_total++;
+  if (retry)
+    g_trp.retry_total++;
+  if (frag)
+    g_trp.frag_total++;
+  if (prot)
+    g_trp.prot_total++;
+  if (qos)
+    g_trp.qos_total++;
 
   // Channel
-  if (channel >= 1 && channel <= 14) g_trp.ch_dist[channel-1]++;
+  if (channel >= 1 && channel <= 14)
+    g_trp.ch_dist[channel - 1]++;
 
   // Rate window (1s)
   if (now != g_trp.last_rate_ts) {
     g_trp.frames_last_s = g_trp.total_frames;
-    g_trp.bytes_last_s  = g_trp.total_bytes;
-    g_trp.last_rate_ts  = now;
+    g_trp.bytes_last_s = g_trp.total_bytes;
+    g_trp.last_rate_ts = now;
   }
 
   // Per-flow
@@ -175,18 +186,22 @@ void trp_ingest(const uint8_t *src, const uint8_t *dst,
     if (f) {
       f->pkt_count++;
       f->byte_count += frame_len;
-      if (retry) f->retry_count++;
-      if (frag)  f->frag_count++;
-      if (prot)  f->prot_count++;
-      if (qos)   f->qos_count++;
+      if (retry)
+        f->retry_count++;
+      if (frag)
+        f->frag_count++;
+      if (prot)
+        f->prot_count++;
+      if (qos)
+        f->qos_count++;
       f->avg_rssi_neg = (uint8_t)((-rssi * 1 + f->avg_rssi_neg * 7) / 8);
       f->last_ts = now;
 
       // Window rate
       if (now - f->window_start_ts >= TRP_WINDOW_S) {
-        f->pkt_rate  = f->window_pkts  / TRP_WINDOW_S;
+        f->pkt_rate = f->window_pkts / TRP_WINDOW_S;
         f->byte_rate = f->window_bytes / TRP_WINDOW_S;
-        f->window_pkts  = 0;
+        f->window_pkts = 0;
         f->window_bytes = 0;
         f->window_start_ts = now;
       }
@@ -199,20 +214,21 @@ void trp_ingest(const uint8_t *src, const uint8_t *dst,
 // ─── Tick ─────────────────────────────────────────────────────────────────────
 void trp_tick() {
   // Expire flows silent for 120s
-  uint32_t now = millis()/1000;
+  uint32_t now = millis() / 1000;
   for (int i = 0; i < TRP_MAX_FLOWS; i++) {
-    if (!g_trp.flows[i].active) continue;
+    if (!g_trp.flows[i].active)
+      continue;
     if (now - g_trp.flows[i].last_ts > 120) {
       memset(&g_trp.flows[i], 0, sizeof(g_trp.flows[i]));
-      if (g_trp.flow_count > 0) g_trp.flow_count--;
+      if (g_trp.flow_count > 0)
+        g_trp.flow_count--;
     }
   }
 }
 
 // ─── JSON builders ────────────────────────────────────────────────────────────
 static void trp_mac_str(const uint8_t *m, char *out) {
-  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-           m[0],m[1],m[2],m[3],m[4],m[5]);
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 static String trp_json_distribution() {
@@ -228,22 +244,26 @@ static String trp_json_distribution() {
   s += ",\"qos\":" + String(g_trp.qos_total);
   s += ",\"mgmt_sub\":[";
   for (int i = 0; i < TRP_MGMT_SUBTYPES; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_trp.mgmt_sub[i]);
   }
   s += "],\"data_sub\":[";
   for (int i = 0; i < TRP_DATA_SUBTYPES; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_trp.data_sub[i]);
   }
   s += "],\"ctrl_sub\":[";
   for (int i = 0; i < TRP_CTRL_SUBTYPES; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_trp.ctrl_sub[i]);
   }
   s += "],\"ch_dist\":[";
   for (int i = 0; i < 14; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += String(g_trp.ch_dist[i]);
   }
   s += "]}";
@@ -256,8 +276,10 @@ static String trp_json_flows() {
   bool first = true;
   for (int i = 0; i < TRP_MAX_FLOWS; i++) {
     TrpFlow &f = g_trp.flows[i];
-    if (!f.active) continue;
-    if (!first) s += ",";
+    if (!f.active)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     trp_mac_str(f.key.src, mac_s);
     trp_mac_str(f.key.dst, mac_d);
@@ -278,13 +300,11 @@ static String trp_json_flows() {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 inline void trp_routes() {
-  server.on("/api/trp/dist", HTTP_GET, []() {
-    server.send(200, "application/json", trp_json_distribution());
-  });
+  server.on("/api/trp/dist", HTTP_GET,
+            []() { server.send(200, "application/json", trp_json_distribution()); });
 
-  server.on("/api/trp/flows", HTTP_GET, []() {
-    server.send(200, "application/json", trp_json_flows());
-  });
+  server.on("/api/trp/flows", HTTP_GET,
+            []() { server.send(200, "application/json", trp_json_flows()); });
 
   server.on("/api/trp/clear", HTTP_POST, []() {
     memset(&g_trp, 0, sizeof(g_trp));

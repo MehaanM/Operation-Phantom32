@@ -231,7 +231,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wupb_routes() {
-  server.on("/probes", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPB_PAGE);
-  });
+  server.on("/probes", HTTP_GET, []() { server.send_P(200, "text/html", WUPB_PAGE); });
 }

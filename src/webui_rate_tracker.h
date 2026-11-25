@@ -172,7 +172,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wurtt_routes() {
-  server.on("/rate-tracker", HTTP_GET, []() {
-    server.send_P(200, "text/html", WURTT_PAGE);
-  });
+  server.on("/rate-tracker", HTTP_GET, []() { server.send_P(200, "text/html", WURTT_PAGE); });
 }

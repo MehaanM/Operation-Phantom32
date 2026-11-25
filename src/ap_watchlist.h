@@ -11,27 +11,26 @@
 
 extern WebServer server;
 
-#define AWL_MAX_ENTRIES  32
-#define AWL_SSID_LEN     33
+#define AWL_MAX_ENTRIES 32
+#define AWL_SSID_LEN 33
 
 struct AwlEntry {
-  uint8_t  bssid[6];
-  char     label[AWL_SSID_LEN];   // human-readable alias
-  int8_t   alert_rssi;            // alert if RSSI drops below this (-100 = disabled)
-  bool     active;
+  uint8_t bssid[6];
+  char label[AWL_SSID_LEN];  // human-readable alias
+  int8_t alert_rssi;         // alert if RSSI drops below this (-100 = disabled)
+  bool active;
   uint32_t last_seen_ms;
-  int8_t   last_rssi;
+  int8_t last_rssi;
   uint32_t seen_count;
 };
 
 static struct {
   AwlEntry entries[AWL_MAX_ENTRIES];
-  uint8_t  count;
+  uint8_t count;
 } g_awl = {};
 
 static inline void awl_mac_str(const uint8_t *m, char *out) {
-  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-           m[0],m[1],m[2],m[3],m[4],m[5]);
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 static inline bool awl_mac_eq(const uint8_t *a, const uint8_t *b) {
@@ -39,16 +38,17 @@ static inline bool awl_mac_eq(const uint8_t *a, const uint8_t *b) {
 }
 
 static inline bool awl_parse_mac(const char *s, uint8_t *out) {
-  return sscanf(s, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-    &out[0],&out[1],&out[2],&out[3],&out[4],&out[5]) == 6;
+  return sscanf(s, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &out[0], &out[1], &out[2], &out[3], &out[4],
+                &out[5]) == 6;
 }
 
 static inline void awl_notify(const uint8_t *bssid, int8_t rssi) {
   for (uint8_t i = 0; i < g_awl.count; i++) {
-    if (!g_awl.entries[i].active) continue;
+    if (!g_awl.entries[i].active)
+      continue;
     if (awl_mac_eq(g_awl.entries[i].bssid, bssid)) {
       g_awl.entries[i].last_seen_ms = millis();
-      g_awl.entries[i].last_rssi    = rssi;
+      g_awl.entries[i].last_rssi = rssi;
       g_awl.entries[i].seen_count++;
     }
   }
@@ -178,27 +178,36 @@ setInterval(refresh,3000);
 )rawhtml";
 
 static inline void awl_routes() {
-  server.on("/watchlist", HTTP_GET, []() {
-    server.send_P(200, "text/html", AWL_PAGE);
-  });
+  server.on("/watchlist", HTTP_GET, []() { server.send_P(200, "text/html", AWL_PAGE); });
 
   server.on("/api/watchlist", HTTP_GET, []() {
     String out;
     out.reserve(1024);
-    out += "{\"count\":"; out += g_awl.count;
+    out += "{\"count\":";
+    out += g_awl.count;
     out += ",\"entries\":[";
     char ms[18];
     for (uint8_t i = 0; i < g_awl.count; i++) {
       const AwlEntry &e = g_awl.entries[i];
-      if (!e.active) continue;
-      if (i > 0) out += ',';
+      if (!e.active)
+        continue;
+      if (i > 0)
+        out += ',';
       awl_mac_str(e.bssid, ms);
-      out += "{\"bssid\":\""; out += ms; out += '"';
-      out += ",\"label\":\""; out += e.label; out += '"';
-      out += ",\"alert_rssi\":"; out += e.alert_rssi;
-      out += ",\"last_rssi\":"; out += e.last_rssi;
-      out += ",\"last_seen_ms\":"; out += e.last_seen_ms;
-      out += ",\"seen_count\":"; out += e.seen_count;
+      out += "{\"bssid\":\"";
+      out += ms;
+      out += '"';
+      out += ",\"label\":\"";
+      out += e.label;
+      out += '"';
+      out += ",\"alert_rssi\":";
+      out += e.alert_rssi;
+      out += ",\"last_rssi\":";
+      out += e.last_rssi;
+      out += ",\"last_seen_ms\":";
+      out += e.last_seen_ms;
+      out += ",\"seen_count\":";
+      out += e.seen_count;
       out += '}';
     }
     out += "]}";
@@ -214,7 +223,10 @@ static inline void awl_routes() {
     uint8_t mac[6] = {};
     // Parse "bssid" key from JSON body
     int bi = body.indexOf("\"bssid\"");
-    if (bi < 0) { server.send(400, "application/json", "{\"error\":\"missing bssid\"}"); return; }
+    if (bi < 0) {
+      server.send(400, "application/json", "{\"error\":\"missing bssid\"}");
+      return;
+    }
     int q1 = body.indexOf('"', bi + 8);
     int q2 = body.indexOf('"', q1 + 1);
     String mac_str = body.substring(q1 + 1, q2);
@@ -224,16 +236,16 @@ static inline void awl_routes() {
     }
     AwlEntry &e = g_awl.entries[g_awl.count++];
     memcpy(e.bssid, mac, 6);
-    e.active      = true;
-    e.last_rssi   = -100;
-    e.seen_count  = 0;
-    e.alert_rssi  = -80;
+    e.active = true;
+    e.last_rssi = -100;
+    e.seen_count = 0;
+    e.alert_rssi = -80;
     // Parse label
     int li = body.indexOf("\"label\"");
     if (li >= 0) {
       int lq1 = body.indexOf('"', li + 8);
       int lq2 = body.indexOf('"', lq1 + 1);
-      strncpy(e.label, body.substring(lq1+1, lq2).c_str(), AWL_SSID_LEN-1);
+      strncpy(e.label, body.substring(lq1 + 1, lq2).c_str(), AWL_SSID_LEN - 1);
     }
     server.send(200, "application/json", "{\"ok\":true}");
   });
@@ -241,7 +253,10 @@ static inline void awl_routes() {
   server.on("/api/watchlist", HTTP_DELETE, []() {
     String body = server.arg("plain");
     int bi = body.indexOf("\"bssid\"");
-    if (bi < 0) { server.send(400, "application/json", "{\"error\":\"missing bssid\"}"); return; }
+    if (bi < 0) {
+      server.send(400, "application/json", "{\"error\":\"missing bssid\"}");
+      return;
+    }
     int q1 = body.indexOf('"', bi + 8);
     int q2 = body.indexOf('"', q1 + 1);
     String mac_str = body.substring(q1 + 1, q2);
@@ -254,7 +269,7 @@ static inline void awl_routes() {
       if (awl_mac_eq(g_awl.entries[i].bssid, mac)) {
         // Shift entries down
         for (uint8_t j = i; j < g_awl.count - 1; j++) {
-          g_awl.entries[j] = g_awl.entries[j+1];
+          g_awl.entries[j] = g_awl.entries[j + 1];
         }
         g_awl.count--;
         server.send(200, "application/json", "{\"ok\":true}");

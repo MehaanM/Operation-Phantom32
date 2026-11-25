@@ -163,7 +163,5 @@ setInterval(refresh, 2500);
 )rawhtml";
 
 inline void wuprt_routes() {
-  server.on("/probe-response", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPRT_PAGE);
-  });
+  server.on("/probe-response", HTTP_GET, []() { server.send_P(200, "text/html", WUPRT_PAGE); });
 }

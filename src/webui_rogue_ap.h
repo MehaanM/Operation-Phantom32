@@ -209,7 +209,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wurgd_routes() {
-  server.on("/rogue-ap", HTTP_GET, []() {
-    server.send_P(200, "text/html", WURGD_PAGE);
-  });
+  server.on("/rogue-ap", HTTP_GET, []() { server.send_P(200, "text/html", WURGD_PAGE); });
 }

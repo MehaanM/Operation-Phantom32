@@ -212,7 +212,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wurom_routes() {
-  server.on("/roaming", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUROM_PAGE);
-  });
+  server.on("/roaming", HTTP_GET, []() { server.send_P(200, "text/html", WUROM_PAGE); });
 }

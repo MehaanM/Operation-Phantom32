@@ -208,7 +208,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuphy_routes() {
-  server.on("/phy-stats", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPHY_PAGE);
-  });
+  server.on("/phy-stats", HTTP_GET, []() { server.send_P(200, "text/html", WUPHY_PAGE); });
 }

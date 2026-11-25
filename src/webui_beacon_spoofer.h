@@ -209,7 +209,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wubsp_routes() {
-  server.on("/beacon-spoofer", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBSP_PAGE);
-  });
+  server.on("/beacon-spoofer", HTTP_GET, []() { server.send_P(200, "text/html", WUBSP_PAGE); });
 }

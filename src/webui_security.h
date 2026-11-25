@@ -199,7 +199,5 @@ setInterval(refresh, 8000);
 )rawhtml";
 
 inline void wusec_routes() {
-  server.on("/security", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSEC_PAGE);
-  });
+  server.on("/security", HTTP_GET, []() { server.send_P(200, "text/html", WUSEC_PAGE); });
 }

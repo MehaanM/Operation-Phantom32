@@ -46,7 +46,7 @@ Replace `/dev/cu.usbserial-0001` with your port (`pio device list` to find it).
 pio test -e native
 ```
 
-This runs all tests in `test/unit/` on your host machine (no ESP32 needed).
+This runs all tests in `test/` on your host machine (no ESP32 needed).
 
 ---
 
@@ -62,6 +62,11 @@ This runs all tests in `test/unit/` on your host machine (no ESP32 needed).
   - Module-scoped globals: `g_<module>_<name>` (e.g. `g_dt_dev_count`)
   - Module-scoped static functions: `<module>_<verb>_<noun>` (e.g. `dt_find_device`)
 - Comments: only add one when the **why** is non-obvious
+- Formatting is enforced by `.clang-format` (Google-based, 100 columns, 2-space indent).
+  Run before committing:
+  ```bash
+  find src/ -name "*.cpp" -o -name "*.h" | xargs clang-format -i
+  ```
 
 ### RAM-conscious coding
 
@@ -111,9 +116,11 @@ Test files must:
 
 3. All CI checks must pass before review:
    - `Build` matrix (all 13 environments)
-   - `Validate platformio.ini` (LITE/PSRAM coverage check)
-   - `Static analysis` (no hardcoded credentials, `zmuldefs` warning check)
-   - `Native tests`
+   - `Native tests` + `Sanitizers (ASan + UBSan)` + `Coverage (gcov)`
+   - `Static analysis` — hardcoded credential check, route auth audit, `zmuldefs`
+     rejection, LITE/PSRAM coverage, clang-format compliance
+   - `Secret scanning` (gitleaks) — no credentials or tokens in git history
+   - `Dependency vulnerability scan` (pip-audit)
 
 4. Write a clear PR description: **what** changed, **why**, and
    **how to test** it on hardware if relevant.

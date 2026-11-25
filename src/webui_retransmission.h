@@ -196,7 +196,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wurta_routes() {
-  server.on("/retransmission", HTTP_GET, []() {
-    server.send_P(200, "text/html", WURTA_PAGE);
-  });
+  server.on("/retransmission", HTTP_GET, []() { server.send_P(200, "text/html", WURTA_PAGE); });
 }

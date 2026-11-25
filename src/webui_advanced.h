@@ -1118,16 +1118,8 @@ setInterval(loadStatus,5000);
 // Route registration for all advanced UI pages
 // ─────────────────────────────────────────────────────────────────────────────
 static void wui_routes() {
-  server.on("/topology",HTTP_GET,[](){
-    server.send_P(200,"text/html",WUI_TOPOLOGY);
-  });
-  server.on("/spectrum",HTTP_GET,[](){
-    server.send_P(200,"text/html",WUI_SPECTRUM);
-  });
-  server.on("/wizard",HTTP_GET,[](){
-    server.send_P(200,"text/html",WUI_WIZARD);
-  });
-  server.on("/settings",HTTP_GET,[](){
-    server.send_P(200,"text/html",WUI_SETTINGS);
-  });
+  server.on("/topology", HTTP_GET, []() { server.send_P(200, "text/html", WUI_TOPOLOGY); });
+  server.on("/spectrum", HTTP_GET, []() { server.send_P(200, "text/html", WUI_SPECTRUM); });
+  server.on("/wizard", HTTP_GET, []() { server.send_P(200, "text/html", WUI_WIZARD); });
+  server.on("/settings", HTTP_GET, []() { server.send_P(200, "text/html", WUI_SETTINGS); });
 }

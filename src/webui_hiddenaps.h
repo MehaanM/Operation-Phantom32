@@ -188,7 +188,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wuhad_routes() {
-  server.on("/hidden-aps", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUHAD_PAGE);
-  });
+  server.on("/hidden-aps", HTTP_GET, []() { server.send_P(200, "text/html", WUHAD_PAGE); });
 }

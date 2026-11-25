@@ -3,13 +3,13 @@
 #include <esp_chip_info.h>
 
 // Board detection: returns JSON with chip/hardware info and board-specific pin defaults
-static void board_routes(){
+static void board_routes() {
   extern WebServer server;
-  server.on("/api/board", HTTP_GET, [](){
+  server.on("/api/board", HTTP_GET, []() {
     esp_chip_info_t ci;
     esp_chip_info(&ci);
 
-    const char* model = "unknown";
+    const char *model = "unknown";
     int i2c_sda = 21, i2c_scl = 22;
     int spi_clk = 18, spi_mosi = 23, spi_cs = 5;
     int uart_rx = 16, uart_tx = 17;
@@ -19,9 +19,13 @@ static void board_routes(){
     model = "ESP32-S3";
     has_bt5 = true;
     // S3 XIAO default: SDA=4, SCL=5; DevKit: 8/9; we use standard
-    i2c_sda = 8; i2c_scl = 9;
-    spi_clk = 12; spi_mosi = 11; spi_cs = 10;
-    uart_rx = 44; uart_tx = 43;
+    i2c_sda = 8;
+    i2c_scl = 9;
+    spi_clk = 12;
+    spi_mosi = 11;
+    spi_cs = 10;
+    uart_rx = 44;
+    uart_tx = 43;
     has_psram = (ci.features & CHIP_FEATURE_EMB_PSRAM) != 0;
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
     model = "ESP32-S2";
@@ -40,10 +44,11 @@ static void board_routes(){
 #endif
 
     // Detect known boards by compile-time board macro
-    const char* board = model;
+    const char *board = model;
 #ifdef ARDUINO_M5STACK_CORE_ESP32
     board = "M5Stack Basic";
-    i2c_sda = 21; i2c_scl = 22;
+    i2c_sda = 21;
+    i2c_scl = 22;
 #elif defined(ARDUINO_M5STACK_Core2)
     board = "M5Stack Core2";
     i2c_sda = 21; i2c_scl = 22;
@@ -74,10 +79,10 @@ static void board_routes(){
     j += ",\"board\":\"" + String(board) + "\"";
     j += ",\"revision\":" + String(ci.revision);
     j += ",\"cores\":" + String(ci.cores);
-    j += ",\"flash_mb\":" + String(ESP.getFlashChipSize()/1024/1024);
-    j += ",\"psram_kb\":" + String(ESP.getPsramSize()/1024);
-    j += ",\"heap_kb\":" + String(ESP.getFreeHeap()/1024);
-    j += ",\"bt5\":" + String(has_bt5?1:0);
+    j += ",\"flash_mb\":" + String(ESP.getFlashChipSize() / 1024 / 1024);
+    j += ",\"psram_kb\":" + String(ESP.getPsramSize() / 1024);
+    j += ",\"heap_kb\":" + String(ESP.getFreeHeap() / 1024);
+    j += ",\"bt5\":" + String(has_bt5 ? 1 : 0);
     j += ",\"pins\":{";
     j += "\"i2c_sda\":" + String(i2c_sda);
     j += ",\"i2c_scl\":" + String(i2c_scl);
@@ -87,6 +92,6 @@ static void board_routes(){
     j += ",\"uart_rx\":" + String(uart_rx);
     j += ",\"uart_tx\":" + String(uart_tx);
     j += "}}";
-    server.send(200,"application/json",j);
+    server.send(200, "application/json", j);
   });
 }

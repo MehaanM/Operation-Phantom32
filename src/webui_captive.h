@@ -178,7 +178,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wucpd_routes() {
-  server.on("/captive", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCPD_PAGE);
-  });
+  server.on("/captive", HTTP_GET, []() { server.send_P(200, "text/html", WUCPD_PAGE); });
 }

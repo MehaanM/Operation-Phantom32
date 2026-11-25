@@ -311,7 +311,5 @@ window.addEventListener('resize', () => {
 )rawhtml";
 
 inline void wusm_routes() {
-  server.on("/sysmon", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSM_PAGE);
-  });
+  server.on("/sysmon", HTTP_GET, []() { server.send_P(200, "text/html", WUSM_PAGE); });
 }

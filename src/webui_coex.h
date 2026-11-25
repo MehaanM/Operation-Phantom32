@@ -191,7 +191,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wucxd_routes() {
-  server.on("/coex", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCXD_PAGE);
-  });
+  server.on("/coex", HTTP_GET, []() { server.send_P(200, "text/html", WUCXD_PAGE); });
 }

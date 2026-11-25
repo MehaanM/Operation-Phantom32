@@ -203,7 +203,5 @@ setInterval(refresh, 1500);
 )rawhtml";
 
 inline void wubwe_routes() {
-  server.on("/bandwidth-est", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBWE_PAGE);
-  });
+  server.on("/bandwidth-est", HTTP_GET, []() { server.send_P(200, "text/html", WUBWE_PAGE); });
 }

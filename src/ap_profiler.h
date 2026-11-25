@@ -9,69 +9,71 @@
 
 extern WebServer server;
 
-#define APP_MAX_PROFILES  64
-#define APP_MAX_SSID      33
-#define APP_MAX_RATES     16
-#define APP_PROFILE_FILE  "/ap_profiles.json"
+#define APP_MAX_PROFILES 64
+#define APP_MAX_SSID 33
+#define APP_MAX_RATES 16
+#define APP_PROFILE_FILE "/ap_profiles.json"
 
 // ─── AP Profile struct ────────────────────────────────────────────────────────
 struct AppProfile {
-  bool    active;
+  bool active;
   uint8_t bssid[6];
-  char    ssid[APP_MAX_SSID];
+  char ssid[APP_MAX_SSID];
   uint8_t channel;
-  int8_t  rssi_baseline;
-  int8_t  rssi_current;
-  int8_t  rssi_min;
-  int8_t  rssi_max;
-  char    security[20];
+  int8_t rssi_baseline;
+  int8_t rssi_current;
+  int8_t rssi_min;
+  int8_t rssi_max;
+  char security[20];
   uint8_t rates[APP_MAX_RATES];
   uint8_t rate_count;
-  bool    has_wps;
-  bool    has_ht;
-  bool    has_vht;
-  bool    has_he;      // 802.11ax
+  bool has_wps;
+  bool has_ht;
+  bool has_vht;
+  bool has_he;  // 802.11ax
   uint8_t ht_caps_lo;
   uint8_t ht_caps_hi;
   uint16_t beacon_interval;
-  uint8_t  dtim_period;
+  uint8_t dtim_period;
   uint32_t first_seen;
   uint32_t last_seen;
   uint32_t beacon_count;
-  bool     is_new;     // new since last baseline save
-  bool     changed;    // channel/security changed since baseline
-  uint8_t  channel_baseline;
-  char     security_baseline[20];
-  int8_t   tx_power_dbm;
-  uint8_t  country_code[3];
-  bool     has_country;
-  uint8_t  vendor_oui[3];
-  bool     has_vendor;
-  char     vendor_name[20];
-  uint32_t uptime_seen; // millis/1000 when first seen this boot
+  bool is_new;   // new since last baseline save
+  bool changed;  // channel/security changed since baseline
+  uint8_t channel_baseline;
+  char security_baseline[20];
+  int8_t tx_power_dbm;
+  uint8_t country_code[3];
+  bool has_country;
+  uint8_t vendor_oui[3];
+  bool has_vendor;
+  char vendor_name[20];
+  uint32_t uptime_seen;  // millis/1000 when first seen this boot
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
 static struct {
   AppProfile profiles[APP_MAX_PROFILES];
-  uint32_t   loaded_at;
-  bool       baseline_loaded;
-  uint32_t   new_count;
-  uint32_t   changed_count;
-  uint32_t   total_seen;
+  uint32_t loaded_at;
+  bool baseline_loaded;
+  uint32_t new_count;
+  uint32_t changed_count;
+  uint32_t total_seen;
 } g_app = {};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-static bool app_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
+static bool app_mac_eq(const uint8_t *a, const uint8_t *b) {
+  return memcmp(a, b, 6) == 0;
+}
 
-static AppProfile* app_find(const uint8_t *bssid) {
+static AppProfile *app_find(const uint8_t *bssid) {
   for (int i = 0; i < APP_MAX_PROFILES; i++)
     if (g_app.profiles[i].active && app_mac_eq(g_app.profiles[i].bssid, bssid))
       return &g_app.profiles[i];
   return nullptr;
 }
 
-static AppProfile* app_alloc(const uint8_t *bssid) {
+static AppProfile *app_alloc(const uint8_t *bssid) {
   for (int i = 0; i < APP_MAX_PROFILES; i++) {
     if (!g_app.profiles[i].active) {
       AppProfile &p = g_app.profiles[i];
@@ -99,9 +101,10 @@ void app_ingest(const uint8_t *bssid, const char *ssid, uint8_t channel, int8_t 
 
   if (!p) {
     p = app_alloc(bssid);
-    if (!p) return;
+    if (!p)
+      return;
     is_new_profile = true;
-    p->is_new = !g_app.baseline_loaded; // only "new" if baseline existed
+    p->is_new = !g_app.baseline_loaded;  // only "new" if baseline existed
   }
 
   p->last_seen = millis() / 1000;
@@ -113,9 +116,12 @@ void app_ingest(const uint8_t *bssid, const char *ssid, uint8_t channel, int8_t 
 
   // RSSI tracking
   p->rssi_current = rssi;
-  if (rssi < p->rssi_min) p->rssi_min = rssi;
-  if (rssi > p->rssi_max) p->rssi_max = rssi;
-  if (p->beacon_count == 1) p->rssi_baseline = rssi;
+  if (rssi < p->rssi_min)
+    p->rssi_min = rssi;
+  if (rssi > p->rssi_max)
+    p->rssi_max = rssi;
+  if (p->beacon_count == 1)
+    p->rssi_baseline = rssi;
 
   // Change detection
   if (g_app.baseline_loaded && !is_new_profile) {
@@ -129,19 +135,21 @@ void app_ingest(const uint8_t *bssid, const char *ssid, uint8_t channel, int8_t 
   }
 
   p->channel = channel;
-  if (security) strncpy(p->security, security, sizeof(p->security) - 1);
+  if (security)
+    strncpy(p->security, security, sizeof(p->security) - 1);
   p->has_wps = has_wps;
   p->has_ht = has_ht;
   p->has_vht = has_vht;
   p->beacon_interval = beacon_interval;
   p->dtim_period = dtim;
 
-  if (is_new_profile && g_app.baseline_loaded) g_app.new_count++;
+  if (is_new_profile && g_app.baseline_loaded)
+    g_app.new_count++;
 }
 
 // ─── Save/load baseline ───────────────────────────────────────────────────────
 static void app_mac_str(const uint8_t *m, char *out) {
-  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0],m[1],m[2],m[3],m[4],m[5]);
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 static String app_profile_to_json(const AppProfile &p) {
@@ -172,20 +180,23 @@ static String app_profile_to_json(const AppProfile &p) {
 
 static void app_save_baseline() {
   File f = LittleFS.open(APP_PROFILE_FILE, "w");
-  if (!f) return;
+  if (!f)
+    return;
 
   f.print("[");
   bool first = true;
   for (int i = 0; i < APP_MAX_PROFILES; i++) {
     AppProfile &p = g_app.profiles[i];
-    if (!p.active) continue;
-    if (!first) f.print(",");
+    if (!p.active)
+      continue;
+    if (!first)
+      f.print(",");
     first = false;
     // Save minimal baseline record
     char mac[18];
     app_mac_str(p.bssid, mac);
     f.printf("{\"bssid\":\"%s\",\"ssid\":\"%s\",\"channel\":%d,\"security\":\"%s\",\"rssi\":%d}",
-      mac, p.ssid, p.channel, p.security, p.rssi_baseline);
+             mac, p.ssid, p.channel, p.security, p.rssi_baseline);
   }
   f.print("]");
   f.close();
@@ -193,7 +204,8 @@ static void app_save_baseline() {
   // Update all baselines
   for (int i = 0; i < APP_MAX_PROFILES; i++) {
     AppProfile &p = g_app.profiles[i];
-    if (!p.active) continue;
+    if (!p.active)
+      continue;
     p.channel_baseline = p.channel;
     strncpy(p.security_baseline, p.security, sizeof(p.security_baseline) - 1);
     p.rssi_baseline = p.rssi_current;
@@ -208,9 +220,11 @@ static void app_save_baseline() {
 
 // Simple JSON parser for loading baseline (no external library)
 static void app_load_baseline() {
-  if (!LittleFS.exists(APP_PROFILE_FILE)) return;
+  if (!LittleFS.exists(APP_PROFILE_FILE))
+    return;
   File f = LittleFS.open(APP_PROFILE_FILE, "r");
-  if (!f) return;
+  if (!f)
+    return;
 
   // We just mark baseline as loaded; actual parsing is complex in pure C
   // so we set the flag and profiles will be compared against scanned data
@@ -223,10 +237,13 @@ static void app_load_baseline() {
 static String app_json_summary() {
   int total = 0, new_count = 0, changed = 0;
   for (int i = 0; i < APP_MAX_PROFILES; i++) {
-    if (!g_app.profiles[i].active) continue;
+    if (!g_app.profiles[i].active)
+      continue;
     total++;
-    if (g_app.profiles[i].is_new) new_count++;
-    if (g_app.profiles[i].changed) changed++;
+    if (g_app.profiles[i].is_new)
+      new_count++;
+    if (g_app.profiles[i].changed)
+      changed++;
   }
   String s = "{\"total\":" + String(total);
   s += ",\"new\":" + String(new_count);
@@ -238,8 +255,10 @@ static String app_json_summary() {
   bool first = true;
   for (int i = 0; i < APP_MAX_PROFILES; i++) {
     AppProfile &p = g_app.profiles[i];
-    if (!p.active) continue;
-    if (!first) s += ",";
+    if (!p.active)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     s += app_profile_to_json(p);
   }
@@ -249,9 +268,8 @@ static String app_json_summary() {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 inline void app_routes() {
-  server.on("/api/app/profiles", HTTP_GET, []() {
-    server.send(200, "application/json", app_json_summary());
-  });
+  server.on("/api/app/profiles", HTTP_GET,
+            []() { server.send(200, "application/json", app_json_summary()); });
 
   server.on("/api/app/save", HTTP_POST, []() {
     app_save_baseline();
@@ -260,7 +278,9 @@ inline void app_routes() {
 
   server.on("/api/app/load", HTTP_POST, []() {
     app_load_baseline();
-    server.send(200, "application/json", "{\"ok\":true,\"loaded\":" + String(g_app.baseline_loaded ? "true" : "false") + "}");
+    server.send(
+        200, "application/json",
+        "{\"ok\":true,\"loaded\":" + String(g_app.baseline_loaded ? "true" : "false") + "}");
   });
 
   server.on("/api/app/export", HTTP_GET, []() {
@@ -270,7 +290,9 @@ inline void app_routes() {
 
   server.on("/api/app/clear", HTTP_POST, []() {
     memset(&g_app.profiles, 0, sizeof(g_app.profiles));
-    g_app.new_count = 0; g_app.changed_count = 0; g_app.total_seen = 0;
+    g_app.new_count = 0;
+    g_app.changed_count = 0;
+    g_app.total_seen = 0;
     server.send(200, "application/json", "{\"ok\":true}");
   });
 
@@ -279,8 +301,10 @@ inline void app_routes() {
     bool first = true;
     for (int i = 0; i < APP_MAX_PROFILES; i++) {
       AppProfile &p = g_app.profiles[i];
-      if (!p.active || !p.is_new) continue;
-      if (!first) s += ",";
+      if (!p.active || !p.is_new)
+        continue;
+      if (!first)
+        s += ",";
       first = false;
       s += app_profile_to_json(p);
     }
@@ -293,8 +317,10 @@ inline void app_routes() {
     bool first = true;
     for (int i = 0; i < APP_MAX_PROFILES; i++) {
       AppProfile &p = g_app.profiles[i];
-      if (!p.active || !p.changed) continue;
-      if (!first) s += ",";
+      if (!p.active || !p.changed)
+        continue;
+      if (!first)
+        s += ",";
       first = false;
       s += app_profile_to_json(p);
     }

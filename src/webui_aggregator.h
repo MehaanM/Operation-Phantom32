@@ -187,7 +187,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wufag_routes() {
-  server.on("/frame-aggr", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFAG_PAGE);
-  });
+  server.on("/frame-aggr", HTTP_GET, []() { server.send_P(200, "text/html", WUFAG_PAGE); });
 }

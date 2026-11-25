@@ -209,7 +209,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuspl_routes() {
-  server.on("/ssid-pool", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSPL_PAGE);
-  });
+  server.on("/ssid-pool", HTTP_GET, []() { server.send_P(200, "text/html", WUSPL_PAGE); });
 }

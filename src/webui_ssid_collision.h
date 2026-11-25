@@ -197,7 +197,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wussc_routes() {
-  server.on("/ssid-collision", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSSC_PAGE);
-  });
+  server.on("/ssid-collision", HTTP_GET, []() { server.send_P(200, "text/html", WUSSC_PAGE); });
 }

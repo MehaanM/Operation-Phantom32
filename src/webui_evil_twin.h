@@ -232,7 +232,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuetd_routes() {
-  server.on("/evil-twin", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUETD_PAGE);
-  });
+  server.on("/evil-twin", HTTP_GET, []() { server.send_P(200, "text/html", WUETD_PAGE); });
 }

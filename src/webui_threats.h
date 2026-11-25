@@ -339,7 +339,5 @@ setInterval(fetchAlerts, 10000);
 )rawhtml";
 
 inline void wut_routes() {
-  server.on("/threats", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUT_PAGE);
-  });
+  server.on("/threats", HTTP_GET, []() { server.send_P(200, "text/html", WUT_PAGE); });
 }

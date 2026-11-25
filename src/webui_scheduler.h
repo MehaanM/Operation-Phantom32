@@ -277,7 +277,5 @@ setInterval(loadJobs, 5000);
 )rawhtml";
 
 inline void wusch_routes() {
-  server.on("/scheduler", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSCH_PAGE);
-  });
+  server.on("/scheduler", HTTP_GET, []() { server.send_P(200, "text/html", WUSCH_PAGE); });
 }

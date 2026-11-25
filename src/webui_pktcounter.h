@@ -227,7 +227,5 @@ setInterval(refresh, 1000);
 )rawhtml";
 
 inline void wupkc_routes() {
-  server.on("/pktcounter", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPKC_PAGE);
-  });
+  server.on("/pktcounter", HTTP_GET, []() { server.send_P(200, "text/html", WUPKC_PAGE); });
 }

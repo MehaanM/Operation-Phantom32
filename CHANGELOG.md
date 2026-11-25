@@ -8,6 +8,39 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **PBKDF2-HMAC-SHA256 password hashing** — replaced MAC-keyed HMAC with PBKDF2
+  (10,000 iterations, 128-bit random per-device salt). Hash and salt stored in NVS;
+  plaintext never stored. Salt regenerated on every credential reset or password change.
+- **Per-device AP WiFi password** — replaced hardcoded `phantom32` with a device-unique
+  12-char random password generated on first boot and stored in NVS.
+- **Session token URL leak prevention** — `?token=` query parameter removed from
+  `am_extract_token_from_request()`; only Cookie and Authorization Bearer accepted.
+- **API key URL leak prevention** — `?apikey=` query parameter removed; only
+  `X-Phantom32-Key` header accepted.
+
+### Added
+- `test_security.cpp` — 48 new security-path unit tests covering: expired/invalid/revoked/
+  replayed sessions, unauthorized access, malformed JSON, oversized inputs, rate-limit
+  exhaustion, PBKDF2 properties (determinism, salt uniqueness, hex format), API key
+  validation (timing safety, exact-length enforcement), concurrent session handling,
+  and token format rejection.
+- `.clang-format` — Google-based C++14 style config (100-column, 2-space indent).
+  All 359 source files reformatted; CI enforces compliance on every push.
+- CI: **secret scanning** (`gitleaks`) job runs on all pushes/PRs with full git history.
+- CI: **dependency vulnerability scanning** (`pip-audit`) job audits Python CI dependencies.
+- CI: **clang-format compliance** step in `lint` job rejects formatting violations.
+- CI: **BUILD_MANIFEST.txt** added to every firmware artifact (git SHA, ref, PIO version,
+  runner OS, build timestamp, workflow run ID).
+- `docs/security.md` — Full security architecture reference.
+- `docs/testing.md` — Test strategy, coverage targets, and how to run tests.
+
+### Changed
+- `SECURITY.md`: updated "What NOT to Report" to reflect per-device AP password
+  (no longer documents `phantom32` as the fixed password).
+- `docs/hardware-compatibility.md`: "Erase everything" section notes that NVS is
+  cleared on `erase_flash`, triggering new credential generation on first boot.
+
 ### Added
 - `auth_manager.h` — Full HTTP authentication layer
   - Device-unique 12-char password generated on first boot (stored in NVS)

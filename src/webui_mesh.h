@@ -282,7 +282,5 @@ window.addEventListener('resize', () => drawTopology(g_data.nodes||[], g_data.li
 )rawhtml";
 
 inline void wumsh_routes() {
-  server.on("/mesh", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUMSH_PAGE);
-  });
+  server.on("/mesh", HTTP_GET, []() { server.send_P(200, "text/html", WUMSH_PAGE); });
 }

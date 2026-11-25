@@ -11,130 +11,144 @@
 
 extern WebServer server;
 
-#define FEXP_MAX_FRAMES  256
-#define FEXP_SSID_LEN    33
-#define FEXP_MAC_LEN     18
+#define FEXP_MAX_FRAMES 256
+#define FEXP_SSID_LEN 33
+#define FEXP_MAC_LEN 18
 
 // Frame type classification
 enum FexpType : uint8_t {
-  FEXP_T_BEACON       = 0,
-  FEXP_T_PROBE_REQ    = 1,
-  FEXP_T_PROBE_RESP   = 2,
-  FEXP_T_AUTH         = 3,
-  FEXP_T_DEAUTH       = 4,
-  FEXP_T_ASSOC_REQ    = 5,
-  FEXP_T_ASSOC_RESP   = 6,
-  FEXP_T_DISASSOC     = 7,
-  FEXP_T_DATA         = 8,
-  FEXP_T_QOSDATA      = 9,
-  FEXP_T_NULL         = 10,
-  FEXP_T_CTRL_ACK     = 11,
-  FEXP_T_CTRL_RTS     = 12,
-  FEXP_T_CTRL_CTS     = 13,
-  FEXP_T_EAPOL        = 14,
-  FEXP_T_OTHER        = 15,
-  FEXP_T_COUNT        = 16
+  FEXP_T_BEACON = 0,
+  FEXP_T_PROBE_REQ = 1,
+  FEXP_T_PROBE_RESP = 2,
+  FEXP_T_AUTH = 3,
+  FEXP_T_DEAUTH = 4,
+  FEXP_T_ASSOC_REQ = 5,
+  FEXP_T_ASSOC_RESP = 6,
+  FEXP_T_DISASSOC = 7,
+  FEXP_T_DATA = 8,
+  FEXP_T_QOSDATA = 9,
+  FEXP_T_NULL = 10,
+  FEXP_T_CTRL_ACK = 11,
+  FEXP_T_CTRL_RTS = 12,
+  FEXP_T_CTRL_CTS = 13,
+  FEXP_T_EAPOL = 14,
+  FEXP_T_OTHER = 15,
+  FEXP_T_COUNT = 16
 };
 
-static const char* const FEXP_TYPE_NAMES[FEXP_T_COUNT] = {
-  "Beacon","ProbeReq","ProbeResp","Auth","Deauth",
-  "AssocReq","AssocResp","Disassoc","Data","QoSData",
-  "Null","ACK","RTS","CTS","EAPOL","Other"
-};
+static const char *const FEXP_TYPE_NAMES[FEXP_T_COUNT] = {
+    "Beacon", "ProbeReq", "ProbeResp", "Auth", "Deauth", "AssocReq", "AssocResp", "Disassoc",
+    "Data",   "QoSData",  "Null",      "ACK",  "RTS",    "CTS",      "EAPOL",     "Other"};
 
 struct FexpFrame {
-  uint32_t  ts_ms;             // millis() capture time
-  uint8_t   ch;                // channel
-  int8_t    rssi;              // signal strength
-  FexpType  type;              // frame classification
-  uint8_t   src[6];            // source MAC
-  uint8_t   dst[6];            // dest MAC
-  uint8_t   bssid[6];         // BSSID (management frames)
-  char      ssid[FEXP_SSID_LEN]; // SSID (beacons/probes)
-  uint16_t  seq_num;           // 802.11 sequence number
-  uint8_t   retry : 1;         // retry bit
-  uint8_t   to_ds : 1;         // to-DS bit
-  uint8_t   from_ds : 1;       // from-DS bit
-  uint8_t   fcs_ok : 1;        // FCS validity
-  uint8_t   protected_f : 1;   // protected frame bit
-  uint16_t  len;               // frame length in bytes
+  uint32_t ts_ms;            // millis() capture time
+  uint8_t ch;                // channel
+  int8_t rssi;               // signal strength
+  FexpType type;             // frame classification
+  uint8_t src[6];            // source MAC
+  uint8_t dst[6];            // dest MAC
+  uint8_t bssid[6];          // BSSID (management frames)
+  char ssid[FEXP_SSID_LEN];  // SSID (beacons/probes)
+  uint16_t seq_num;          // 802.11 sequence number
+  uint8_t retry : 1;         // retry bit
+  uint8_t to_ds : 1;         // to-DS bit
+  uint8_t from_ds : 1;       // from-DS bit
+  uint8_t fcs_ok : 1;        // FCS validity
+  uint8_t protected_f : 1;   // protected frame bit
+  uint16_t len;              // frame length in bytes
 };
 
 static struct {
   FexpFrame buf[FEXP_MAX_FRAMES];
-  uint16_t  head;              // ring write pointer
-  uint16_t  total;             // total frames ingested
-  uint32_t  per_type[FEXP_T_COUNT]; // cumulative per-type counts
-  bool      running;
+  uint16_t head;                    // ring write pointer
+  uint16_t total;                   // total frames ingested
+  uint32_t per_type[FEXP_T_COUNT];  // cumulative per-type counts
+  bool running;
 } g_fexp = {};
 
 // MAC as colon-separated string into out[18]
 static inline void fexp_mac_str(const uint8_t *m, char *out) {
-  snprintf(out, FEXP_MAC_LEN, "%02X:%02X:%02X:%02X:%02X:%02X",
-           m[0],m[1],m[2],m[3],m[4],m[5]);
+  snprintf(out, FEXP_MAC_LEN, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 // Classify 802.11 frame type/subtype from FC bytes
 static inline FexpType fexp_classify(uint8_t fc0, uint8_t fc1, const uint8_t *body, uint16_t len) {
-  uint8_t type    = (fc0 >> 2) & 0x03;
+  uint8_t type = (fc0 >> 2) & 0x03;
   uint8_t subtype = (fc0 >> 4) & 0x0F;
-  if (type == 0) { // Management
+  if (type == 0) {  // Management
     switch (subtype) {
-      case 8:  return FEXP_T_BEACON;
-      case 4:  return FEXP_T_PROBE_REQ;
-      case 5:  return FEXP_T_PROBE_RESP;
-      case 11: return FEXP_T_AUTH;
-      case 12: return FEXP_T_DEAUTH;
-      case 0:  return FEXP_T_ASSOC_REQ;
-      case 1:  return FEXP_T_ASSOC_RESP;
-      case 10: return FEXP_T_DISASSOC;
-      default: return FEXP_T_OTHER;
+      case 8:
+        return FEXP_T_BEACON;
+      case 4:
+        return FEXP_T_PROBE_REQ;
+      case 5:
+        return FEXP_T_PROBE_RESP;
+      case 11:
+        return FEXP_T_AUTH;
+      case 12:
+        return FEXP_T_DEAUTH;
+      case 0:
+        return FEXP_T_ASSOC_REQ;
+      case 1:
+        return FEXP_T_ASSOC_RESP;
+      case 10:
+        return FEXP_T_DISASSOC;
+      default:
+        return FEXP_T_OTHER;
     }
-  } else if (type == 1) { // Control
+  } else if (type == 1) {  // Control
     switch (subtype) {
-      case 13: return FEXP_T_ACK;
-      case 11: return FEXP_T_RTS;
-      case 12: return FEXP_T_CTS;
-      default: return FEXP_T_OTHER;
+      case 13:
+        return FEXP_T_ACK;
+      case 11:
+        return FEXP_T_RTS;
+      case 12:
+        return FEXP_T_CTS;
+      default:
+        return FEXP_T_OTHER;
     }
-  } else { // Data
+  } else {  // Data
     if (len > 32) {
       // Check LLC/SNAP for EAPOL (0x888E)
       const uint8_t *llc = body + 24;
-      if (len > 32 && llc[0]==0xAA && llc[1]==0xAA && llc[2]==0x03 &&
-          llc[6]==0x88 && llc[7]==0x8E) return FEXP_T_EAPOL;
+      if (len > 32 && llc[0] == 0xAA && llc[1] == 0xAA && llc[2] == 0x03 && llc[6] == 0x88 &&
+          llc[7] == 0x8E)
+        return FEXP_T_EAPOL;
     }
-    if (subtype == 4 || subtype == 12) return FEXP_T_NULL;
-    if (subtype & 8) return FEXP_T_QOSDATA;
+    if (subtype == 4 || subtype == 12)
+      return FEXP_T_NULL;
+    if (subtype & 8)
+      return FEXP_T_QOSDATA;
     return FEXP_T_DATA;
   }
 }
 
 // Ingest a raw frame (called from promiscuous callback)
 static inline void fexp_ingest(const uint8_t *payload, uint16_t len, int8_t rssi, uint8_t ch) {
-  if (!g_fexp.running || len < 24) return;
+  if (!g_fexp.running || len < 24)
+    return;
   FexpFrame &f = g_fexp.buf[g_fexp.head % FEXP_MAX_FRAMES];
   memset(&f, 0, sizeof(f));
 
   uint8_t fc0 = payload[0], fc1 = payload[1];
   uint8_t type = (fc0 >> 2) & 0x03;
 
-  f.ts_ms      = millis();
-  f.ch         = ch;
-  f.rssi       = rssi;
-  f.retry      = (fc1 & 0x08) ? 1 : 0;
-  f.to_ds      = (fc1 & 0x01) ? 1 : 0;
-  f.from_ds    = (fc1 & 0x02) ? 1 : 0;
+  f.ts_ms = millis();
+  f.ch = ch;
+  f.rssi = rssi;
+  f.retry = (fc1 & 0x08) ? 1 : 0;
+  f.to_ds = (fc1 & 0x01) ? 1 : 0;
+  f.from_ds = (fc1 & 0x02) ? 1 : 0;
   f.protected_f = (fc1 & 0x40) ? 1 : 0;
-  f.fcs_ok     = 1;
-  f.len        = len;
-  f.seq_num    = payload[22] | (payload[23] << 8);
-  f.seq_num    = (f.seq_num >> 4) & 0x0FFF;
-  f.type       = fexp_classify(fc0, fc1, payload, len);
+  f.fcs_ok = 1;
+  f.len = len;
+  f.seq_num = payload[22] | (payload[23] << 8);
+  f.seq_num = (f.seq_num >> 4) & 0x0FFF;
+  f.type = fexp_classify(fc0, fc1, payload, len);
 
   // Extract addresses based on frame type
-  memcpy(f.dst,   payload + 4,  6);
-  memcpy(f.src,   payload + 10, 6);
+  memcpy(f.dst, payload + 4, 6);
+  memcpy(f.src, payload + 10, 6);
   memcpy(f.bssid, payload + 16, 6);
 
   // Extract SSID from management frames (beacon, probe req/resp, assoc req)
@@ -144,9 +158,10 @@ static inline void fexp_ingest(const uint8_t *payload, uint16_t len, int8_t rssi
     if (ie_off + 2 <= len) {
       uint16_t pos = ie_off;
       while (pos + 2 <= len) {
-        uint8_t ie_id  = payload[pos];
+        uint8_t ie_id = payload[pos];
         uint8_t ie_len = payload[pos + 1];
-        if (pos + 2 + ie_len > len) break;
+        if (pos + 2 + ie_len > len)
+          break;
         if (ie_id == 0 && ie_len < FEXP_SSID_LEN) {
           memcpy(f.ssid, payload + pos + 2, ie_len);
           f.ssid[ie_len] = '\0';
@@ -171,25 +186,47 @@ static inline void fexp_clear() {
 // Append compact JSON object for one frame into String
 static inline void fexp_frame_json(const FexpFrame &f, String &out, bool first) {
   char sm[FEXP_MAC_LEN], dm[FEXP_MAC_LEN], bm[FEXP_MAC_LEN];
-  fexp_mac_str(f.src,   sm);
-  fexp_mac_str(f.dst,   dm);
+  fexp_mac_str(f.src, sm);
+  fexp_mac_str(f.dst, dm);
   fexp_mac_str(f.bssid, bm);
-  if (!first) out += ',';
-  out += "{\"ts\":"; out += f.ts_ms;
-  out += ",\"ch\":"; out += f.ch;
-  out += ",\"rssi\":"; out += f.rssi;
-  out += ",\"type\":\""; out += FEXP_TYPE_NAMES[f.type]; out += '"';
-  out += ",\"src\":\""; out += sm; out += '"';
-  out += ",\"dst\":\""; out += dm; out += '"';
-  out += ",\"bssid\":\""; out += bm; out += '"';
-  if (f.ssid[0]) { out += ",\"ssid\":\""; out += f.ssid; out += '"'; }
-  out += ",\"seq\":"; out += f.seq_num;
-  out += ",\"len\":"; out += f.len;
+  if (!first)
+    out += ',';
+  out += "{\"ts\":";
+  out += f.ts_ms;
+  out += ",\"ch\":";
+  out += f.ch;
+  out += ",\"rssi\":";
+  out += f.rssi;
+  out += ",\"type\":\"";
+  out += FEXP_TYPE_NAMES[f.type];
+  out += '"';
+  out += ",\"src\":\"";
+  out += sm;
+  out += '"';
+  out += ",\"dst\":\"";
+  out += dm;
+  out += '"';
+  out += ",\"bssid\":\"";
+  out += bm;
+  out += '"';
+  if (f.ssid[0]) {
+    out += ",\"ssid\":\"";
+    out += f.ssid;
+    out += '"';
+  }
+  out += ",\"seq\":";
+  out += f.seq_num;
+  out += ",\"len\":";
+  out += f.len;
   out += ",\"flags\":\"";
-  if (f.retry)      out += 'R';
-  if (f.to_ds)      out += 'T';
-  if (f.from_ds)    out += 'F';
-  if (f.protected_f) out += 'P';
+  if (f.retry)
+    out += 'R';
+  if (f.to_ds)
+    out += 'T';
+  if (f.from_ds)
+    out += 'F';
+  if (f.protected_f)
+    out += 'P';
   out += '"';
   out += '}';
 }
@@ -455,31 +492,42 @@ setInterval(refresh, 2000);
 inline void fexp_routes() {
   g_fexp.running = true;
 
-  server.on("/frame-exporter", HTTP_GET, []() {
-    server.send_P(200, "text/html", FEXP_PAGE);
-  });
+  server.on("/frame-exporter", HTTP_GET, []() { server.send_P(200, "text/html", FEXP_PAGE); });
 
   server.on("/api/fexp/frames", HTTP_GET, []() {
     // Count per-type groups
     uint32_t mgmt = 0, data = 0, ctrl = 0, eapol = 0;
-    for (uint8_t i = FEXP_T_BEACON; i <= FEXP_T_DISASSOC; i++) mgmt  += g_fexp.per_type[i];
-    for (uint8_t i = FEXP_T_DATA;   i <= FEXP_T_NULL;    i++) data  += g_fexp.per_type[i];
-    for (uint8_t i = FEXP_T_CTRL_ACK; i <= FEXP_T_CTRL_CTS; i++) ctrl += g_fexp.per_type[i];
+    for (uint8_t i = FEXP_T_BEACON; i <= FEXP_T_DISASSOC; i++)
+      mgmt += g_fexp.per_type[i];
+    for (uint8_t i = FEXP_T_DATA; i <= FEXP_T_NULL; i++)
+      data += g_fexp.per_type[i];
+    for (uint8_t i = FEXP_T_CTRL_ACK; i <= FEXP_T_CTRL_CTS; i++)
+      ctrl += g_fexp.per_type[i];
     eapol = g_fexp.per_type[FEXP_T_EAPOL];
 
     String out;
     out.reserve(8192);
-    out += "{\"total\":"; out += g_fexp.total;
-    out += ",\"mgmt\":";  out += mgmt;
-    out += ",\"data_cnt\":"; out += data;
-    out += ",\"ctrl\":";  out += ctrl;
-    out += ",\"eapol\":"; out += eapol;
+    out += "{\"total\":";
+    out += g_fexp.total;
+    out += ",\"mgmt\":";
+    out += mgmt;
+    out += ",\"data_cnt\":";
+    out += data;
+    out += ",\"ctrl\":";
+    out += ctrl;
+    out += ",\"eapol\":";
+    out += eapol;
     out += ",\"per_type\":{";
     bool first = true;
     for (uint8_t i = 0; i < FEXP_T_COUNT; i++) {
-      if (!g_fexp.per_type[i]) continue;
-      if (!first) out += ',';
-      out += '"'; out += FEXP_TYPE_NAMES[i]; out += "\":"; out += g_fexp.per_type[i];
+      if (!g_fexp.per_type[i])
+        continue;
+      if (!first)
+        out += ',';
+      out += '"';
+      out += FEXP_TYPE_NAMES[i];
+      out += "\":";
+      out += g_fexp.per_type[i];
       first = false;
     }
     out += "},\"frames\":[";

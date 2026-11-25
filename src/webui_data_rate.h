@@ -208,7 +208,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wudrt_routes() {
-  server.on("/data-rates", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUDRT_PAGE);
-  });
+  server.on("/data-rates", HTTP_GET, []() { server.send_P(200, "text/html", WUDRT_PAGE); });
 }

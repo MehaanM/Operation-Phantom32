@@ -198,7 +198,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wupfd_routes() {
-  server.on("/probe-flood", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPFD_PAGE);
-  });
+  server.on("/probe-flood", HTTP_GET, []() { server.send_P(200, "text/html", WUPFD_PAGE); });
 }

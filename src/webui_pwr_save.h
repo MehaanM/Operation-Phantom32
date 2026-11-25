@@ -176,7 +176,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wupst_routes() {
-  server.on("/power-save", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPST_PAGE);
-  });
+  server.on("/power-save", HTTP_GET, []() { server.send_P(200, "text/html", WUPST_PAGE); });
 }

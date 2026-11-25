@@ -216,7 +216,63 @@ jobs:
           retention-days: 14
 
   # ----------------------------------------------------------------
-  # Job 2: Static analysis
+  # Job 1d: Secret scanning (gitleaks)
+  # ----------------------------------------------------------------
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required for gitleaks
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # ----------------------------------------------------------------
+  # Job 1e: Dependency vulnerability scanning
+  # ----------------------------------------------------------------
+  dep-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        run: |
+          # Collect all Python packages CI installs across jobs.
+          echo "platformio==${{ env.PIO_VERSION }}" > /tmp/ci_reqs.txt
+          echo "pip-audit" >> /tmp/ci_reqs.txt
+          pip-audit --requirement /tmp/ci_reqs.txt --output json > pip_audit.json || {
+            cat pip_audit.json
+            echo "ERROR: pip-audit found vulnerabilities in CI Python dependencies." >&2
+            exit 1
+          }
+          echo "OK: No known vulnerabilities in CI Python dependencies."
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip_audit.json
+          retention-days: 14
+
+  # ----------------------------------------------------------------
+  # Job 2: Static analysis + formatting
   # ----------------------------------------------------------------
   lint:
     name: Static analysis
@@ -224,6 +280,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check clang-format compliance
+        run: |
+          sudo apt-get install -y --no-install-recommends clang-format
+          # Collect all C/C++ source files and check formatting.
+          find src/ -name "*.cpp" -o -name "*.h" | sort > /tmp/src_files.txt
+          errors=0
+          while IFS= read -r f; do
+            diff_out=$(clang-format --dry-run --Werror "$f" 2>&1 || true)
+            if [ -n "$diff_out" ]; then
+              echo "FORMAT: $f needs reformatting"
+              errors=$((errors + 1))
+            fi
+          done < /tmp/src_files.txt
+          if [ "$errors" -gt 0 ]; then
+            echo "ERROR: $errors file(s) are not clang-format compliant." >&2
+            echo "Run: clang-format -i src/*.h src/*.cpp" >&2
+            exit 1
+          fi
+          echo "OK: All source files pass clang-format."
 
       - name: Check for hardcoded AP password in non-define contexts
         run: |
@@ -351,7 +427,7 @@ jobs:
   # ----------------------------------------------------------------
   build:
     name: Build ${{ matrix.env }}
-    needs: [ native-tests, native-sanitizers, lint ]
+    needs: [ native-tests, native-sanitizers, lint, secret-scan, dep-scan ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -441,6 +517,16 @@ jobs:
           # Generate SHA-256 checksums for release verification.
           sha256sum artifacts/${{ matrix.env }}/*.bin \
             > artifacts/${{ matrix.env }}/SHA256SUMS.txt 2>/dev/null || true
+          # Reproducible build manifest: records every input that determines the output.
+          cat > artifacts/${{ matrix.env }}/BUILD_MANIFEST.txt <<EOF
+          build_env:      ${{ matrix.env }}
+          git_commit:     ${{ github.sha }}
+          git_ref:        ${{ github.ref }}
+          runner_os:      ${{ runner.os }}
+          pio_version:    ${{ env.PIO_VERSION }}
+          built_at:       $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          workflow_run:   ${{ github.run_id }}/${{ github.run_number }}
+          EOF
 
       - name: Upload firmware artifact
         if: success() && github.ref == 'refs/heads/main'

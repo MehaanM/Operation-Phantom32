@@ -396,7 +396,5 @@ startPolling();
 )rawhtml";
 
 inline void wubi_routes() {
-  server.on("/ble-iot", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBI_PAGE);
-  });
+  server.on("/ble-iot", HTTP_GET, []() { server.send_P(200, "text/html", WUBI_PAGE); });
 }

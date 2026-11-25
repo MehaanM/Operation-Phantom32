@@ -9,26 +9,26 @@
 
 extern WebServer server;
 
-#define WDG_HIST_LEN      60   // 60 second rolling history
-#define WDG_TASK_MAX      16   // max tasks to track
-#define WDG_ALERT_MAX     32   // max alert log entries
+#define WDG_HIST_LEN 60   // 60 second rolling history
+#define WDG_TASK_MAX 16   // max tasks to track
+#define WDG_ALERT_MAX 32  // max alert log entries
 
 // ─── Alert levels ─────────────────────────────────────────────────────────────
-enum WdgLevel { WDG_OK=0, WDG_WARN=1, WDG_CRIT=2 };
+enum WdgLevel { WDG_OK = 0, WDG_WARN = 1, WDG_CRIT = 2 };
 
 // ─── Alert entry ─────────────────────────────────────────────────────────────
 struct WdgAlert {
-  bool     used;
+  bool used;
   uint32_t ts;
   WdgLevel level;
-  char     msg[64];
+  char msg[64];
 };
 
 // ─── Task snapshot ────────────────────────────────────────────────────────────
 struct WdgTask {
-  bool    active;
-  char    name[16];
-  uint32_t stack_hwm;    // high water mark (bytes remaining)
+  bool active;
+  char name[16];
+  uint32_t stack_hwm;  // high water mark (bytes remaining)
   UBaseType_t priority;
   eTaskState state;
   uint32_t last_seen;
@@ -38,12 +38,12 @@ struct WdgTask {
 static struct {
   // Heap history (free bytes, sampled every second)
   uint32_t heap_hist[WDG_HIST_LEN];
-  uint8_t  heap_idx;
+  uint8_t heap_idx;
   uint32_t heap_min_ever;
 
   // CPU approximate (via tick counter delta)
   uint32_t cpu_ticks_hist[WDG_HIST_LEN];
-  uint8_t  cpu_idx;
+  uint8_t cpu_idx;
 
   // Flash usage
   uint32_t fs_total;
@@ -53,18 +53,18 @@ static struct {
   uint32_t boot_ts;
 
   // Task info
-  WdgTask  tasks[WDG_TASK_MAX];
-  uint8_t  task_count;
+  WdgTask tasks[WDG_TASK_MAX];
+  uint8_t task_count;
 
   // Alerts
   WdgAlert alerts[WDG_ALERT_MAX];
-  uint8_t  alert_head;
+  uint8_t alert_head;
   uint32_t total_alerts;
 
   // Thresholds
-  uint32_t heap_warn_bytes;    // warn if free heap below
-  uint32_t heap_crit_bytes;    // critical below
-  uint32_t stack_warn_bytes;   // warn if task stack hwm below
+  uint32_t heap_warn_bytes;   // warn if free heap below
+  uint32_t heap_crit_bytes;   // critical below
+  uint32_t stack_warn_bytes;  // warn if task stack hwm below
 
   // Restart tracking
   uint32_t restart_count;
@@ -72,12 +72,10 @@ static struct {
 
   TaskHandle_t monitor_task;
   bool running;
-} g_wdg = {
-  .heap_min_ever = UINT32_MAX,
-  .heap_warn_bytes = 20000,
-  .heap_crit_bytes = 8000,
-  .stack_warn_bytes = 256
-};
+} g_wdg = {.heap_min_ever = UINT32_MAX,
+           .heap_warn_bytes = 20000,
+           .heap_crit_bytes = 8000,
+           .stack_warn_bytes = 256};
 
 // ─── Log alert ────────────────────────────────────────────────────────────────
 static void wdg_alert(WdgLevel level, const char *fmt, ...) {
@@ -99,7 +97,8 @@ static void wdg_sample_heap() {
   g_wdg.heap_hist[g_wdg.heap_idx % WDG_HIST_LEN] = free_heap;
   g_wdg.heap_idx++;
 
-  if (free_heap < g_wdg.heap_min_ever) g_wdg.heap_min_ever = free_heap;
+  if (free_heap < g_wdg.heap_min_ever)
+    g_wdg.heap_min_ever = free_heap;
 
   if (free_heap < g_wdg.heap_crit_bytes) {
     wdg_alert(WDG_CRIT, "Heap critical: %u bytes free", free_heap);
@@ -132,9 +131,10 @@ static void wdg_sample_tasks() {
 
 // ─── Sample filesystem ────────────────────────────────────────────────────────
 static void wdg_sample_fs() {
-  if (!LittleFS.begin()) return;
+  if (!LittleFS.begin())
+    return;
   g_wdg.fs_total = LittleFS.totalBytes();
-  g_wdg.fs_used  = LittleFS.usedBytes();
+  g_wdg.fs_used = LittleFS.usedBytes();
 }
 
 // ─── Monitor task ─────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ static void wdg_monitor_task(void *arg) {
     wdg_sample_tasks();
 
     static uint8_t fs_tick = 0;
-    if (++fs_tick >= 10) { // Every 10 seconds
+    if (++fs_tick >= 10) {  // Every 10 seconds
       wdg_sample_fs();
       fs_tick = 0;
     }
@@ -161,7 +161,8 @@ static void wdg_monitor_task(void *arg) {
 
 // ─── Start/stop ───────────────────────────────────────────────────────────────
 inline void wdg_start() {
-  if (g_wdg.running) return;
+  if (g_wdg.running)
+    return;
   g_wdg.running = true;
   xTaskCreate(wdg_monitor_task, "wdg_mon", 3072, nullptr, 2, &g_wdg.monitor_task);
 }
@@ -171,30 +172,47 @@ inline void wdg_stop() {
 }
 
 // ─── Reset reason string ──────────────────────────────────────────────────────
-static const char* wdg_reset_reason_str(esp_reset_reason_t r) {
+static const char *wdg_reset_reason_str(esp_reset_reason_t r) {
   switch (r) {
-    case ESP_RST_POWERON:  return "power_on";
-    case ESP_RST_EXT:      return "external";
-    case ESP_RST_SW:       return "software";
-    case ESP_RST_PANIC:    return "panic";
-    case ESP_RST_INT_WDT:  return "int_watchdog";
-    case ESP_RST_TASK_WDT: return "task_watchdog";
-    case ESP_RST_WDT:      return "watchdog";
-    case ESP_RST_DEEPSLEEP: return "deep_sleep";
-    case ESP_RST_BROWNOUT: return "brownout";
-    case ESP_RST_SDIO:     return "sdio";
-    default: return "unknown";
+    case ESP_RST_POWERON:
+      return "power_on";
+    case ESP_RST_EXT:
+      return "external";
+    case ESP_RST_SW:
+      return "software";
+    case ESP_RST_PANIC:
+      return "panic";
+    case ESP_RST_INT_WDT:
+      return "int_watchdog";
+    case ESP_RST_TASK_WDT:
+      return "task_watchdog";
+    case ESP_RST_WDT:
+      return "watchdog";
+    case ESP_RST_DEEPSLEEP:
+      return "deep_sleep";
+    case ESP_RST_BROWNOUT:
+      return "brownout";
+    case ESP_RST_SDIO:
+      return "sdio";
+    default:
+      return "unknown";
   }
 }
 
-static const char* wdg_task_state_str(eTaskState s) {
+static const char *wdg_task_state_str(eTaskState s) {
   switch (s) {
-    case eRunning:   return "running";
-    case eReady:     return "ready";
-    case eBlocked:   return "blocked";
-    case eSuspended: return "suspended";
-    case eDeleted:   return "deleted";
-    default:         return "unknown";
+    case eRunning:
+      return "running";
+    case eReady:
+      return "ready";
+    case eBlocked:
+      return "blocked";
+    case eSuspended:
+      return "suspended";
+    case eDeleted:
+      return "deleted";
+    default:
+      return "unknown";
   }
 }
 
@@ -218,7 +236,8 @@ static String wdg_json_status() {
   s += ",\"reset_reason\":\"" + String(wdg_reset_reason_str(g_wdg.last_reset_reason)) + "\"";
   s += ",\"heap_hist\":[";
   for (int i = 0; i < WDG_HIST_LEN; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     int idx = (g_wdg.heap_idx - WDG_HIST_LEN + i + WDG_HIST_LEN) % WDG_HIST_LEN;
     s += String(g_wdg.heap_hist[idx]);
   }
@@ -226,8 +245,10 @@ static String wdg_json_status() {
   bool first = true;
   for (int i = 0; i < g_wdg.task_count; i++) {
     WdgTask &t = g_wdg.tasks[i];
-    if (!t.active) continue;
-    if (!first) s += ",";
+    if (!t.active)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     s += "{\"name\":\"" + String(t.name) + "\"";
     s += ",\"stack_hwm\":" + String(t.stack_hwm);
@@ -240,8 +261,10 @@ static String wdg_json_status() {
   for (int i = 0; i < WDG_ALERT_MAX; i++) {
     int idx = (g_wdg.alert_head - WDG_ALERT_MAX + i + WDG_ALERT_MAX) % WDG_ALERT_MAX;
     WdgAlert &a = g_wdg.alerts[idx];
-    if (!a.used) continue;
-    if (!first) s += ",";
+    if (!a.used)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     s += "{\"ts\":" + String(a.ts);
     s += ",\"level\":" + String((int)a.level);
@@ -254,9 +277,8 @@ static String wdg_json_status() {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 inline void wdg_routes() {
-  server.on("/api/wdg/status", HTTP_GET, []() {
-    server.send(200, "application/json", wdg_json_status());
-  });
+  server.on("/api/wdg/status", HTTP_GET,
+            []() { server.send(200, "application/json", wdg_json_status()); });
 
   server.on("/api/wdg/start", HTTP_POST, []() {
     wdg_start();
@@ -278,7 +300,8 @@ inline void wdg_routes() {
   server.on("/api/wdg/heap_hist", HTTP_GET, []() {
     String s = "[";
     for (int i = 0; i < WDG_HIST_LEN; i++) {
-      if (i) s += ",";
+      if (i)
+        s += ",";
       int idx = (g_wdg.heap_idx - WDG_HIST_LEN + i + WDG_HIST_LEN) % WDG_HIST_LEN;
       s += String(g_wdg.heap_hist[idx]);
     }

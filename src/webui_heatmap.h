@@ -237,7 +237,5 @@ window.addEventListener('resize', () => {
 )rawhtml";
 
 inline void wushm_routes() {
-  server.on("/heatmap", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSHM_PAGE);
-  });
+  server.on("/heatmap", HTTP_GET, []() { server.send_P(200, "text/html", WUSHM_PAGE); });
 }

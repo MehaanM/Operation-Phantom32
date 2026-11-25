@@ -206,7 +206,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wushm_routes() {
-  server.on("/signal-heatmap", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSHM_PAGE);
-  });
+  server.on("/signal-heatmap", HTTP_GET, []() { server.send_P(200, "text/html", WUSHM_PAGE); });
 }

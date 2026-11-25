@@ -182,7 +182,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wuapf_routes() {
-  server.on("/fingerprint", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUAPF_PAGE);
-  });
+  server.on("/fingerprint", HTTP_GET, []() { server.send_P(200, "text/html", WUAPF_PAGE); });
 }

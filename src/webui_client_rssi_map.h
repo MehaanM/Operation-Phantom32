@@ -160,7 +160,5 @@ setInterval(refresh, 2500);
 )rawhtml";
 
 inline void wucrm_routes() {
-  server.on("/client-rssi", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCRM_PAGE);
-  });
+  server.on("/client-rssi", HTTP_GET, []() { server.send_P(200, "text/html", WUCRM_PAGE); });
 }

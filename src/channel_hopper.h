@@ -12,61 +12,63 @@ extern WebServer server;
 
 // ─── Hop strategies ───────────────────────────────────────────────────────────
 enum ChopStrategy {
-  CHOP_SEQ = 0,          // 1→2→3→…→13→14→1
-  CHOP_RANDOM,           // random channel each hop
-  CHOP_WEIGHTED,         // hop more on busy channels
-  CHOP_ADAPTIVE,         // dwell longer on active channels
-  CHOP_1_6_11,           // North American non-overlapping
-  CHOP_1_6_11_36_40,     // 2.4+5 GHz combo
-  CHOP_CUSTOM,           // user-defined list
-  CHOP_TARGET_LOCK,      // stay on one channel
-  CHOP_5GHZ_ONLY,        // 5 GHz channels
+  CHOP_SEQ = 0,       // 1→2→3→…→13→14→1
+  CHOP_RANDOM,        // random channel each hop
+  CHOP_WEIGHTED,      // hop more on busy channels
+  CHOP_ADAPTIVE,      // dwell longer on active channels
+  CHOP_1_6_11,        // North American non-overlapping
+  CHOP_1_6_11_36_40,  // 2.4+5 GHz combo
+  CHOP_CUSTOM,        // user-defined list
+  CHOP_TARGET_LOCK,   // stay on one channel
+  CHOP_5GHZ_ONLY,     // 5 GHz channels
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
-#define CHOP_MAX_CUSTOM    32
-#define CHOP_HISTORY       64
+#define CHOP_MAX_CUSTOM 32
+#define CHOP_HISTORY 64
 
-static const uint8_t CHOP_NON_OVERLAP_24[]  = {1, 6, 11};
-static const uint8_t CHOP_5GHZ_CHANNELS[]   = {
-  36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,149,153,157,161,165
-};
-#define CHOP_5GHZ_COUNT    24
+static const uint8_t CHOP_NON_OVERLAP_24[] = {1, 6, 11};
+static const uint8_t CHOP_5GHZ_CHANNELS[] = {36,  40,  44,  48,  52,  56,  60,  64,
+                                             100, 104, 108, 112, 116, 120, 124, 128,
+                                             132, 136, 140, 149, 153, 157, 161, 165};
+#define CHOP_5GHZ_COUNT 24
 
 struct ChopChannelStats {
   uint32_t packets;
   uint32_t dwell_ms_total;
   uint32_t visits;
   uint32_t last_visit_ts;
-  int8_t   avg_rssi;
-  float    weight;
+  int8_t avg_rssi;
+  float weight;
 };
 
 static struct {
   ChopStrategy strategy;
-  bool     running;
-  uint8_t  current_channel;
-  uint8_t  target_channel;   // for TARGET_LOCK
-  uint32_t dwell_ms;         // base dwell time
+  bool running;
+  uint8_t current_channel;
+  uint8_t target_channel;  // for TARGET_LOCK
+  uint32_t dwell_ms;       // base dwell time
   uint32_t min_dwell_ms;
   uint32_t max_dwell_ms;
   uint32_t last_hop_ts;
   uint32_t total_hops;
-  uint32_t hop_idx;          // position in current list
-  uint8_t  custom_channels[CHOP_MAX_CUSTOM];
-  uint8_t  custom_count;
-  ChopChannelStats stats[14 + CHOP_5GHZ_COUNT]; // 2.4 + 5GHz
-  uint8_t  history[CHOP_HISTORY];
-  uint8_t  hist_idx;
+  uint32_t hop_idx;  // position in current list
+  uint8_t custom_channels[CHOP_MAX_CUSTOM];
+  uint8_t custom_count;
+  ChopChannelStats stats[14 + CHOP_5GHZ_COUNT];  // 2.4 + 5GHz
+  uint8_t history[CHOP_HISTORY];
+  uint8_t hist_idx;
   TaskHandle_t task_handle;
-  uint32_t packets_this_dwell; // used by adaptive
+  uint32_t packets_this_dwell;  // used by adaptive
 } g_chop = {};
 
 // ─── Channel → stats index ────────────────────────────────────────────────────
 static int chop_ch_to_idx(uint8_t ch) {
-  if (ch >= 1 && ch <= 14) return ch - 1;
+  if (ch >= 1 && ch <= 14)
+    return ch - 1;
   for (int i = 0; i < CHOP_5GHZ_COUNT; i++) {
-    if (CHOP_5GHZ_CHANNELS[i] == ch) return 14 + i;
+    if (CHOP_5GHZ_CHANNELS[i] == ch)
+      return 14 + i;
   }
   return -1;
 }
@@ -74,15 +76,17 @@ static int chop_ch_to_idx(uint8_t ch) {
 // ─── Normalize weights ────────────────────────────────────────────────────────
 static void chop_normalize_weights() {
   float total = 0;
-  for (int i = 0; i < 14; i++) total += g_chop.stats[i].packets + 1;
-  for (int i = 0; i < 14; i++) g_chop.stats[i].weight = (g_chop.stats[i].packets + 1) / total;
+  for (int i = 0; i < 14; i++)
+    total += g_chop.stats[i].packets + 1;
+  for (int i = 0; i < 14; i++)
+    g_chop.stats[i].weight = (g_chop.stats[i].packets + 1) / total;
 }
 
 // ─── Next channel selection ───────────────────────────────────────────────────
 static uint8_t chop_next_channel() {
   switch (g_chop.strategy) {
     case CHOP_SEQ:
-      g_chop.hop_idx = (g_chop.hop_idx + 1) % 13; // ch 1-13
+      g_chop.hop_idx = (g_chop.hop_idx + 1) % 13;  // ch 1-13
       return (uint8_t)(g_chop.hop_idx + 1);
 
     case CHOP_RANDOM: {
@@ -99,7 +103,8 @@ static uint8_t chop_next_channel() {
       float cumulative = 0;
       for (int i = 0; i < 13; i++) {
         cumulative += g_chop.stats[i].weight;
-        if (r <= cumulative) return (uint8_t)(i + 1);
+        if (r <= cumulative)
+          return (uint8_t)(i + 1);
       }
       return 6;
     }
@@ -115,7 +120,8 @@ static uint8_t chop_next_channel() {
     }
 
     case CHOP_CUSTOM:
-      if (g_chop.custom_count == 0) return 1;
+      if (g_chop.custom_count == 0)
+        return 1;
       g_chop.hop_idx = (g_chop.hop_idx + 1) % g_chop.custom_count;
       return g_chop.custom_channels[g_chop.hop_idx];
 
@@ -139,7 +145,8 @@ static uint8_t chop_next_channel() {
       // Mix: 70% most-active, 30% least-visited
       uint8_t rnd;
       esp_fill_random(&rnd, 1);
-      if (rnd < 180) return (uint8_t)(best + 1);
+      if (rnd < 180)
+        return (uint8_t)(best + 1);
       // Find least visited
       int least = 0;
       uint32_t least_v = 0xFFFFFFFF;
@@ -159,13 +166,16 @@ static uint8_t chop_next_channel() {
 
 // ─── Adaptive dwell time ─────────────────────────────────────────────────────
 static uint32_t chop_dwell_for(uint8_t ch) {
-  if (g_chop.strategy != CHOP_ADAPTIVE) return g_chop.dwell_ms;
+  if (g_chop.strategy != CHOP_ADAPTIVE)
+    return g_chop.dwell_ms;
   int idx = chop_ch_to_idx(ch);
-  if (idx < 0) return g_chop.dwell_ms;
+  if (idx < 0)
+    return g_chop.dwell_ms;
   uint32_t pkts = g_chop.stats[idx].packets;
   // Scale: 0 pkts → min_dwell, many pkts → max_dwell
-  uint32_t dwell = g_chop.min_dwell_ms + (uint32_t)((float)(g_chop.max_dwell_ms - g_chop.min_dwell_ms) *
-    min(1.0f, (float)pkts / 100.0f));
+  uint32_t dwell =
+      g_chop.min_dwell_ms + (uint32_t)((float)(g_chop.max_dwell_ms - g_chop.min_dwell_ms) *
+                                       min(1.0f, (float)pkts / 100.0f));
   return dwell;
 }
 
@@ -197,19 +207,25 @@ static void chop_task(void *arg) {
   while (g_chop.running) {
     uint32_t dwell = chop_dwell_for(g_chop.current_channel);
     vTaskDelay(pdMS_TO_TICKS(dwell));
-    if (g_chop.running) chop_do_hop();
+    if (g_chop.running)
+      chop_do_hop();
   }
   g_chop.task_handle = nullptr;
   vTaskDelete(nullptr);
 }
 
 // ─── Packet counter (call from promiscuous callback) ─────────────────────────
-inline void chop_count_packet() { g_chop.packets_this_dwell++; }
-inline uint8_t chop_current_channel() { return g_chop.current_channel; }
+inline void chop_count_packet() {
+  g_chop.packets_this_dwell++;
+}
+inline uint8_t chop_current_channel() {
+  return g_chop.current_channel;
+}
 
 // ─── Control ─────────────────────────────────────────────────────────────────
 inline void chop_start(ChopStrategy strat, uint32_t dwell_ms = 200) {
-  if (g_chop.running) return;
+  if (g_chop.running)
+    return;
   g_chop.strategy = strat;
   g_chop.dwell_ms = dwell_ms < 50 ? 50 : dwell_ms;
   g_chop.min_dwell_ms = 100;
@@ -223,7 +239,8 @@ inline void chop_start(ChopStrategy strat, uint32_t dwell_ms = 200) {
 inline void chop_stop() {
   g_chop.running = false;
   uint32_t deadline = millis() + 500;
-  while (g_chop.task_handle && millis() < deadline) vTaskDelay(10);
+  while (g_chop.task_handle && millis() < deadline)
+    vTaskDelay(10);
 }
 
 static String chop_json_status() {
@@ -235,7 +252,8 @@ static String chop_json_status() {
   s += ",\"total_hops\":" + String(g_chop.total_hops);
   s += ",\"channel_stats\":[";
   for (int i = 0; i < 14; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     s += "{\"ch\":" + String(i + 1);
     s += ",\"pkts\":" + String(g_chop.stats[i].packets);
     s += ",\"visits\":" + String(g_chop.stats[i].visits);
@@ -245,7 +263,8 @@ static String chop_json_status() {
   s += "],\"history\":[";
   int hist_total = min((int)g_chop.hist_idx, CHOP_HISTORY);
   for (int i = 0; i < hist_total; i++) {
-    if (i) s += ",";
+    if (i)
+      s += ",";
     int idx = (g_chop.hist_idx - 1 - i + CHOP_HISTORY) % CHOP_HISTORY;
     s += String(g_chop.history[idx]);
   }
@@ -255,14 +274,14 @@ static String chop_json_status() {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 inline void chop_routes() {
-  server.on("/api/chop/status", HTTP_GET, []() {
-    server.send(200, "application/json", chop_json_status());
-  });
+  server.on("/api/chop/status", HTTP_GET,
+            []() { server.send(200, "application/json", chop_json_status()); });
 
   server.on("/api/chop/start", HTTP_POST, []() {
     int strat = server.hasArg("strategy") ? server.arg("strategy").toInt() : CHOP_SEQ;
     int dwell = server.hasArg("dwell") ? server.arg("dwell").toInt() : 200;
-    if (server.hasArg("target")) g_chop.target_channel = server.arg("target").toInt();
+    if (server.hasArg("target"))
+      g_chop.target_channel = server.arg("target").toInt();
     chop_start((ChopStrategy)strat, dwell);
     server.send(200, "application/json", "{\"ok\":true}");
   });
@@ -273,7 +292,10 @@ inline void chop_routes() {
   });
 
   server.on("/api/chop/channel", HTTP_POST, []() {
-    if (!server.hasArg("ch")) { server.send(400, "application/json", "{\"error\":\"missing ch\"}"); return; }
+    if (!server.hasArg("ch")) {
+      server.send(400, "application/json", "{\"error\":\"missing ch\"}");
+      return;
+    }
     uint8_t ch = server.arg("ch").toInt();
     wifi_second_chan_t sec = WIFI_SECOND_CHAN_NONE;
     esp_wifi_set_channel(ch, sec);
@@ -282,8 +304,14 @@ inline void chop_routes() {
   });
 
   server.on("/api/chop/custom/add", HTTP_POST, []() {
-    if (!server.hasArg("ch")) { server.send(400, "application/json", "{\"error\":\"missing ch\"}"); return; }
-    if (g_chop.custom_count >= CHOP_MAX_CUSTOM) { server.send(400, "application/json", "{\"error\":\"list full\"}"); return; }
+    if (!server.hasArg("ch")) {
+      server.send(400, "application/json", "{\"error\":\"missing ch\"}");
+      return;
+    }
+    if (g_chop.custom_count >= CHOP_MAX_CUSTOM) {
+      server.send(400, "application/json", "{\"error\":\"list full\"}");
+      return;
+    }
     g_chop.custom_channels[g_chop.custom_count++] = server.arg("ch").toInt();
     server.send(200, "application/json", "{\"ok\":true}");
   });
@@ -294,9 +322,12 @@ inline void chop_routes() {
   });
 
   server.on("/api/chop/dwell", HTTP_POST, []() {
-    if (server.hasArg("ms"))    g_chop.dwell_ms     = server.arg("ms").toInt();
-    if (server.hasArg("min"))   g_chop.min_dwell_ms = server.arg("min").toInt();
-    if (server.hasArg("max"))   g_chop.max_dwell_ms = server.arg("max").toInt();
+    if (server.hasArg("ms"))
+      g_chop.dwell_ms = server.arg("ms").toInt();
+    if (server.hasArg("min"))
+      g_chop.min_dwell_ms = server.arg("min").toInt();
+    if (server.hasArg("max"))
+      g_chop.max_dwell_ms = server.arg("max").toInt();
     server.send(200, "application/json", "{\"ok\":true}");
   });
 }

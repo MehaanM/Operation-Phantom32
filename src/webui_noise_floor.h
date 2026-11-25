@@ -227,7 +227,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wunfl_routes() {
-  server.on("/noise-floor", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUNFL_PAGE);
-  });
+  server.on("/noise-floor", HTTP_GET, []() { server.send_P(200, "text/html", WUNFL_PAGE); });
 }

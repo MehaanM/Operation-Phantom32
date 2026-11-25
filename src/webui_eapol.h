@@ -192,7 +192,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wueap_routes() {
-  server.on("/eapol", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUEAP_PAGE);
-  });
+  server.on("/eapol", HTTP_GET, []() { server.send_P(200, "text/html", WUEAP_PAGE); });
 }

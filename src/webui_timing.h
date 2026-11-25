@@ -192,7 +192,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wutad_routes() {
-  server.on("/timing", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUTAD_PAGE);
-  });
+  server.on("/timing", HTTP_GET, []() { server.send_P(200, "text/html", WUTAD_PAGE); });
 }

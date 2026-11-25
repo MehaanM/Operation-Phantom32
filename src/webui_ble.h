@@ -220,7 +220,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wuble_routes() {
-  server.on("/ble", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBLE_PAGE);
-  });
+  server.on("/ble", HTTP_GET, []() { server.send_P(200, "text/html", WUBLE_PAGE); });
 }

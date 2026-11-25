@@ -15,53 +15,53 @@
 // ===========================================================================
 
 struct ExtFrameInfo {
-  uint8_t type;        // 802.11 frame type (mgmt=0, ctrl=1, data=2)
-  uint8_t subtype;     // 802.11 subtype
-  uint8_t ch;          // channel
-  int8_t  rssi;        // RSSI in dBm
-  uint8_t src[6];      // source MAC
-  uint8_t dst[6];      // destination MAC
-  uint8_t bssid[6];    // BSSID
-  char    ssid[33];    // SSID (if beacon/probe)
-  uint16_t len;        // frame length
-  uint32_t seq;        // sequence number
-  uint64_t tsf;        // TSF counter (from beacon)
-  uint16_t beacon_int; // beacon interval (from beacon)
-  bool    retry;       // retry bit
+  uint8_t type;         // 802.11 frame type (mgmt=0, ctrl=1, data=2)
+  uint8_t subtype;      // 802.11 subtype
+  uint8_t ch;           // channel
+  int8_t rssi;          // RSSI in dBm
+  uint8_t src[6];       // source MAC
+  uint8_t dst[6];       // destination MAC
+  uint8_t bssid[6];     // BSSID
+  char ssid[33];        // SSID (if beacon/probe)
+  uint16_t len;         // frame length
+  uint32_t seq;         // sequence number
+  uint64_t tsf;         // TSF counter (from beacon)
+  uint16_t beacon_int;  // beacon interval (from beacon)
+  bool retry;           // retry bit
 
   // Capability info (from beacon)
-  bool    is_ap;
-  bool    is_open;
-  bool    has_pmf;
-  bool    has_wps;
-  bool    has_ht;
-  bool    has_vht;
-  bool    has_he;
-  uint8_t ch_bw;       // channel width: 20/40/80/160
-  uint8_t sec_ch;      // secondary channel (HT40)
-  uint8_t sec_flags;   // security flags
-  uint8_t bss_color;   // 802.11ax BSS Color
-  bool    he_capable;
-  bool    color_disabled;
+  bool is_ap;
+  bool is_open;
+  bool has_pmf;
+  bool has_wps;
+  bool has_ht;
+  bool has_vht;
+  bool has_he;
+  uint8_t ch_bw;      // channel width: 20/40/80/160
+  uint8_t sec_ch;     // secondary channel (HT40)
+  uint8_t sec_flags;  // security flags
+  uint8_t bss_color;  // 802.11ax BSS Color
+  bool he_capable;
+  bool color_disabled;
 
   // BSS Load IE
-  bool     has_bss_load;
-  uint8_t  bss_util;    // 0-255
-  uint8_t  bss_sta;
+  bool has_bss_load;
+  uint8_t bss_util;  // 0-255
+  uint8_t bss_sta;
   uint16_t bss_avail;
 
   // WPS info
-  bool    has_wps_ie;
+  bool has_wps_ie;
 
   // Interworking
-  bool    has_interworking;
-  bool    internet_bit;
+  bool has_interworking;
+  bool internet_bit;
 
   // Multicast / broadcast
-  bool    is_mcast;
-  bool    is_bcast;
-  bool    is_arp;
-  bool    arp_is_request;
+  bool is_mcast;
+  bool is_bcast;
+  bool is_arp;
+  bool arp_is_request;
 };
 
 #ifndef PHANTOM32_LITE
@@ -117,9 +117,9 @@ struct ExtFrameInfo {
 
 static String ext_status_json() {
   String s = "{";
-  s += "\"uptime_ms\":"  + String(millis());
+  s += "\"uptime_ms\":" + String(millis());
   s += ",\"free_heap\":" + String(ESP.getFreeHeap());
-  s += ",\"min_heap\":"  + String(ESP.getMinFreeHeap());
+  s += ",\"min_heap\":" + String(ESP.getMinFreeHeap());
   s += ",\"total_heap\":" + String(ESP.getHeapSize());
   s += "}";
   return s;
@@ -130,21 +130,21 @@ static String ext_status_json() {
 // ============================================================
 
 static const char EXT_NAV_LINKS[] PROGMEM =
-  "<a href='/'>Home</a>"
-  "<a href='/dashboard'>Dashboard</a>"
-  "<a href='/channel-analyzer'>Channels</a>"
-  "<a href='/signal-heatmap'>Signal Map</a>"
-  "<a href='/topology'>Topology</a>"
-  "<a href='/scan-cache'>Scan Cache</a>"
-  "<a href='/probe-flood'>Probe Flood</a>"
-  "<a href='/multicast'>Multicast</a>"
-  "<a href='/eapol'>EAPOL</a>"
-  "<a href='/wps'>WPS</a>"
-  "<a href='/timing'>Timing</a>"
-  "<a href='/tsf'>TSF</a>"
-  "<a href='/bss-color'>BSS Color</a>"
-  "<a href='/bss-load'>BSS Load</a>"
-  "<a href='/captive'>Captive</a>";
+    "<a href='/'>Home</a>"
+    "<a href='/dashboard'>Dashboard</a>"
+    "<a href='/channel-analyzer'>Channels</a>"
+    "<a href='/signal-heatmap'>Signal Map</a>"
+    "<a href='/topology'>Topology</a>"
+    "<a href='/scan-cache'>Scan Cache</a>"
+    "<a href='/probe-flood'>Probe Flood</a>"
+    "<a href='/multicast'>Multicast</a>"
+    "<a href='/eapol'>EAPOL</a>"
+    "<a href='/wps'>WPS</a>"
+    "<a href='/timing'>Timing</a>"
+    "<a href='/tsf'>TSF</a>"
+    "<a href='/bss-color'>BSS Color</a>"
+    "<a href='/bss-load'>BSS Load</a>"
+    "<a href='/captive'>Captive</a>";
 
 // ============================================================
 // Register ALL extended module routes.
@@ -183,9 +183,8 @@ inline void ext_register_routes() {
   wucaz_routes();
 
   // Combined status
-  server.on("/api/status/all", HTTP_GET, []() {
-    server.send(200, "application/json", ext_status_json());
-  });
+  server.on("/api/status/all", HTTP_GET,
+            []() { server.send(200, "application/json", ext_status_json()); });
 }
 
 // ============================================================
@@ -197,8 +196,7 @@ inline void ext_dispatch_frame(const ExtFrameInfo &f) {
   shm_ingest(f.ch, f.rssi, f.bssid, f.ssid);
 
   // Channel analyzer: every frame
-  caz_ingest(f.ch, f.rssi, f.bssid, f.ssid, f.has_ht, f.has_vht, f.has_he,
-             (CazBW)0, f.sec_ch);
+  caz_ingest(f.ch, f.rssi, f.bssid, f.ssid, f.has_ht, f.has_vht, f.has_he, (CazBW)0, f.sec_ch);
 
   if (f.type == 0) {  // management frames
     switch (f.subtype) {
@@ -208,30 +206,26 @@ inline void ext_dispatch_frame(const ExtFrameInfo &f) {
         // Timing anomaly detector
         tad_ingest_beacon(f.bssid, f.ssid, f.ch, f.beacon_int, f.tsf);
         // Scan result cache
-        src_ingest_beacon(f.bssid, f.ssid, f.ch, f.rssi, f.sec_flags, "", "",
-                          0, f.ssid[0]==0, 0, f.beacon_int, 0,
-                          f.has_ht, f.has_vht, f.has_he, 0, 20, false);
+        src_ingest_beacon(f.bssid, f.ssid, f.ch, f.rssi, f.sec_flags, "", "", 0, f.ssid[0] == 0, 0,
+                          f.beacon_int, 0, f.has_ht, f.has_vht, f.has_he, 0, 20, false);
         // Network topology
         ntt_ingest_ap(f.bssid, f.ssid, f.ch, f.rssi);
         // BSS Color
         if (f.he_capable) {
-          bsc_ingest(f.bssid, f.ssid, f.ch, f.rssi, true, f.bss_color,
-                     false, f.color_disabled, 0, -82, -62, false);
+          bsc_ingest(f.bssid, f.ssid, f.ch, f.rssi, true, f.bss_color, false, f.color_disabled, 0,
+                     -82, -62, false);
         }
         // BSS Load
         if (f.has_bss_load) {
-          bsl_ingest(f.bssid, f.ssid, f.ch, f.rssi,
-                     f.bss_util, f.bss_sta, f.bss_avail);
+          bsl_ingest(f.bssid, f.ssid, f.ch, f.rssi, f.bss_util, f.bss_sta, f.bss_avail);
         }
         // Captive portal
-        cpd_ingest(f.bssid, f.ssid, f.ch, f.rssi, f.is_open, f.has_pmf,
-                   f.has_wps, f.has_interworking, f.internet_bit,
-                   f.beacon_int, f.sec_flags);
+        cpd_ingest(f.bssid, f.ssid, f.ch, f.rssi, f.is_open, f.has_pmf, f.has_wps,
+                   f.has_interworking, f.internet_bit, f.beacon_int, f.sec_flags);
         // WPS detector
         if (f.has_wps_ie) {
-          wps_ingest_beacon(f.bssid, f.ssid, f.ch, f.rssi,
-                            WPS_STATE_CONFIGURED, WPS_METHOD_PBC, WPS_VER_2_0,
-                            "", "", "", "", false, false);
+          wps_ingest_beacon(f.bssid, f.ssid, f.ch, f.rssi, WPS_STATE_CONFIGURED, WPS_METHOD_PBC,
+                            WPS_VER_2_0, "", "", "", "", false, false);
         }
         break;
 
@@ -246,16 +240,16 @@ inline void ext_dispatch_frame(const ExtFrameInfo &f) {
         ntt_ingest_probe(nullptr, f.bssid, f.ch, f.rssi);
         break;
 
-      case 11: // auth
+      case 11:  // auth
         tad_ingest_auth(f.bssid, f.ch);
         break;
 
-      case 12: // deauth
+      case 12:  // deauth
         tad_ingest_deauth(f.src, f.ch);
         eap_ingest_deauth_mid_hs(f.dst, f.src);
         break;
 
-      case 10: // disassoc
+      case 10:  // disassoc
         tad_ingest_deauth(f.src, f.ch);
         break;
     }
@@ -283,37 +277,37 @@ inline void ext_dispatch_frame(const ExtFrameInfo &f) {
 // ============================================================
 static inline bool psram_alloc_all() {
 #ifdef BOARD_HAS_PSRAM
-  _g_mct_raw    = (G_MctState*)   ps_calloc(1, sizeof(G_MctState));
-  _g_eap_raw    = (G_EapState*)   ps_calloc(1, sizeof(G_EapState));
-  _g_wps_raw    = (G_WpsDetState*)ps_calloc(1, sizeof(G_WpsDetState));
-  _g_tad_raw    = (G_TadState*)   ps_calloc(1, sizeof(G_TadState));
-  _g_src_raw    = (G_SrcState*)   ps_calloc(1, sizeof(G_SrcState));
-  _g_pfd_raw    = (G_PfdState*)   ps_calloc(1, sizeof(G_PfdState));
-  _g_tsf_raw    = (G_TsfState*)   ps_calloc(1, sizeof(G_TsfState));
-  _g_bsc_raw    = (G_BscState*)   ps_calloc(1, sizeof(G_BscState));
-  _g_ntt_raw    = (G_NttState*)   ps_calloc(1, sizeof(G_NttState));
-  _g_shm_raw    = (G_ShmState*)   ps_calloc(1, sizeof(G_ShmState));
-  _g_cpd_raw    = (G_CpdState*)   ps_calloc(1, sizeof(G_CpdState));
-  _g_bsl_raw    = (G_BslState*)   ps_calloc(1, sizeof(G_BslState));
+  _g_mct_raw = (G_MctState *)ps_calloc(1, sizeof(G_MctState));
+  _g_eap_raw = (G_EapState *)ps_calloc(1, sizeof(G_EapState));
+  _g_wps_raw = (G_WpsDetState *)ps_calloc(1, sizeof(G_WpsDetState));
+  _g_tad_raw = (G_TadState *)ps_calloc(1, sizeof(G_TadState));
+  _g_src_raw = (G_SrcState *)ps_calloc(1, sizeof(G_SrcState));
+  _g_pfd_raw = (G_PfdState *)ps_calloc(1, sizeof(G_PfdState));
+  _g_tsf_raw = (G_TsfState *)ps_calloc(1, sizeof(G_TsfState));
+  _g_bsc_raw = (G_BscState *)ps_calloc(1, sizeof(G_BscState));
+  _g_ntt_raw = (G_NttState *)ps_calloc(1, sizeof(G_NttState));
+  _g_shm_raw = (G_ShmState *)ps_calloc(1, sizeof(G_ShmState));
+  _g_cpd_raw = (G_CpdState *)ps_calloc(1, sizeof(G_CpdState));
+  _g_bsl_raw = (G_BslState *)ps_calloc(1, sizeof(G_BslState));
   // Headers included directly in main.cpp before extended_modules.h:
-  _g_pfl_raw    = (G_PflState*)   ps_calloc(1, sizeof(G_PflState));
-  _g_das_raw    = (G_DasState*)   ps_calloc(1, sizeof(G_DasState));
-  _g_et_raw     = (EtStatus*)     ps_calloc(1, sizeof(EtStatus));
-  prh_entries   = (PrhEntry*)     ps_calloc(PRH_MAX_ENTRIES, sizeof(PrhEntry));
-  g_dt_devs     = (DtDevice*)     ps_calloc(DT_MAX_DEVICES, sizeof(DtDevice));
-  g_dt_aps      = (DtAP*)         ps_calloc(DT_MAX_APS, sizeof(DtAP));
-  g_dt_alerts   = (DtAlert*)      ps_calloc(DT_MAX_ALERTS, sizeof(DtAlert));
-  g_cli_scripts = (CliScript*)    ps_calloc(CLI_SCRIPT_MAX, sizeof(CliScript));
-  return _g_mct_raw && _g_eap_raw && _g_wps_raw && _g_tad_raw && _g_src_raw &&
-         _g_pfd_raw && _g_tsf_raw && _g_bsc_raw && _g_ntt_raw && _g_shm_raw &&
-         _g_cpd_raw && _g_bsl_raw && _g_pfl_raw && _g_das_raw && _g_et_raw &&
-         prh_entries && g_dt_devs && g_dt_aps && g_dt_alerts && g_cli_scripts;
+  _g_pfl_raw = (G_PflState *)ps_calloc(1, sizeof(G_PflState));
+  _g_das_raw = (G_DasState *)ps_calloc(1, sizeof(G_DasState));
+  _g_et_raw = (EtStatus *)ps_calloc(1, sizeof(EtStatus));
+  prh_entries = (PrhEntry *)ps_calloc(PRH_MAX_ENTRIES, sizeof(PrhEntry));
+  g_dt_devs = (DtDevice *)ps_calloc(DT_MAX_DEVICES, sizeof(DtDevice));
+  g_dt_aps = (DtAP *)ps_calloc(DT_MAX_APS, sizeof(DtAP));
+  g_dt_alerts = (DtAlert *)ps_calloc(DT_MAX_ALERTS, sizeof(DtAlert));
+  g_cli_scripts = (CliScript *)ps_calloc(CLI_SCRIPT_MAX, sizeof(CliScript));
+  return _g_mct_raw && _g_eap_raw && _g_wps_raw && _g_tad_raw && _g_src_raw && _g_pfd_raw &&
+         _g_tsf_raw && _g_bsc_raw && _g_ntt_raw && _g_shm_raw && _g_cpd_raw && _g_bsl_raw &&
+         _g_pfl_raw && _g_das_raw && _g_et_raw && prh_entries && g_dt_devs && g_dt_aps &&
+         g_dt_alerts && g_cli_scripts;
 #else
   return true;
 #endif
 }
 
-#else // PHANTOM32_LITE
+#else  // PHANTOM32_LITE
 // ===========================================================================
 // LITE BUILD — analytics disabled to fit in 320 KB DRAM (no PSRAM boards)
 // Only the ExtFrameInfo struct (above) and no-op stubs are compiled in.
@@ -324,9 +318,9 @@ static const char EXT_NAV_LINKS[] PROGMEM = "<a href='/'>Home</a>";
 
 static String ext_status_json() {
   String s = "{";
-  s += "\"uptime_ms\":"  + String(millis());
+  s += "\"uptime_ms\":" + String(millis());
   s += ",\"free_heap\":" + String(ESP.getFreeHeap());
-  s += ",\"min_heap\":"  + String(ESP.getMinFreeHeap());
+  s += ",\"min_heap\":" + String(ESP.getMinFreeHeap());
   s += ",\"total_heap\":" + String(ESP.getHeapSize());
   s += ",\"lite_mode\":true";
   s += "}";
@@ -334,13 +328,14 @@ static String ext_status_json() {
 }
 
 inline void ext_register_routes() {
-  server.on("/api/status/all", HTTP_GET, []() {
-    server.send(200, "application/json", ext_status_json());
-  });
+  server.on("/api/status/all", HTTP_GET,
+            []() { server.send(200, "application/json", ext_status_json()); });
 }
 
 inline void ext_dispatch_frame(const ExtFrameInfo &) {}
 
-static inline bool psram_alloc_all() { return true; }
+static inline bool psram_alloc_all() {
+  return true;
+}
 
-#endif // PHANTOM32_LITE
+#endif  // PHANTOM32_LITE

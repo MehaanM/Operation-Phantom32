@@ -199,7 +199,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wubrt_routes() {
-  server.on("/beacon-rates", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBRT_PAGE);
-  });
+  server.on("/beacon-rates", HTTP_GET, []() { server.send_P(200, "text/html", WUBRT_PAGE); });
 }

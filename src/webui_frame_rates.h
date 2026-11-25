@@ -197,7 +197,5 @@ setInterval(refresh, 1500);
 )rawhtml";
 
 inline void wufrt_routes() {
-  server.on("/frame-rates", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUFRT_PAGE);
-  });
+  server.on("/frame-rates", HTTP_GET, []() { server.send_P(200, "text/html", WUFRT_PAGE); });
 }

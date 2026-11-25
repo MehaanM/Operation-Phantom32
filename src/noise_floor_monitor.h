@@ -11,31 +11,28 @@
 
 extern WebServer server;
 
-#define NFM_CHANNELS   14
-#define NFM_HISTORY    60    // samples per channel
-#define NFM_WINDOW_S   10    // noise estimation window in seconds
+#define NFM_CHANNELS 14
+#define NFM_HISTORY 60   // samples per channel
+#define NFM_WINDOW_S 10  // noise estimation window in seconds
 
 struct NfmChannel {
-  int8_t   noise_est;          // current estimated noise floor (dBm)
-  int8_t   noise_min;          // historical minimum noise (quietest)
-  int8_t   noise_max;          // historical maximum noise (noisiest)
-  int8_t   hist[NFM_HISTORY];  // rolling noise history
-  uint8_t  hist_head;
+  int8_t noise_est;          // current estimated noise floor (dBm)
+  int8_t noise_min;          // historical minimum noise (quietest)
+  int8_t noise_max;          // historical maximum noise (noisiest)
+  int8_t hist[NFM_HISTORY];  // rolling noise history
+  uint8_t hist_head;
   uint32_t sample_count;
-  uint32_t window_low_sum;     // sum of lowest 10% RSSIs in window
+  uint32_t window_low_sum;  // sum of lowest 10% RSSIs in window
   uint16_t window_low_cnt;
   uint32_t last_update_ms;
-  bool     is_noisy;           // flagged above threshold
+  bool is_noisy;  // flagged above threshold
 };
 
 static struct {
   NfmChannel ch[NFM_CHANNELS];
-  int8_t     noise_threshold;   // above this = noisy (default -85 dBm)
-  bool       enabled;
-} g_nfm = {
-  .noise_threshold = -85,
-  .enabled = true
-};
+  int8_t noise_threshold;  // above this = noisy (default -85 dBm)
+  bool enabled;
+} g_nfm = {.noise_threshold = -85, .enabled = true};
 
 static inline void nfm_init() {
   for (uint8_t c = 0; c < NFM_CHANNELS; c++) {
@@ -49,13 +46,14 @@ static inline void nfm_init() {
 
 // Called per received frame; use lowest-percentile RSSI as noise estimate
 static inline void nfm_ingest(uint8_t ch, int8_t rssi) {
-  if (!g_nfm.enabled || ch < 1 || ch > NFM_CHANNELS) return;
+  if (!g_nfm.enabled || ch < 1 || ch > NFM_CHANNELS)
+    return;
   NfmChannel &c = g_nfm.ch[ch - 1];
 
   // Keep track of very-low RSSI readings for noise estimation
   // The noise floor is the median of the bottom 10% of RSSI readings
   if (rssi < -75) {
-    c.window_low_sum += (-rssi); // store absolute value
+    c.window_low_sum += (-rssi);  // store absolute value
     c.window_low_cnt++;
   }
 
@@ -67,15 +65,17 @@ static inline void nfm_ingest(uint8_t ch, int8_t rssi) {
     if (c.window_low_cnt > 0) {
       int8_t est = -(int8_t)(c.window_low_sum / c.window_low_cnt);
       c.noise_est = est;
-      if (est < c.noise_min) c.noise_min = est;
-      if (est > c.noise_max) c.noise_max = est;
-      c.is_noisy  = (est > g_nfm.noise_threshold);
+      if (est < c.noise_min)
+        c.noise_min = est;
+      if (est > c.noise_max)
+        c.noise_max = est;
+      c.is_noisy = (est > g_nfm.noise_threshold);
       c.hist[c.hist_head % NFM_HISTORY] = est;
       c.hist_head = (c.hist_head + 1) % NFM_HISTORY;
     }
-    c.window_low_sum  = 0;
-    c.window_low_cnt  = 0;
-    c.last_update_ms  = now;
+    c.window_low_sum = 0;
+    c.window_low_cnt = 0;
+    c.last_update_ms = now;
   }
 }
 
@@ -243,27 +243,34 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 static inline void nfm_routes() {
-  server.on("/noise-monitor", HTTP_GET, []() {
-    server.send_P(200, "text/html", NFM_PAGE);
-  });
+  server.on("/noise-monitor", HTTP_GET, []() { server.send_P(200, "text/html", NFM_PAGE); });
 
   server.on("/api/nfm/all", HTTP_GET, []() {
     String out;
     out.reserve(2048);
-    out += "{\"threshold\":"; out += g_nfm.noise_threshold;
+    out += "{\"threshold\":";
+    out += g_nfm.noise_threshold;
     out += ",\"channels\":[";
     for (uint8_t c = 0; c < NFM_CHANNELS; c++) {
       const NfmChannel &ch = g_nfm.ch[c];
-      if (c > 0) out += ',';
-      out += "{\"ch\":"; out += (c+1);
-      out += ",\"noise_est\":"; out += ch.noise_est;
-      out += ",\"noise_min\":"; out += ch.noise_min;
-      out += ",\"noise_max\":"; out += ch.noise_max;
-      out += ",\"samples\":";   out += ch.sample_count;
-      out += ",\"is_noisy\":";  out += (ch.is_noisy ? "true" : "false");
+      if (c > 0)
+        out += ',';
+      out += "{\"ch\":";
+      out += (c + 1);
+      out += ",\"noise_est\":";
+      out += ch.noise_est;
+      out += ",\"noise_min\":";
+      out += ch.noise_min;
+      out += ",\"noise_max\":";
+      out += ch.noise_max;
+      out += ",\"samples\":";
+      out += ch.sample_count;
+      out += ",\"is_noisy\":";
+      out += (ch.is_noisy ? "true" : "false");
       out += ",\"hist\":[";
       for (uint8_t h = 0; h < NFM_HISTORY; h++) {
-        if (h > 0) out += ',';
+        if (h > 0)
+          out += ',';
         out += ch.hist[(ch.hist_head + h) % NFM_HISTORY];
       }
       out += "]}";
@@ -275,10 +282,16 @@ static inline void nfm_routes() {
   server.on("/api/nfm/clear", HTTP_POST, []() {
     for (uint8_t c = 0; c < NFM_CHANNELS; c++) {
       NfmChannel &ch = g_nfm.ch[c];
-      ch.noise_est = -100; ch.noise_min = -30; ch.noise_max = -100;
-      ch.sample_count = 0; ch.window_low_sum = 0; ch.window_low_cnt = 0;
-      ch.is_noisy = false; ch.hist_head = 0;
-      for (uint8_t h = 0; h < NFM_HISTORY; h++) ch.hist[h] = -100;
+      ch.noise_est = -100;
+      ch.noise_min = -30;
+      ch.noise_max = -100;
+      ch.sample_count = 0;
+      ch.window_low_sum = 0;
+      ch.window_low_cnt = 0;
+      ch.is_noisy = false;
+      ch.hist_head = 0;
+      for (uint8_t h = 0; h < NFM_HISTORY; h++)
+        ch.hist[h] = -100;
     }
     server.send(200, "application/json", "{\"ok\":true}");
   });

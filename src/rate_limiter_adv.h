@@ -25,30 +25,30 @@ extern WebServer server;
 // CONFIGURATION
 // ============================================================
 
-#define RLA_MAX_TOOL_SLOTS   32    // maximum tool entries
-#define RLA_MAX_IP_SLOTS     16    // IPs to rate-track
-#define RLA_WINDOW_S         1     // rate window in seconds (sliding)
-#define RLA_IP_WINDOW_S      60    // HTTP request window in seconds
+#define RLA_MAX_TOOL_SLOTS 32  // maximum tool entries
+#define RLA_MAX_IP_SLOTS 16    // IPs to rate-track
+#define RLA_WINDOW_S 1         // rate window in seconds (sliding)
+#define RLA_IP_WINDOW_S 60     // HTTP request window in seconds
 
-#define RLA_DEFAULT_TX_FPS   20    // default max TX frames per second per tool
-#define RLA_DEFAULT_BURST    50    // burst capacity (frames above steady rate)
-#define RLA_GLOBAL_FPS       200   // combined max TX frames/second across all tools
-#define RLA_HTTP_REQ_PM      300   // max HTTP requests per minute per IP
+#define RLA_DEFAULT_TX_FPS 20  // default max TX frames per second per tool
+#define RLA_DEFAULT_BURST 50   // burst capacity (frames above steady rate)
+#define RLA_GLOBAL_FPS 200     // combined max TX frames/second across all tools
+#define RLA_HTTP_REQ_PM 300    // max HTTP requests per minute per IP
 
-#define RLA_NVS_NS           "phantom32"
-#define RLA_NVS_GLOBAL_FPS   "rla_gfps"
-#define RLA_NVS_HTTP_RPM     "rla_hrpm"
+#define RLA_NVS_NS "phantom32"
+#define RLA_NVS_GLOBAL_FPS "rla_gfps"
+#define RLA_NVS_HTTP_RPM "rla_hrpm"
 
 // ============================================================
 // DATA STRUCTURES
 // ============================================================
 
 struct RlaToolSlot {
-  char     name[24];         // tool name (matches ToolModule name)
-  bool     active;
+  char name[24];  // tool name (matches ToolModule name)
+  bool active;
   uint32_t max_fps;          // configured max frames/second
   uint32_t burst_capacity;   // token bucket burst capacity
-  float    tokens;           // current token count (token bucket)
+  float tokens;              // current token count (token bucket)
   uint32_t last_refill_us;   // last token refill timestamp (esp_timer_get_time)
   uint32_t total_allowed;    // lifetime frames allowed
   uint32_t total_blocked;    // lifetime frames blocked
@@ -58,14 +58,14 @@ struct RlaToolSlot {
 };
 
 struct RlaIpSlot {
-  char     ip[16];
-  uint32_t req_count;        // requests in current window
-  uint32_t window_start_s;   // start of current window (seconds)
-  uint32_t total_blocked;    // lifetime blocked requests from this IP
+  char ip[16];
+  uint32_t req_count;       // requests in current window
+  uint32_t window_start_s;  // start of current window (seconds)
+  uint32_t total_blocked;   // lifetime blocked requests from this IP
 };
 
 struct RlaGlobalBucket {
-  float    tokens;
+  float tokens;
   uint32_t last_refill_us;
   uint32_t max_fps;
   uint32_t total_allowed;
@@ -76,22 +76,20 @@ struct RlaGlobalBucket {
 // STATE
 // ============================================================
 
-static RlaToolSlot   g_rla_tools[RLA_MAX_TOOL_SLOTS] = {};
-static RlaIpSlot     g_rla_ips[RLA_MAX_IP_SLOTS] = {};
-static RlaGlobalBucket g_rla_global = {
-  .tokens = RLA_GLOBAL_FPS,
-  .last_refill_us = 0,
-  .max_fps = RLA_GLOBAL_FPS,
-  .total_allowed = 0,
-  .total_blocked = 0
-};
+static RlaToolSlot g_rla_tools[RLA_MAX_TOOL_SLOTS] = {};
+static RlaIpSlot g_rla_ips[RLA_MAX_IP_SLOTS] = {};
+static RlaGlobalBucket g_rla_global = {.tokens = RLA_GLOBAL_FPS,
+                                       .last_refill_us = 0,
+                                       .max_fps = RLA_GLOBAL_FPS,
+                                       .total_allowed = 0,
+                                       .total_blocked = 0};
 static uint32_t g_rla_http_rpm = RLA_HTTP_REQ_PM;
 
 // ============================================================
 // HELPERS
 // ============================================================
 
-static RlaToolSlot* rla_find_tool(const char *name) {
+static RlaToolSlot *rla_find_tool(const char *name) {
   for (int i = 0; i < RLA_MAX_TOOL_SLOTS; i++) {
     if (g_rla_tools[i].active && strcmp(g_rla_tools[i].name, name) == 0)
       return &g_rla_tools[i];
@@ -99,7 +97,7 @@ static RlaToolSlot* rla_find_tool(const char *name) {
   return nullptr;
 }
 
-static RlaToolSlot* rla_alloc_tool(const char *name) {
+static RlaToolSlot *rla_alloc_tool(const char *name) {
   for (int i = 0; i < RLA_MAX_TOOL_SLOTS; i++) {
     if (!g_rla_tools[i].active) {
       RlaToolSlot &s = g_rla_tools[i];
@@ -116,18 +114,21 @@ static RlaToolSlot* rla_alloc_tool(const char *name) {
   return nullptr;
 }
 
-static RlaToolSlot* rla_get_or_create(const char *name) {
+static RlaToolSlot *rla_get_or_create(const char *name) {
   RlaToolSlot *s = rla_find_tool(name);
-  if (s) return s;
+  if (s)
+    return s;
   return rla_alloc_tool(name);
 }
 
 static void rla_refill_tool(RlaToolSlot *s) {
   uint64_t now_us = esp_timer_get_time();
   float elapsed_s = (float)(now_us - s->last_refill_us) / 1e6f;
-  if (elapsed_s <= 0) return;
+  if (elapsed_s <= 0)
+    return;
   s->tokens += elapsed_s * s->max_fps;
-  if (s->tokens > s->burst_capacity) s->tokens = s->burst_capacity;
+  if (s->tokens > s->burst_capacity)
+    s->tokens = s->burst_capacity;
   s->last_refill_us = now_us;
 
   // Rolling 1s fps counter
@@ -142,7 +143,8 @@ static void rla_refill_tool(RlaToolSlot *s) {
 static void rla_refill_global() {
   uint64_t now_us = esp_timer_get_time();
   float elapsed_s = (float)(now_us - g_rla_global.last_refill_us) / 1e6f;
-  if (elapsed_s <= 0) return;
+  if (elapsed_s <= 0)
+    return;
   g_rla_global.tokens += elapsed_s * g_rla_global.max_fps;
   if (g_rla_global.tokens > g_rla_global.max_fps * 2)
     g_rla_global.tokens = g_rla_global.max_fps * 2;
@@ -189,10 +191,11 @@ static bool rla_check(const char *tool_name) {
 // HTTP REQUEST RATE CHECK
 // ============================================================
 
-static RlaIpSlot* rla_ip_find_or_add(const char *ip) {
+static RlaIpSlot *rla_ip_find_or_add(const char *ip) {
   uint32_t now_s = millis() / 1000;
   for (int i = 0; i < RLA_MAX_IP_SLOTS; i++) {
-    if (strcmp(g_rla_ips[i].ip, ip) == 0) return &g_rla_ips[i];
+    if (strcmp(g_rla_ips[i].ip, ip) == 0)
+      return &g_rla_ips[i];
   }
   for (int i = 0; i < RLA_MAX_IP_SLOTS; i++) {
     if (!g_rla_ips[i].ip[0]) {
@@ -203,7 +206,8 @@ static RlaIpSlot* rla_ip_find_or_add(const char *ip) {
     }
   }
   // Evict the oldest.
-  uint32_t oldest = UINT32_MAX; int idx = 0;
+  uint32_t oldest = UINT32_MAX;
+  int idx = 0;
   for (int i = 0; i < RLA_MAX_IP_SLOTS; i++) {
     if (g_rla_ips[i].window_start_s < oldest) {
       oldest = g_rla_ips[i].window_start_s;
@@ -218,7 +222,8 @@ static RlaIpSlot* rla_ip_find_or_add(const char *ip) {
 
 static bool rla_check_http(const char *ip) {
   RlaIpSlot *s = rla_ip_find_or_add(ip);
-  if (!s) return true;
+  if (!s)
+    return true;
   uint32_t now_s = millis() / 1000;
   if ((now_s - s->window_start_s) >= RLA_IP_WINDOW_S) {
     s->req_count = 0;
@@ -240,8 +245,8 @@ static void rla_load_config() {
   Preferences prefs;
   prefs.begin(RLA_NVS_NS, true);
   g_rla_global.max_fps = prefs.getUInt(RLA_NVS_GLOBAL_FPS, RLA_GLOBAL_FPS);
-  g_rla_global.tokens  = g_rla_global.max_fps;
-  g_rla_http_rpm       = prefs.getUInt(RLA_NVS_HTTP_RPM, RLA_HTTP_REQ_PM);
+  g_rla_global.tokens = g_rla_global.max_fps;
+  g_rla_http_rpm = prefs.getUInt(RLA_NVS_HTTP_RPM, RLA_HTTP_REQ_PM);
   prefs.end();
 }
 
@@ -249,7 +254,7 @@ static void rla_save_config() {
   Preferences prefs;
   prefs.begin(RLA_NVS_NS, false);
   prefs.putUInt(RLA_NVS_GLOBAL_FPS, g_rla_global.max_fps);
-  prefs.putUInt(RLA_NVS_HTTP_RPM,   g_rla_http_rpm);
+  prefs.putUInt(RLA_NVS_HTTP_RPM, g_rla_http_rpm);
   prefs.end();
 }
 
@@ -267,8 +272,10 @@ static void rla_handle_status() {
   s += "},\"tools\":[";
   bool first = true;
   for (int i = 0; i < RLA_MAX_TOOL_SLOTS; i++) {
-    if (!g_rla_tools[i].active) continue;
-    if (!first) s += ",";
+    if (!g_rla_tools[i].active)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     s += "{\"name\":\"" + String(g_rla_tools[i].name) + "\"";
     s += ",\"max_fps\":" + String(g_rla_tools[i].max_fps);
@@ -313,11 +320,13 @@ static void rla_handle_set_tool() {
   }
   if (server.hasArg("max_fps")) {
     uint32_t fps = (uint32_t)server.arg("max_fps").toInt();
-    if (fps > 0 && fps <= 500) s->max_fps = fps;
+    if (fps > 0 && fps <= 500)
+      s->max_fps = fps;
   }
   if (server.hasArg("burst")) {
     uint32_t burst = (uint32_t)server.arg("burst").toInt();
-    if (burst > 0 && burst <= 1000) s->burst_capacity = burst;
+    if (burst > 0 && burst <= 1000)
+      s->burst_capacity = burst;
   }
   server.send(200, "application/json", "{\"ok\":true}");
 }
@@ -348,13 +357,13 @@ static void rla_handle_reset_tool() {
 inline void rla_init() {
   rla_load_config();
   g_rla_global.last_refill_us = esp_timer_get_time();
-  Serial.printf("[RLA] Rate limiter init. Global max: %u fps, HTTP: %u rpm\n",
-                g_rla_global.max_fps, g_rla_http_rpm);
+  Serial.printf("[RLA] Rate limiter init. Global max: %u fps, HTTP: %u rpm\n", g_rla_global.max_fps,
+                g_rla_http_rpm);
 }
 
 inline void rla_routes() {
-  server.on("/api/rla/status",    HTTP_GET,  rla_handle_status);
-  server.on("/api/rla/global",    HTTP_POST, rla_handle_set_global);
-  server.on("/api/rla/tool",      HTTP_POST, rla_handle_set_tool);
-  server.on("/api/rla/tool/reset",HTTP_POST, rla_handle_reset_tool);
+  server.on("/api/rla/status", HTTP_GET, rla_handle_status);
+  server.on("/api/rla/global", HTTP_POST, rla_handle_set_global);
+  server.on("/api/rla/tool", HTTP_POST, rla_handle_set_tool);
+  server.on("/api/rla/tool/reset", HTTP_POST, rla_handle_reset_tool);
 }

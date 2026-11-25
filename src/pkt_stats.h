@@ -12,8 +12,8 @@
 
 extern WebServer server;
 
-#define PKTS_HISTORY_S  60   // 60 seconds of per-second rate history
-#define PKTS_HISTORY_M  60   // 60 minutes of per-minute rate history
+#define PKTS_HISTORY_S 60  // 60 seconds of per-second rate history
+#define PKTS_HISTORY_M 60  // 60 minutes of per-minute rate history
 
 struct PktsSecBucket {
   uint32_t total;
@@ -23,23 +23,23 @@ struct PktsSecBucket {
 };
 
 static struct {
-  PktsSecBucket  sec_hist[PKTS_HISTORY_S];  // ring of 1s buckets
-  uint32_t       min_hist[PKTS_HISTORY_M];  // ring of 1m totals
-  uint8_t        sec_head;
-  uint8_t        min_head;
-  uint32_t       sec_start_ms;
-  uint32_t       min_start_ms;
-  uint64_t       grand_total;
-  uint32_t       grand_mgmt;
-  uint32_t       grand_data;
-  uint32_t       grand_ctrl;
-  uint32_t       cur_sec_total;
-  uint32_t       cur_sec_mgmt;
-  uint32_t       cur_sec_data;
-  uint32_t       cur_sec_ctrl;
-  uint32_t       cur_min_total;
-  uint32_t       peak_pps;
-  uint32_t       avg_pps_x100;    // * 100 for fixed-point
+  PktsSecBucket sec_hist[PKTS_HISTORY_S];  // ring of 1s buckets
+  uint32_t min_hist[PKTS_HISTORY_M];       // ring of 1m totals
+  uint8_t sec_head;
+  uint8_t min_head;
+  uint32_t sec_start_ms;
+  uint32_t min_start_ms;
+  uint64_t grand_total;
+  uint32_t grand_mgmt;
+  uint32_t grand_data;
+  uint32_t grand_ctrl;
+  uint32_t cur_sec_total;
+  uint32_t cur_sec_mgmt;
+  uint32_t cur_sec_data;
+  uint32_t cur_sec_ctrl;
+  uint32_t cur_min_total;
+  uint32_t peak_pps;
+  uint32_t avg_pps_x100;  // * 100 for fixed-point
 } g_pkts = {};
 
 static inline void pkts_init() {
@@ -52,9 +52,16 @@ static inline void pkts_ingest(uint8_t type_group) {
   g_pkts.grand_total++;
   g_pkts.cur_sec_total++;
   g_pkts.cur_min_total++;
-  if      (type_group == 0) { g_pkts.grand_mgmt++; g_pkts.cur_sec_mgmt++; }
-  else if (type_group == 1) { g_pkts.grand_data++; g_pkts.cur_sec_data++; }
-  else                      { g_pkts.grand_ctrl++; g_pkts.cur_sec_ctrl++; }
+  if (type_group == 0) {
+    g_pkts.grand_mgmt++;
+    g_pkts.cur_sec_mgmt++;
+  } else if (type_group == 1) {
+    g_pkts.grand_data++;
+    g_pkts.cur_sec_data++;
+  } else {
+    g_pkts.grand_ctrl++;
+    g_pkts.cur_sec_ctrl++;
+  }
 }
 
 static inline void pkts_tick() {
@@ -63,23 +70,24 @@ static inline void pkts_tick() {
   if (now - g_pkts.sec_start_ms >= 1000) {
     PktsSecBucket &b = g_pkts.sec_hist[g_pkts.sec_head % PKTS_HISTORY_S];
     b.total = g_pkts.cur_sec_total;
-    b.mgmt  = g_pkts.cur_sec_mgmt;
-    b.data  = g_pkts.cur_sec_data;
-    b.ctrl  = g_pkts.cur_sec_ctrl;
-    if (b.total > g_pkts.peak_pps) g_pkts.peak_pps = b.total;
+    b.mgmt = g_pkts.cur_sec_mgmt;
+    b.data = g_pkts.cur_sec_data;
+    b.ctrl = g_pkts.cur_sec_ctrl;
+    if (b.total > g_pkts.peak_pps)
+      g_pkts.peak_pps = b.total;
     // Exponential moving average (alpha ≈ 0.1)
     g_pkts.avg_pps_x100 = (g_pkts.avg_pps_x100 * 9 + b.total * 100) / 10;
     g_pkts.sec_head = (g_pkts.sec_head + 1) % PKTS_HISTORY_S;
     g_pkts.cur_sec_total = g_pkts.cur_sec_mgmt = 0;
-    g_pkts.cur_sec_data  = g_pkts.cur_sec_ctrl = 0;
-    g_pkts.sec_start_ms  = now;
+    g_pkts.cur_sec_data = g_pkts.cur_sec_ctrl = 0;
+    g_pkts.sec_start_ms = now;
   }
 
   if (now - g_pkts.min_start_ms >= 60000) {
     g_pkts.min_hist[g_pkts.min_head % PKTS_HISTORY_M] = g_pkts.cur_min_total;
-    g_pkts.min_head      = (g_pkts.min_head + 1) % PKTS_HISTORY_M;
+    g_pkts.min_head = (g_pkts.min_head + 1) % PKTS_HISTORY_M;
     g_pkts.cur_min_total = 0;
-    g_pkts.min_start_ms  = now;
+    g_pkts.min_start_ms = now;
   }
 }
 
@@ -213,39 +221,48 @@ setInterval(refresh, 1000);
 )rawhtml";
 
 static inline void pkts_routes() {
-  server.on("/pkt-stats", HTTP_GET, []() {
-    server.send_P(200, "text/html", PKTS_PAGE);
-  });
+  server.on("/pkt-stats", HTTP_GET, []() { server.send_P(200, "text/html", PKTS_PAGE); });
 
   server.on("/api/pktstats", HTTP_GET, []() {
     String out;
     out.reserve(2048);
-    out += "{\"grand_total\":";   out += (uint32_t)g_pkts.grand_total;
-    out += ",\"grand_mgmt\":";    out += g_pkts.grand_mgmt;
-    out += ",\"grand_data\":";    out += g_pkts.grand_data;
-    out += ",\"grand_ctrl\":";    out += g_pkts.grand_ctrl;
-    out += ",\"peak_pps\":";      out += g_pkts.peak_pps;
-    out += ",\"cur_pps\":";       out += g_pkts.cur_sec_total;
-    out += ",\"avg_pps_x100\":";  out += g_pkts.avg_pps_x100;
-    out += ",\"boot_ms\":0";      // placeholder; real boot_ms comes from main
+    out += "{\"grand_total\":";
+    out += (uint32_t)g_pkts.grand_total;
+    out += ",\"grand_mgmt\":";
+    out += g_pkts.grand_mgmt;
+    out += ",\"grand_data\":";
+    out += g_pkts.grand_data;
+    out += ",\"grand_ctrl\":";
+    out += g_pkts.grand_ctrl;
+    out += ",\"peak_pps\":";
+    out += g_pkts.peak_pps;
+    out += ",\"cur_pps\":";
+    out += g_pkts.cur_sec_total;
+    out += ",\"avg_pps_x100\":";
+    out += g_pkts.avg_pps_x100;
+    out += ",\"boot_ms\":0";  // placeholder; real boot_ms comes from main
     out += ",\"sec_hist\":[";
     for (uint8_t i = 0; i < PKTS_HISTORY_S; i++) {
-      if (i>0) out += ',';
+      if (i > 0)
+        out += ',';
       out += g_pkts.sec_hist[(g_pkts.sec_head + i) % PKTS_HISTORY_S].total;
     }
     out += "],\"sec_hist_mgmt\":[";
     for (uint8_t i = 0; i < PKTS_HISTORY_S; i++) {
-      if (i>0) out += ',';
+      if (i > 0)
+        out += ',';
       out += g_pkts.sec_hist[(g_pkts.sec_head + i) % PKTS_HISTORY_S].mgmt;
     }
     out += "],\"sec_hist_data\":[";
     for (uint8_t i = 0; i < PKTS_HISTORY_S; i++) {
-      if (i>0) out += ',';
+      if (i > 0)
+        out += ',';
       out += g_pkts.sec_hist[(g_pkts.sec_head + i) % PKTS_HISTORY_S].data;
     }
     out += "],\"min_hist\":[";
     for (uint8_t i = 0; i < PKTS_HISTORY_M; i++) {
-      if (i>0) out += ',';
+      if (i > 0)
+        out += ',';
       out += g_pkts.min_hist[(g_pkts.min_head + i) % PKTS_HISTORY_M];
     }
     out += "]}";

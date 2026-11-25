@@ -1182,10 +1182,6 @@ autoRefreshInterval=setInterval(refreshCurrentPage,5000);
 )rawhtml";
 
 static void wuim_routes() {
-  server.on("/", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUIM_PAGE);
-  });
-  server.on("/index.html", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUIM_PAGE);
-  });
+  server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", WUIM_PAGE); });
+  server.on("/index.html", HTTP_GET, []() { server.send_P(200, "text/html", WUIM_PAGE); });
 }

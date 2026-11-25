@@ -211,7 +211,5 @@ setInterval(refresh, 5000);
 )rawhtml";
 
 inline void wusru_routes() {
-  server.on("/spatial-reuse", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUSRU_PAGE);
-  });
+  server.on("/spatial-reuse", HTTP_GET, []() { server.send_P(200, "text/html", WUSRU_PAGE); });
 }

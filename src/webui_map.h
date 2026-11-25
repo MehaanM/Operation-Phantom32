@@ -442,7 +442,5 @@ loop();
 )rawhtml";
 
 inline void wum_routes() {
-  server.on("/map", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUM_PAGE);
-  });
+  server.on("/map", HTTP_GET, []() { server.send_P(200, "text/html", WUM_PAGE); });
 }

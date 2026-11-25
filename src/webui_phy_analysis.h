@@ -261,7 +261,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wupha_routes() {
-  server.on("/phy-analysis", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUPHA_PAGE);
-  });
+  server.on("/phy-analysis", HTTP_GET, []() { server.send_P(200, "text/html", WUPHA_PAGE); });
 }

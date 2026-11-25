@@ -248,7 +248,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuclt_routes() {
-  server.on("/clients", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCLT_PAGE);
-  });
+  server.on("/clients", HTTP_GET, []() { server.send_P(200, "text/html", WUCLT_PAGE); });
 }

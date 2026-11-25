@@ -207,7 +207,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuban_routes() {
-  server.on("/beacon-anomaly", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBAN_PAGE);
-  });
+  server.on("/beacon-anomaly", HTTP_GET, []() { server.send_P(200, "text/html", WUBAN_PAGE); });
 }

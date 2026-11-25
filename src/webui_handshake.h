@@ -186,7 +186,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wuwht_routes() {
-  server.on("/handshakes", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUWHT_PAGE);
-  });
+  server.on("/handshakes", HTTP_GET, []() { server.send_P(200, "text/html", WUWHT_PAGE); });
 }

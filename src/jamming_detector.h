@@ -30,22 +30,22 @@ enum JdJamType {
 enum JdSeverity { JD_SEV_INFO, JD_SEV_LOW, JD_SEV_MEDIUM, JD_SEV_HIGH, JD_SEV_CRITICAL };
 
 // ─── Structs ──────────────────────────────────────────────────────────────────
-#define JD_ALERT_MAX       32
-#define JD_BSSID_WINDOW    64
-#define JD_SSID_WINDOW     64
-#define JD_HISTORY_SIZE    120  // 2 minutes at 1s intervals
-#define JD_FRAME_WINDOW    5    // seconds for rate calc
+#define JD_ALERT_MAX 32
+#define JD_BSSID_WINDOW 64
+#define JD_SSID_WINDOW 64
+#define JD_HISTORY_SIZE 120  // 2 minutes at 1s intervals
+#define JD_FRAME_WINDOW 5    // seconds for rate calc
 
 struct JdAlert {
-  bool       active;
-  JdJamType  type;
+  bool active;
+  JdJamType type;
   JdSeverity severity;
-  uint32_t   ts;
-  uint32_t   end_ts;      // 0 = still active
-  uint8_t    channel;
-  int8_t     rssi;
-  char       detail[80];
-  uint32_t   frame_count;
+  uint32_t ts;
+  uint32_t end_ts;  // 0 = still active
+  uint8_t channel;
+  int8_t rssi;
+  char detail[80];
+  uint32_t frame_count;
 };
 
 struct JdChannelState {
@@ -58,44 +58,44 @@ struct JdChannelState {
   uint32_t cts_frames;
   uint32_t fcs_errors;
   uint32_t window_start;  // millis
-  int8_t   rssi_last;
-  int8_t   rssi_min;
-  int8_t   rssi_max;
-  uint32_t unique_bssids; // in current window
-  uint32_t unique_ssids;  // in current window
+  int8_t rssi_last;
+  int8_t rssi_min;
+  int8_t rssi_max;
+  uint32_t unique_bssids;  // in current window
+  uint32_t unique_ssids;   // in current window
   // Circular history
   uint16_t frame_rate_hist[JD_HISTORY_SIZE];
   uint16_t deauth_rate_hist[JD_HISTORY_SIZE];
-  uint8_t  hist_idx;
+  uint8_t hist_idx;
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
 static struct {
-  JdAlert       alerts[JD_ALERT_MAX];
-  uint8_t       alert_head;
-  uint32_t      total_alerts;
+  JdAlert alerts[JD_ALERT_MAX];
+  uint8_t alert_head;
+  uint32_t total_alerts;
   JdChannelState channels[14];  // 2.4 GHz channels 1-14
-  bool          monitoring;
-  uint32_t      last_tick;
+  bool monitoring;
+  uint32_t last_tick;
 
   // Per-window tracking
-  uint8_t  window_bssids[JD_BSSID_WINDOW][6];
-  uint8_t  window_bssid_count;
-  char     window_ssids[JD_SSID_WINDOW][33];
-  uint8_t  window_ssid_count;
+  uint8_t window_bssids[JD_BSSID_WINDOW][6];
+  uint8_t window_bssid_count;
+  char window_ssids[JD_SSID_WINDOW][33];
+  uint8_t window_ssid_count;
   uint32_t window_start;
 
   // Baseline for signal-drop detection
-  int8_t   signal_baseline[14];
-  bool     baseline_set[14];
+  int8_t signal_baseline[14];
+  bool baseline_set[14];
 
   // Thresholds
-  uint16_t thr_deauth_flood;    // deauths/5s
-  uint16_t thr_beacon_flood;    // unique BSSIDs/5s
-  uint16_t thr_probe_flood;     // probes/5s
-  uint16_t thr_ssid_chaos;      // unique SSIDs/5s
-  uint16_t thr_nav_poison;      // CTS duration µs
-  int8_t   thr_signal_drop_db;  // dB drop to trigger
+  uint16_t thr_deauth_flood;  // deauths/5s
+  uint16_t thr_beacon_flood;  // unique BSSIDs/5s
+  uint16_t thr_probe_flood;   // probes/5s
+  uint16_t thr_ssid_chaos;    // unique SSIDs/5s
+  uint16_t thr_nav_poison;    // CTS duration µs
+  int8_t thr_signal_drop_db;  // dB drop to trigger
 } g_jd = {};
 
 // ─── Add alert ────────────────────────────────────────────────────────────────
@@ -135,32 +135,40 @@ static void jd_resolve_alert(JdJamType type, uint8_t ch) {
 }
 
 // ─── Ingest frame ─────────────────────────────────────────────────────────────
-void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub,
-               const uint8_t *bssid, const char *ssid,
-               int8_t rssi, uint16_t nav_duration) {
-  if (!g_jd.monitoring || ch < 1 || ch > 14) return;
+void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub, const uint8_t *bssid,
+               const char *ssid, int8_t rssi, uint16_t nav_duration) {
+  if (!g_jd.monitoring || ch < 1 || ch > 14)
+    return;
 
   JdChannelState &cs = g_jd.channels[ch - 1];
   uint32_t now = millis();
 
   cs.total_frames++;
   cs.rssi_last = rssi;
-  if (rssi < cs.rssi_min) cs.rssi_min = rssi;
-  if (rssi > cs.rssi_max) cs.rssi_max = rssi;
+  if (rssi < cs.rssi_min)
+    cs.rssi_min = rssi;
+  if (rssi > cs.rssi_max)
+    cs.rssi_max = rssi;
 
   // Frame type classification
   if (frame_type == 0) {  // Management
-    if (frame_sub == 8) cs.beacon_frames++;
-    else if (frame_sub == 4 || frame_sub == 5) cs.probe_frames++;
-    else if (frame_sub == 10) cs.disassoc_frames++;
-    else if (frame_sub == 11 || frame_sub == 12) cs.deauth_frames++;
-    else if (frame_sub == 0 || frame_sub == 1) cs.auth_frames++;
+    if (frame_sub == 8)
+      cs.beacon_frames++;
+    else if (frame_sub == 4 || frame_sub == 5)
+      cs.probe_frames++;
+    else if (frame_sub == 10)
+      cs.disassoc_frames++;
+    else if (frame_sub == 11 || frame_sub == 12)
+      cs.deauth_frames++;
+    else if (frame_sub == 0 || frame_sub == 1)
+      cs.auth_frames++;
   } else if (frame_type == 1) {  // Control
-    if (frame_sub == 12) {  // CTS
+    if (frame_sub == 12) {       // CTS
       cs.cts_frames++;
       if (nav_duration > g_jd.thr_nav_poison) {
         char detail[80];
-        snprintf(detail, sizeof(detail), "CTS NAV=%uµs on CH%d (threshold %uµs)", nav_duration, ch, g_jd.thr_nav_poison);
+        snprintf(detail, sizeof(detail), "CTS NAV=%uµs on CH%d (threshold %uµs)", nav_duration, ch,
+                 g_jd.thr_nav_poison);
         jd_alert(JD_JAM_CTS_NAV_POISON, JD_SEV_HIGH, ch, rssi, detail);
       }
     }
@@ -170,7 +178,10 @@ void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub,
   if (bssid) {
     bool found = false;
     for (int i = 0; i < g_jd.window_bssid_count; i++) {
-      if (memcmp(g_jd.window_bssids[i], bssid, 6) == 0) { found = true; break; }
+      if (memcmp(g_jd.window_bssids[i], bssid, 6) == 0) {
+        found = true;
+        break;
+      }
     }
     if (!found && g_jd.window_bssid_count < JD_BSSID_WINDOW) {
       memcpy(g_jd.window_bssids[g_jd.window_bssid_count++], bssid, 6);
@@ -181,7 +192,10 @@ void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub,
   if (ssid && ssid[0]) {
     bool found = false;
     for (int i = 0; i < g_jd.window_ssid_count; i++) {
-      if (strcmp(g_jd.window_ssids[i], ssid) == 0) { found = true; break; }
+      if (strcmp(g_jd.window_ssids[i], ssid) == 0) {
+        found = true;
+        break;
+      }
     }
     if (!found && g_jd.window_ssid_count < JD_SSID_WINDOW) {
       strncpy(g_jd.window_ssids[g_jd.window_ssid_count++], ssid, 32);
@@ -208,11 +222,13 @@ void jd_ingest(uint8_t ch, uint8_t frame_type, uint8_t frame_sub,
 
 // ─── Periodic tick (call every 1s) ────────────────────────────────────────────
 inline void jd_tick(uint8_t current_ch) {
-  if (!g_jd.monitoring) return;
+  if (!g_jd.monitoring)
+    return;
   uint32_t now = millis();
   uint32_t elapsed = now - g_jd.window_start;
 
-  if (elapsed < 5000) return; // 5-second evaluation window
+  if (elapsed < 5000)
+    return;  // 5-second evaluation window
 
   JdChannelState &cs = g_jd.channels[current_ch < 1 || current_ch > 14 ? 0 : current_ch - 1];
   char detail[80];
@@ -244,7 +260,8 @@ inline void jd_tick(uint8_t current_ch) {
 
   // Check SSID chaos
   if (g_jd.window_ssid_count >= g_jd.thr_ssid_chaos) {
-    snprintf(detail, sizeof(detail), "CH%d: %u unique SSIDs in 5s (possible SSID flood)", current_ch, g_jd.window_ssid_count);
+    snprintf(detail, sizeof(detail), "CH%d: %u unique SSIDs in 5s (possible SSID flood)",
+             current_ch, g_jd.window_ssid_count);
     jd_alert(JD_JAM_SSID_CHAOS, JD_SEV_MEDIUM, current_ch, cs.rssi_last, detail);
   }
 
@@ -257,12 +274,14 @@ inline void jd_tick(uint8_t current_ch) {
   }
 
   // Update history
-  cs.frame_rate_hist[cs.hist_idx % JD_HISTORY_SIZE] = (uint16_t)(cs.total_frames * 1000 / (elapsed ? elapsed : 1));
-  cs.deauth_rate_hist[cs.hist_idx % JD_HISTORY_SIZE] = (uint16_t)(cs.deauth_frames * 1000 / (elapsed ? elapsed : 1));
+  cs.frame_rate_hist[cs.hist_idx % JD_HISTORY_SIZE] =
+      (uint16_t)(cs.total_frames * 1000 / (elapsed ? elapsed : 1));
+  cs.deauth_rate_hist[cs.hist_idx % JD_HISTORY_SIZE] =
+      (uint16_t)(cs.deauth_frames * 1000 / (elapsed ? elapsed : 1));
   cs.hist_idx++;
 
   // Reset window
-  memset(&cs.total_frames, 0, (uint8_t*)&cs.rssi_last - (uint8_t*)&cs.total_frames);
+  memset(&cs.total_frames, 0, (uint8_t *)&cs.rssi_last - (uint8_t *)&cs.total_frames);
   g_jd.window_bssid_count = 0;
   g_jd.window_ssid_count = 0;
   g_jd.window_start = now;
@@ -272,43 +291,62 @@ inline void jd_tick(uint8_t current_ch) {
 // ─── Init ────────────────────────────────────────────────────────────────────
 inline void jd_init() {
   memset(&g_jd, 0, sizeof(g_jd));
-  g_jd.thr_deauth_flood    = 20;
-  g_jd.thr_beacon_flood    = 30;
-  g_jd.thr_probe_flood     = 50;
-  g_jd.thr_ssid_chaos      = 20;
-  g_jd.thr_nav_poison      = 30000; // 30ms
-  g_jd.thr_signal_drop_db  = 25;
-  g_jd.monitoring          = true;
-  g_jd.window_start        = millis();
-  for (int i = 0; i < 14; i++) g_jd.channels[i].rssi_min = -100;
+  g_jd.thr_deauth_flood = 20;
+  g_jd.thr_beacon_flood = 30;
+  g_jd.thr_probe_flood = 50;
+  g_jd.thr_ssid_chaos = 20;
+  g_jd.thr_nav_poison = 30000;  // 30ms
+  g_jd.thr_signal_drop_db = 25;
+  g_jd.monitoring = true;
+  g_jd.window_start = millis();
+  for (int i = 0; i < 14; i++)
+    g_jd.channels[i].rssi_min = -100;
 }
 
 // ─── JSON status ─────────────────────────────────────────────────────────────
-static const char* jd_jam_name(JdJamType t) {
+static const char *jd_jam_name(JdJamType t) {
   switch (t) {
-    case JD_JAM_DEAUTH_FLOOD: return "deauth_flood";
-    case JD_JAM_BEACON_FLOOD: return "beacon_flood";
-    case JD_JAM_CTS_NAV_POISON: return "cts_nav_poison";
-    case JD_JAM_PROBE_FLOOD: return "probe_flood";
-    case JD_JAM_DISASSOC_FLOOD: return "disassoc_flood";
-    case JD_JAM_AUTH_FLOOD: return "auth_flood";
-    case JD_JAM_CONTINUOUS_TX: return "continuous_tx";
-    case JD_JAM_CHANNEL_POLLUTION: return "channel_pollution";
-    case JD_JAM_SSID_CHAOS: return "ssid_chaos";
-    case JD_JAM_SIGNAL_DROP: return "signal_drop";
-    case JD_JAM_BLIND_CHANNEL: return "blind_channel";
-    default: return "none";
+    case JD_JAM_DEAUTH_FLOOD:
+      return "deauth_flood";
+    case JD_JAM_BEACON_FLOOD:
+      return "beacon_flood";
+    case JD_JAM_CTS_NAV_POISON:
+      return "cts_nav_poison";
+    case JD_JAM_PROBE_FLOOD:
+      return "probe_flood";
+    case JD_JAM_DISASSOC_FLOOD:
+      return "disassoc_flood";
+    case JD_JAM_AUTH_FLOOD:
+      return "auth_flood";
+    case JD_JAM_CONTINUOUS_TX:
+      return "continuous_tx";
+    case JD_JAM_CHANNEL_POLLUTION:
+      return "channel_pollution";
+    case JD_JAM_SSID_CHAOS:
+      return "ssid_chaos";
+    case JD_JAM_SIGNAL_DROP:
+      return "signal_drop";
+    case JD_JAM_BLIND_CHANNEL:
+      return "blind_channel";
+    default:
+      return "none";
   }
 }
 
-static const char* jd_sev_name(JdSeverity s) {
+static const char *jd_sev_name(JdSeverity s) {
   switch (s) {
-    case JD_SEV_INFO: return "info";
-    case JD_SEV_LOW: return "low";
-    case JD_SEV_MEDIUM: return "medium";
-    case JD_SEV_HIGH: return "high";
-    case JD_SEV_CRITICAL: return "critical";
-    default: return "none";
+    case JD_SEV_INFO:
+      return "info";
+    case JD_SEV_LOW:
+      return "low";
+    case JD_SEV_MEDIUM:
+      return "medium";
+    case JD_SEV_HIGH:
+      return "high";
+    case JD_SEV_CRITICAL:
+      return "critical";
+    default:
+      return "none";
   }
 }
 
@@ -321,8 +359,10 @@ static String jd_json_status() {
   int total = min((int)g_jd.alert_head, JD_ALERT_MAX);
   for (int i = 0; i < total; i++) {
     JdAlert &a = g_jd.alerts[i];
-    if (!a.active) continue;
-    if (!first) s += ",";
+    if (!a.active)
+      continue;
+    if (!first)
+      s += ",";
     first = false;
     s += "{\"type\":\"" + String(jd_jam_name(a.type)) + "\"";
     s += ",\"severity\":\"" + String(jd_sev_name(a.severity)) + "\"";
@@ -337,7 +377,8 @@ static String jd_json_status() {
   }
   s += "],\"channels\":[";
   for (int ch = 0; ch < 14; ch++) {
-    if (ch) s += ",";
+    if (ch)
+      s += ",";
     JdChannelState &cs = g_jd.channels[ch];
     s += "{\"ch\":" + String(ch + 1);
     s += ",\"frames\":" + String(cs.total_frames);
@@ -354,9 +395,8 @@ static String jd_json_status() {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 inline void jd_routes() {
-  server.on("/api/jd/status", HTTP_GET, []() {
-    server.send(200, "application/json", jd_json_status());
-  });
+  server.on("/api/jd/status", HTTP_GET,
+            []() { server.send(200, "application/json", jd_json_status()); });
 
   server.on("/api/jd/start", HTTP_POST, []() {
     g_jd.monitoring = true;
@@ -376,12 +416,18 @@ inline void jd_routes() {
   });
 
   server.on("/api/jd/thresholds", HTTP_POST, []() {
-    if (server.hasArg("deauth"))   g_jd.thr_deauth_flood   = server.arg("deauth").toInt();
-    if (server.hasArg("beacon"))   g_jd.thr_beacon_flood   = server.arg("beacon").toInt();
-    if (server.hasArg("probe"))    g_jd.thr_probe_flood    = server.arg("probe").toInt();
-    if (server.hasArg("ssid"))     g_jd.thr_ssid_chaos     = server.arg("ssid").toInt();
-    if (server.hasArg("nav"))      g_jd.thr_nav_poison     = server.arg("nav").toInt();
-    if (server.hasArg("sig_drop")) g_jd.thr_signal_drop_db = server.arg("sig_drop").toInt();
+    if (server.hasArg("deauth"))
+      g_jd.thr_deauth_flood = server.arg("deauth").toInt();
+    if (server.hasArg("beacon"))
+      g_jd.thr_beacon_flood = server.arg("beacon").toInt();
+    if (server.hasArg("probe"))
+      g_jd.thr_probe_flood = server.arg("probe").toInt();
+    if (server.hasArg("ssid"))
+      g_jd.thr_ssid_chaos = server.arg("ssid").toInt();
+    if (server.hasArg("nav"))
+      g_jd.thr_nav_poison = server.arg("nav").toInt();
+    if (server.hasArg("sig_drop"))
+      g_jd.thr_signal_drop_db = server.arg("sig_drop").toInt();
     server.send(200, "application/json", "{\"ok\":true}");
   });
 }

@@ -212,7 +212,5 @@ setInterval(refresh, 2000);
 )rawhtml";
 
 inline void wudst_routes() {
-  server.on("/ds-state", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUDST_PAGE);
-  });
+  server.on("/ds-state", HTTP_GET, []() { server.send_P(200, "text/html", WUDST_PAGE); });
 }

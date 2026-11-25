@@ -227,7 +227,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wurrm_routes() {
-  server.on("/rrm", HTTP_GET, []() {
-    server.send_P(200, "text/html", WURRM_PAGE);
-  });
+  server.on("/rrm", HTTP_GET, []() { server.send_P(200, "text/html", WURRM_PAGE); });
 }

@@ -191,7 +191,5 @@ setInterval(refresh, 3000);
 )rawhtml";
 
 inline void wucat_routes() {
-  server.on("/client-assoc", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUCAT_PAGE);
-  });
+  server.on("/client-assoc", HTTP_GET, []() { server.send_P(200, "text/html", WUCAT_PAGE); });
 }

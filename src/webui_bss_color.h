@@ -189,7 +189,5 @@ setInterval(refresh, 4000);
 )rawhtml";
 
 inline void wubsc_routes() {
-  server.on("/bss-color", HTTP_GET, []() {
-    server.send_P(200, "text/html", WUBSC_PAGE);
-  });
+  server.on("/bss-color", HTTP_GET, []() { server.send_P(200, "text/html", WUBSC_PAGE); });
 }

@@ -121,6 +121,14 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
+      - name: Collect build environment metadata
+        id: meta
+        run: |
+          echo "gcc_version=$(gcc --version | head -1)" >> "$GITHUB_OUTPUT"
+          echo "python_version=$(python3 --version)" >> "$GITHUB_OUTPUT"
+          echo "runner_os=$(uname -srm)" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+
       - name: Build release notes
         id: notes
         run: |
@@ -163,6 +171,23 @@ jobs:
 
           ### SHA-256 checksums
           Per-environment \`SHA256SUMS.txt\` files are included in this release.
+
+          ### Reproducibility
+          | Field | Value |
+          |---|---|
+          | Source commit | \`${{ github.sha }}\` |
+          | Git ref | \`${{ github.ref }}\` |
+          | PlatformIO | ${{ env.PIO_VERSION }} |
+          | GCC | ${{ steps.meta.outputs.gcc_version }} |
+          | Python | ${{ steps.meta.outputs.python_version }} |
+          | Runner OS | ${{ steps.meta.outputs.runner_os }} |
+          | Built at | ${{ steps.meta.outputs.built_at }} |
+          | Workflow run | [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+          To verify a binary, download the matching \`SHA256SUMS.txt\` and run:
+          \`\`\`bash
+          sha256sum --check firmware_<env>_SHA256SUMS.txt
+          \`\`\`
           EOF
 
       - name: Create GitHub Release and upload assets

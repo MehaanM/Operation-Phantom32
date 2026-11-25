@@ -1,11 +1,17 @@
 # Phantom32
 
-A Wi-Fi and Bluetooth security research toolkit for ESP32 microcontrollers.
-Phantom32 runs entirely on the device and exposes a local HTTP web UI at
-`192.168.4.1` for configuring and operating 802.11 research tools.
+An embedded systems project demonstrating ESP32 architecture, wireless
+protocol implementation, and security engineering on constrained hardware.
+Phantom32 is a Wi-Fi and Bluetooth diagnostic toolkit that runs fully
+on-device and exposes a local HTTP web UI at `192.168.4.1`.
 
-**FOR AUTHORIZED SECURITY RESEARCH AND EDUCATIONAL USE ONLY.**
+Built to professional engineering standards: 13-board CI matrix, 85% line
+coverage enforced, ASan/UBSan sanitizers, SBOM generation, flash-budget
+enforcement, and a full web flasher — no IDE required.
+
+**FOR AUTHORIZED USE IN ENVIRONMENTS YOU OWN OR HAVE WRITTEN PERMISSION TO TEST.**
 Read [LEGAL.md](./LEGAL.md) before using this software.
+Licensed under the [MIT License](./LICENSE).
 
 ---
 

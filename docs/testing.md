@@ -99,13 +99,23 @@ pio run -e doom_s3         # ESP32-S3 (primary dev board)
 
 ## Coverage Targets
 
-| Metric | Minimum | Target |
+| Metric | CI minimum | Project target |
 |---|---|---|
-| Line coverage | 80% | ≥ 90% |
-| Branch coverage | 50% | ≥ 80% |
+| Line coverage | 85% | ≥ 95% |
+| Branch coverage | 65% | ≥ 80% |
+| Function coverage | Reported | ≥ 98% |
 
 These minimums are enforced by the `native-coverage` CI job. Pushes that
-drop below 80% line or 50% branch coverage cause the CI build to fail.
+drop below 85% line or 65% branch coverage cause the CI build to fail.
+
+### Compiler-dependent branch measurement
+
+Branch coverage numbers are **not portable across compiler versions**.
+GCC 15 (used on Ubuntu 26.04 runners) instruments approximately 16% more
+branches than GCC 11/12 — it adds MCDC/decision-level branches that earlier
+compilers did not emit. The 65% branch threshold is calibrated for the GCC 15
+environment and corresponds to ≥ 70% coverage when measured with GCC 11/12.
+Line coverage is unaffected and remains stable across compiler versions.
 
 ---
 
@@ -146,8 +156,9 @@ For NVS-dependent logic, use in-memory stubs as shown in `test_auth_manager.cpp`
 |---|---|---|
 | `native-tests` | All pushes/PRs | Any test failure, zero tests executed |
 | `native-sanitizers` | All pushes/PRs | ASan/UBSan error |
-| `native-coverage` | All pushes/PRs | Line < 80% or branch < 50% |
+| `native-coverage` | All pushes/PRs | Line < 85% or branch < 65% (GCC-15-calibrated) |
 | `lint` | All pushes/PRs | Format violation, hardcoded credential, unguarded route |
 | `secret-scan` | All pushes/PRs | Secret detected in git history |
 | `dep-scan` | All pushes/PRs | Known CVE in CI Python dependencies |
 | `build` (matrix) | All pushes/PRs | Compile error on any of 13 boards |
+| `build` memory check | All pushes/PRs | Flash > 90% (LITE) / 96% (PSRAM), RAM > 85% |

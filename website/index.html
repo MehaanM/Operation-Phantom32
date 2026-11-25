@@ -1,5 +1,6 @@
 <title>Operation Phantom32</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Flash Phantom32 firmware to any supported ESP32 board directly from your browser. No drivers, no IDE required.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 
@@ -684,6 +685,61 @@ esp-web-install-button [slot="activate"] {
 .footer-link { color: var(--cyan-dim); text-decoration: none; font-size: 10px; font-family: 'Share Tech Mono', monospace; letter-spacing: .1em; }
 .footer-link:hover { color: var(--cyan); }
 
+/* ── Release link ──────────────────────────────── */
+.hero-release { margin-top: 20px; }
+.release-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-dim);
+  text-decoration: none;
+  letter-spacing: .08em;
+  transition: color .15s;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.release-link:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+.release-tag {
+  background: rgba(0,240,255,.08);
+  color: var(--cyan);
+  border: 1px solid var(--cyan-dim);
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+
+/* ── Skip nav ───────────────────────────────────── */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  background: var(--cyan);
+  color: #000;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 8px 14px;
+  z-index: 100;
+  border-radius: 2px;
+  transition: top .15s;
+}
+.skip-nav:focus { top: 8px; }
+
+/* ── Focus styles ───────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+button:focus-visible, a:focus-visible { outline: 2px solid var(--cyan); }
+
 /* ── Responsive ─────────────────────────────────── */
 @media (max-width: 600px) {
   .nav-tab { padding: 15px 10px; font-size: 10px; letter-spacing: .1em; }
@@ -703,7 +759,9 @@ esp-web-install-button [slot="activate"] {
 </style>
 
 <!-- canvas -->
-<canvas id="bg-canvas"></canvas>
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<a class="skip-nav" href="#main-content">Skip to content</a>
 
 <div class="site-wrap">
 
@@ -722,10 +780,10 @@ esp-web-install-button [slot="activate"] {
       </span>
     </a>
 
-    <nav class="nav-tabs" role="tablist">
-      <button class="nav-tab active" role="tab" onclick="switchTab('flash')">Flash</button>
-      <button class="nav-tab" role="tab" onclick="switchTab('instructions')">Instructions</button>
-      <button class="nav-tab" role="tab" onclick="switchTab('about')">About</button>
+    <nav class="nav-tabs" role="tablist" aria-label="Site navigation">
+      <button id="tab-btn-flash" class="nav-tab active" role="tab" aria-selected="true" aria-controls="tab-flash" onclick="switchTab('flash')">Flash</button>
+      <button id="tab-btn-instructions" class="nav-tab" role="tab" aria-selected="false" aria-controls="tab-instructions" onclick="switchTab('instructions')">Instructions</button>
+      <button id="tab-btn-about" class="nav-tab" role="tab" aria-selected="false" aria-controls="tab-about" onclick="switchTab('about')">About</button>
     </nav>
 
     <div class="status-pill"><div class="status-dot"></div>ONLINE</div>
@@ -733,9 +791,9 @@ esp-web-install-button [slot="activate"] {
 </header>
 
 <!-- ══ TAB: FLASH ══════════════════════════════════ -->
-<div id="tab-flash" class="tab-panel active">
+<div id="tab-flash" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-flash">
 
-  <section class="hero">
+  <section class="hero" id="main-content">
     <div class="hero-tag">Web Firmware Installer</div>
     <h1>Flash <span class="word-phantom">Phantom</span><span class="word-32">32</span><br>from your browser</h1>
     <p class="hero-desc">One click. No drivers. No IDE. Connect your ESP32 over USB and install
@@ -753,6 +811,12 @@ esp-web-install-button [slot="activate"] {
         <span class="hero-stat-num">0</span>
         <span class="hero-stat-label">Drivers</span>
       </div>
+    </div>
+    <div class="hero-release">
+      <a class="release-link" href="https://github.com/MehaanM/Operation-Phantom32/releases/latest" target="_blank" rel="noopener">
+        <span class="release-tag">v3.2.1</span>
+        <span>Latest release &amp; checksums ↗</span>
+      </a>
     </div>
   </section>
 
@@ -1041,11 +1105,13 @@ esp-web-install-button [slot="activate"] {
 /* ── Tabs ──────────────────────────────────────────────────────────────── */
 function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-  ['flash','instructions','about'].forEach((t,i)=>{
-    if(t===name) document.querySelectorAll('.nav-tab')[i].classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>{
+    t.classList.remove('active');
+    t.setAttribute('aria-selected','false');
   });
+  document.getElementById('tab-'+name).classList.add('active');
+  const btn = document.getElementById('tab-btn-'+name);
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
   window.scrollTo(0,0);
 }
 

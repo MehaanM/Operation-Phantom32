@@ -121,39 +121,6 @@ static void et_html_escape(const char *in, char *out, size_t out_sz) {
   out[j] = '\0';
 }
 
-// ============================================================
-// TESTS: Uncovered branches
-// ============================================================
-
-void test_html_escape_buffer_too_small() {
-  // Buffer of exactly 5 bytes can hold 4 chars + null, but "&amp;" needs 5+null=6
-  // so the escape should truncate rather than overflow.
-  char out[6];
-  et_html_escape("A&B", out, 6); // A=1, &amp;=5+null => &amp; won't fit → break
-  out[5] = '\0';
-  // Result should not contain unescaped & or crash
-  TEST_ASSERT_TRUE(out[0] == 'A');
-}
-
-void test_state_stop_from_stopping_fails() {
-  et_reset();
-  et_start();
-  et_stop(); // now ET_STOPPING
-  TEST_ASSERT_FALSE(et_stop()); // can't stop again from STOPPING
-}
-
-void test_state_start_from_stopping_fails() {
-  et_reset();
-  et_start();
-  et_stop(); // now ET_STOPPING
-  TEST_ASSERT_FALSE(et_start()); // != ET_IDLE, so returns false
-}
-
-void test_cred_add_all_null() {
-  et_reset();
-  TEST_ASSERT_FALSE(et_add_cred(nullptr, nullptr, nullptr));
-}
-
 // State machine transitions.
 static bool et_start() {
   if (g_et_state != ET_IDLE) return false;
@@ -375,6 +342,36 @@ void test_state_restart_after_stop() {
   et_start(); et_stop(); et_finish_stop();
   TEST_ASSERT_TRUE(et_start());
   TEST_ASSERT_EQUAL(ET_RUNNING, g_et_state);
+}
+
+// ============================================================
+// TESTS: Uncovered branches (placed after stub definitions)
+// ============================================================
+
+void test_html_escape_buffer_too_small() {
+  char out[6];
+  et_html_escape("A&B", out, 6); // &amp; = 5 chars, won't fit in remaining 5 → break
+  out[5] = '\0';
+  TEST_ASSERT_TRUE(out[0] == 'A');
+}
+
+void test_state_stop_from_stopping_fails() {
+  et_reset();
+  et_start();
+  et_stop(); // now ET_STOPPING
+  TEST_ASSERT_FALSE(et_stop()); // != ET_RUNNING
+}
+
+void test_state_start_from_stopping_fails() {
+  et_reset();
+  et_start();
+  et_stop(); // now ET_STOPPING
+  TEST_ASSERT_FALSE(et_start()); // != ET_IDLE
+}
+
+void test_cred_add_all_null() {
+  et_reset();
+  TEST_ASSERT_FALSE(et_add_cred(nullptr, nullptr, nullptr));
 }
 
 // ============================================================

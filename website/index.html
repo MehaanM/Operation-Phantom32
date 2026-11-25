@@ -1,30 +1,31 @@
 <title>Operation Phantom32</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 
 <style>
-/* ── Tokens ──────────────────────────────────────────────── */
 :root {
-  --bg:         #03060f;
-  --surface:    #080e1c;
-  --surface2:   #0c1526;
-  --border:     #172035;
-  --border-hi:  #223050;
-  --accent:     #00d4ff;
-  --accent-dim: #005f72;
-  --accent2:    #7b2fff;
-  --fg:         #c0d8f0;
-  --fg-muted:   #3d5570;
-  --fg-dim:     #1e3048;
-  --green:      #00ff9f;
-  --green-dim:  #005e3a;
-  --chip-lite:  #071d2e;
-  --chip-psram: #07201a;
+  --bg:       #000308;
+  --bg2:      #010610;
+  --surface:  #030d1a;
+  --surface2: #061222;
+  --border:   #0a2040;
+  --border-hi:#0f3060;
+  --cyan:     #00f0ff;
+  --cyan-dim: #004858;
+  --cyan-glow:rgba(0,240,255,.18);
+  --purple:   #8b00ff;
+  --purple-lo:rgba(139,0,255,.12);
+  --green:    #00ff88;
+  --green-dim:#004d2a;
+  --red:      #ff2244;
+  --fg:       #8ab8d0;
+  --fg-hi:    #c8e8f8;
+  --fg-dim:   #1a3a52;
   color-scheme: dark;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 body {
   background: var(--bg);
@@ -34,38 +35,48 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: max(16px, env(safe-area-inset-left,0px));
+  padding-right: max(16px, env(safe-area-inset-right,0px));
   padding-block: 0;
 }
 
-/* ── Animated canvas background ─────────────────────────── */
+/* ── Layered animated background ──────────────── */
 #bg-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: .55;
 }
 
-/* ── All content above canvas ────────────────────────────── */
-.site-wrap { position: relative; z-index: 1; }
+/* Vignette overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,240,255,.04) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(139,0,255,.05) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, transparent 55%, rgba(0,3,8,.7) 100%);
+  pointer-events: none;
+}
 
-/* ── Header ──────────────────────────────────────────────── */
+.site-wrap { position: relative; z-index: 2; }
+
+/* ── Header ────────────────────────────────────── */
 .site-header {
   position: sticky;
-  top: env(safe-area-inset-top, 0px);
-  z-index: 10;
-  background: rgba(3,6,15,.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  top: env(safe-area-inset-top,0px);
+  z-index: 20;
+  background: rgba(0,3,8,.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
 }
-
 .header-inner {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 0 max(16px, env(safe-area-inset-left, 0px));
+  padding: 0 max(16px, env(safe-area-inset-left,0px));
   display: flex;
   align-items: center;
   gap: 0;
@@ -75,42 +86,83 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
-  padding: 14px 0;
-  margin-right: 32px;
+  padding: 13px 0;
+  margin-right: 36px;
+  flex-shrink: 0;
 }
-.logo-mark { width: 30px; height: 30px; flex-shrink: 0; }
+.logo-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.logo-ring {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--cyan-dim);
+  border-radius: 50%;
+  animation: spin 8s linear infinite;
+}
+.logo-ring::before {
+  content: "";
+  position: absolute;
+  top: -2px; left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--cyan);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.logo-diamond {
+  position: absolute;
+  inset: 7px;
+  border: 1.5px solid var(--cyan);
+  transform: rotate(45deg);
+  opacity: .7;
+}
+.logo-dot {
+  position: absolute;
+  inset: 14px;
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--cyan), 0 0 20px rgba(0,240,255,.4);
+}
+
 .logo-text {
-  font-family: 'Space Mono', monospace;
-  font-size: 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
   font-weight: 700;
-  color: var(--accent);
-  letter-spacing: .02em;
+  color: var(--fg-hi);
+  letter-spacing: .06em;
   line-height: 1.1;
+  text-transform: uppercase;
+}
+.logo-text strong {
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(0,240,255,.5);
 }
 .logo-text span {
   display: block;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 9px;
-  color: var(--fg-muted);
-  letter-spacing: .15em;
+  color: var(--fg-dim);
+  letter-spacing: .25em;
   text-transform: uppercase;
   margin-top: 1px;
 }
 
 /* tabs */
-.nav-tabs {
-  display: flex;
-  gap: 0;
-  flex: 1;
-}
+.nav-tabs { display: flex; flex: 1; }
 .nav-tab {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .12em;
+  font-weight: 400;
+  letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--fg-dim);
   border: none;
   background: none;
   cursor: pointer;
@@ -118,158 +170,215 @@ body {
   border-bottom: 2px solid transparent;
   transition: color .15s, border-color .15s;
   white-space: nowrap;
+  position: relative;
 }
 .nav-tab:hover { color: var(--fg); }
 .nav-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0,240,255,.4);
 }
 
-.header-badge {
+.status-pill {
   margin-left: auto;
-  font-family: 'Space Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 10px;
   color: var(--green);
   letter-spacing: .1em;
   border: 1px solid var(--green-dim);
-  padding: 3px 8px;
-  border-radius: 3px;
-  background: rgba(0,255,159,.05);
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: rgba(0,255,136,.05);
   white-space: nowrap;
 }
+.status-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
 
-/* ── Tab panels ──────────────────────────────────────────── */
+/* ── Panels ─────────────────────────────────────── */
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* ── Hero ────────────────────────────────────────────────── */
+/* ── Hero ───────────────────────────────────────── */
 .hero {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 72px 0 56px;
+  padding: 80px 0 60px;
   text-align: center;
+  position: relative;
 }
-.hero-eyebrow {
-  font-family: 'Space Mono', monospace;
+.hero-tag {
+  font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
-  letter-spacing: .2em;
+  letter-spacing: .3em;
   text-transform: uppercase;
-  color: var(--accent-dim);
-  margin-bottom: 20px;
+  color: var(--cyan-dim);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
+.hero-tag::before,.hero-tag::after {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan-dim));
+}
+.hero-tag::after { transform: scaleX(-1); }
+
 .hero h1 {
-  font-family: 'Space Mono', monospace;
-  font-size: clamp(26px, 5vw, 50px);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(36px, 7vw, 72px);
   font-weight: 700;
-  line-height: 1.1;
-  color: #fff;
+  line-height: 1.0;
+  color: var(--fg-hi);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 24px;
   text-wrap: balance;
-  margin-bottom: 20px;
 }
-.hero h1 em {
-  font-style: normal;
-  color: var(--accent);
-  text-shadow: 0 0 32px rgba(0,212,255,.5);
+.hero h1 .word-phantom {
+  display: inline-block;
+  color: var(--cyan);
+  text-shadow: 0 0 30px rgba(0,240,255,.5), 0 0 60px rgba(0,240,255,.2);
+  position: relative;
 }
+.hero h1 .word-32 {
+  color: var(--purple);
+  text-shadow: 0 0 24px rgba(139,0,255,.5);
+}
+
 .hero-desc {
-  font-size: 17px;
-  color: var(--fg-muted);
-  max-width: 520px;
-  margin: 0 auto 36px;
-  line-height: 1.65;
+  font-size: 16px;
+  color: var(--fg);
+  max-width: 500px;
+  margin: 0 auto 48px;
+  line-height: 1.7;
+  opacity: .8;
 }
+
 .hero-stats {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 0;
   flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
 }
+.hero-stat {
+  flex: 1;
+  padding: 20px 16px;
+  border-right: 1px solid var(--border);
+  min-width: 120px;
+}
+.hero-stat:last-child { border-right: none; }
 .hero-stat-num {
-  font-family: 'Space Mono', monospace;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--accent);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 32px;
+  color: var(--cyan);
   display: block;
+  text-shadow: 0 0 16px rgba(0,240,255,.4);
+  line-height: 1.1;
 }
 .hero-stat-label {
-  font-size: 11px;
-  color: var(--fg-muted);
-  letter-spacing: .1em;
+  font-size: 10px;
+  color: var(--fg-dim);
+  letter-spacing: .15em;
   text-transform: uppercase;
+  margin-top: 4px;
+  display: block;
 }
 
-/* ── Notice ──────────────────────────────────────────────── */
+/* ── Notice ─────────────────────────────────────── */
 .notice {
-  max-width: 1100px;
-  margin: 0 auto 32px;
-  background: rgba(0,212,255,.04);
-  border: 1px solid rgba(0,212,255,.18);
-  border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  max-width: 1140px;
+  margin: 32px auto 32px;
+  background: rgba(0,240,255,.03);
+  border: 1px solid rgba(0,240,255,.12);
+  border-left: 2px solid var(--cyan);
+  border-radius: 2px;
   padding: 12px 16px;
-  font-size: 13px;
-  color: var(--fg-muted);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--fg-dim);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
-.notice-icon { color: var(--accent); font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-.notice a { color: var(--accent); text-decoration: none; }
-.notice a:hover { text-decoration: underline; }
+.notice-ico { color: var(--cyan); flex-shrink: 0; }
+.notice a { color: var(--cyan); text-decoration: none; }
+.notice a:hover { text-shadow: 0 0 8px rgba(0,240,255,.5); }
 
-/* ── Section label ───────────────────────────────────────── */
+/* ── Section label ──────────────────────────────── */
 .section-label {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto 24px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 .section-label h2 {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: .18em;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .25em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--fg-dim);
   font-weight: 400;
   white-space: nowrap;
 }
-.section-label::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
+.section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-/* ── Board group ─────────────────────────────────────────── */
-.board-group { max-width: 1100px; margin: 0 auto 48px; }
-.board-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.board-group-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+/* ── Board group ────────────────────────────────── */
+.board-group { max-width: 1140px; margin: 0 auto 48px; }
+.board-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.board-group-title.lite  { color: var(--accent); }
+.board-group-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+.board-group-title.lite  { color: var(--cyan); }
 .board-group-title.psram { color: var(--green); }
-.board-group-count { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--fg-dim); }
+.board-group-count { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--fg-dim); }
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(258px,1fr));
+  gap: 10px;
 }
 
-/* ── Board card ──────────────────────────────────────────── */
+/* ── Board card ─────────────────────────────────── */
 .board-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 18px;
+  border-radius: 3px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  transition: border-color .15s, background .15s;
+  gap: 10px;
+  transition: border-color .2s, box-shadow .2s, background .2s;
   position: relative;
   overflow: hidden;
 }
@@ -277,33 +386,51 @@ body {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 2px;
+  height: 1px;
   opacity: 0;
   transition: opacity .2s;
 }
-.board-card.lite::before  { background: linear-gradient(90deg, var(--accent), transparent); }
-.board-card.psram::before { background: linear-gradient(90deg, var(--green), transparent); }
-.board-card:hover { border-color: var(--border-hi); background: var(--surface2); }
+.board-card.lite::before  { background: linear-gradient(90deg, var(--cyan), transparent 60%); }
+.board-card.psram::before { background: linear-gradient(90deg, var(--green), transparent 60%); }
+
+.board-card.lite:hover {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 20px rgba(0,240,255,.06), inset 0 0 20px rgba(0,240,255,.03);
+  background: var(--surface2);
+}
+.board-card.psram:hover {
+  border-color: var(--green-dim);
+  box-shadow: 0 0 20px rgba(0,255,136,.06), inset 0 0 20px rgba(0,255,136,.03);
+  background: var(--surface2);
+}
 .board-card:hover::before { opacity: 1; }
 
 .board-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.board-name { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.3; }
-.board-module { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--fg-muted); margin-top: 2px; }
-.badge-row { display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
-.badge {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  padding: 3px 6px;
-  border-radius: 3px;
+.board-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
   font-weight: 700;
+  color: var(--fg-hi);
+  line-height: 1.2;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.board-module { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--fg-dim); margin-top: 2px; letter-spacing: .1em; }
+.badge-row { display: flex; gap: 4px; flex-wrap: wrap; flex-shrink: 0; }
+.badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-weight: 400;
   white-space: nowrap;
 }
-.badge.lite  { background: var(--chip-lite);  color: var(--accent); border: 1px solid var(--accent-dim); }
-.badge.psram { background: var(--chip-psram); color: var(--green);  border: 1px solid var(--green-dim); }
-.badge.chip  { background: rgba(123,47,255,.12); color: #a07bff; border: 1px solid rgba(123,47,255,.3); }
-.board-desc { font-size: 12px; color: var(--fg-muted); line-height: 1.55; }
+.badge.lite  { background: rgba(0,240,255,.06);  color: var(--cyan);   border: 1px solid var(--cyan-dim); }
+.badge.psram { background: rgba(0,255,136,.06);  color: var(--green);  border: 1px solid var(--green-dim); }
+.badge.chip  { background: rgba(139,0,255,.08);  color: #b060ff;       border: 1px solid rgba(139,0,255,.25); }
+.board-desc { font-size: 12px; color: var(--fg-dim); line-height: 1.6; }
 .board-flash-btn { margin-top: auto; display: block; width: 100%; }
 
 esp-web-install-button { display: block; width: 100%; }
@@ -311,11 +438,10 @@ esp-web-install-button button,
 esp-web-install-button [slot="activate"] {
   width: 100%;
   padding: 9px 16px;
-  border-radius: 4px;
-  font-family: 'Space Mono', monospace;
+  border-radius: 2px;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all .15s;
@@ -324,11 +450,13 @@ esp-web-install-button [slot="activate"] {
 }
 .board-card.lite esp-web-install-button button,
 .board-card.lite esp-web-install-button [slot="activate"] {
-  color: var(--accent); border-color: var(--accent-dim);
+  color: var(--cyan); border-color: var(--cyan-dim);
 }
 .board-card.lite esp-web-install-button button:hover,
 .board-card.lite esp-web-install-button [slot="activate"]:hover {
-  background: rgba(0,212,255,.1); border-color: var(--accent);
+  background: rgba(0,240,255,.08);
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(0,240,255,.15);
 }
 .board-card.psram esp-web-install-button button,
 .board-card.psram esp-web-install-button [slot="activate"] {
@@ -336,232 +464,214 @@ esp-web-install-button [slot="activate"] {
 }
 .board-card.psram esp-web-install-button button:hover,
 .board-card.psram esp-web-install-button [slot="activate"]:hover {
-  background: rgba(0,255,159,.08); border-color: var(--green);
+  background: rgba(0,255,136,.07);
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(0,255,136,.12);
 }
 
-/* ── Instructions tab ────────────────────────────────────── */
-.instr-wrap {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 60px 0 80px;
-}
-.instr-title {
-  font-family: 'Space Mono', monospace;
-  font-size: clamp(22px, 4vw, 36px);
+/* ── Instructions tab ───────────────────────────── */
+.instr-wrap { max-width: 760px; margin: 0 auto; padding: 60px 0 80px; }
+.page-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(28px, 5vw, 44px);
   font-weight: 700;
-  color: #fff;
+  color: var(--fg-hi);
+  text-transform: uppercase;
+  letter-spacing: .05em;
   margin-bottom: 8px;
+  line-height: 1.1;
 }
-.instr-title em { font-style: normal; color: var(--accent); }
-.instr-subtitle { font-size: 15px; color: var(--fg-muted); margin-bottom: 48px; }
+.page-title em { font-style: normal; color: var(--cyan); text-shadow: 0 0 20px rgba(0,240,255,.4); }
+.page-sub { font-size: 14px; color: var(--fg-dim); margin-bottom: 48px; font-family: 'Share Tech Mono', monospace; letter-spacing: .08em; }
 
-.step-list { display: flex; flex-direction: column; gap: 0; }
-.step {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 0 20px;
-  position: relative;
-}
+.step-list { display: flex; flex-direction: column; }
+.step { display: grid; grid-template-columns: 50px 1fr; gap: 0 20px; position: relative; }
 .step:not(:last-child)::after {
   content: "";
   position: absolute;
-  left: 23px;
-  top: 48px;
-  bottom: 0;
-  width: 2px;
-  background: var(--border);
+  left: 24px; top: 50px; bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--cyan-dim), transparent);
 }
 .step-num-col { display: flex; flex-direction: column; align-items: center; }
 .step-num {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-dim);
-  background: rgba(0,212,255,.07);
+  width: 50px; height: 50px;
+  border: 1px solid var(--cyan-dim);
+  background: rgba(0,240,255,.05);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0,240,255,.4);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
 }
-.step-body { padding: 10px 0 40px; }
+.step-body { padding: 10px 0 44px; }
 .step-heading {
-  font-family: 'Space Mono', monospace;
-  font-size: 16px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
   font-weight: 700;
-  color: #fff;
-  margin-bottom: 8px;
+  color: var(--fg-hi);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 10px;
 }
-.step-text { font-size: 14px; color: var(--fg-muted); line-height: 1.7; }
+.step-text { font-size: 14px; color: var(--fg-dim); line-height: 1.75; }
 .step-text strong { color: var(--fg); }
 .step-text code {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
   background: var(--surface2);
   border: 1px solid var(--border);
   padding: 1px 6px;
-  border-radius: 3px;
-  color: var(--accent);
+  border-radius: 2px;
+  color: var(--cyan);
 }
 
 .instr-tip {
-  margin-top: 8px;
-  background: rgba(0,212,255,.04);
-  border: 1px solid rgba(0,212,255,.15);
-  border-radius: 4px;
+  margin-top: 10px;
+  background: rgba(0,240,255,.03);
+  border: 1px solid rgba(0,240,255,.1);
+  border-left: 2px solid var(--cyan-dim);
   padding: 10px 14px;
-  font-size: 13px;
-  color: var(--fg-muted);
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-family: 'Share Tech Mono', monospace;
+  letter-spacing: .04em;
+  line-height: 1.6;
 }
-.instr-tip strong { color: var(--accent); }
+.instr-tip strong { color: var(--cyan); }
 
 .compat-box {
   margin-top: 48px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
   padding: 24px;
 }
 .compat-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  letter-spacing: .15em;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .2em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--fg-dim);
   margin-bottom: 16px;
 }
-.compat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.compat-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-.compat-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.compat-dot.yes { background: var(--green); box-shadow: 0 0 6px rgba(0,255,159,.5); }
-.compat-dot.no  { background: #ff4455; box-shadow: 0 0 6px rgba(255,68,85,.4); }
+.compat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compat-item { display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: 'Share Tech Mono', monospace; color: var(--fg-dim); letter-spacing: .04em; }
+.compat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.compat-dot.yes { background: var(--green); box-shadow: 0 0 6px rgba(0,255,136,.5); }
+.compat-dot.no  { background: var(--red);   box-shadow: 0 0 6px rgba(255,34,68,.4); }
 
-/* ── About tab ───────────────────────────────────────────── */
-.about-wrap {
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 60px 0 80px;
-}
+/* ── About tab ──────────────────────────────────── */
+.about-wrap { max-width: 820px; margin: 0 auto; padding: 60px 0 80px; }
 
 .about-hero {
   display: flex;
   align-items: center;
   gap: 28px;
-  margin-bottom: 48px;
+  margin-bottom: 52px;
   flex-wrap: wrap;
 }
 .about-avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-dim);
-  background: linear-gradient(135deg, var(--accent-dim), var(--accent2));
+  width: 76px; height: 76px;
+  border: 1px solid var(--cyan-dim);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 28px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 32px;
   font-weight: 700;
-  color: #fff;
+  color: var(--cyan);
+  text-shadow: 0 0 16px rgba(0,240,255,.5);
+  background: rgba(0,240,255,.04);
   flex-shrink: 0;
+  clip-path: polygon(12px 0%, 100% 0%, calc(100% - 12px) 100%, 0% 100%);
+  position: relative;
 }
 .about-name {
-  font-family: 'Space Mono', monospace;
-  font-size: clamp(20px, 4vw, 30px);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(22px, 4vw, 34px);
   font-weight: 700;
-  color: #fff;
-  line-height: 1.2;
-}
-.about-name em { font-style: normal; color: var(--accent); }
-.about-school {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.about-school::before {
-  content: "◈";
-  color: var(--accent-dim);
-  font-size: 10px;
-}
-
-.about-section { margin-bottom: 40px; }
-.about-section-label {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  letter-spacing: .2em;
+  color: var(--fg-hi);
   text-transform: uppercase;
-  color: var(--accent-dim);
-  margin-bottom: 14px;
+  letter-spacing: .05em;
+  line-height: 1.1;
+}
+.about-name em { font-style: normal; color: var(--cyan); text-shadow: 0 0 16px rgba(0,240,255,.4); }
+.about-school {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 6px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.about-school::before { content: "▸ "; color: var(--cyan-dim); }
+
+.about-section { margin-bottom: 44px; }
+.about-section-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  color: var(--cyan-dim);
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
-.about-section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.about-section-label::before { content: "//"; color: var(--cyan-dim); }
+.about-section-label::after  { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-.about-p { font-size: 15px; color: var(--fg-muted); line-height: 1.75; margin-bottom: 14px; }
+.about-p { font-size: 14px; color: var(--fg-dim); line-height: 1.8; margin-bottom: 14px; }
 .about-p strong { color: var(--fg); }
-.about-p em { font-style: normal; color: var(--accent); }
+.about-p em { font-style: normal; color: var(--cyan); }
 
 .compare-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+  gap: 10px;
   margin-top: 16px;
 }
 .compare-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
   padding: 18px;
 }
-.compare-card.phantom { border-color: var(--accent-dim); background: rgba(0,212,255,.04); }
+.compare-card.phantom { border-color: var(--cyan-dim); background: rgba(0,240,255,.03); }
 .compare-label {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 10px;
-  letter-spacing: .15em;
+  letter-spacing: .2em;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
-.compare-card.phantom .compare-label { color: var(--accent); }
+.compare-card.phantom .compare-label { color: var(--cyan); }
 .compare-card:not(.phantom) .compare-label { color: var(--fg-dim); }
 .compare-item {
-  font-size: 12px;
-  color: var(--fg-muted);
-  padding: 4px 0;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-dim);
+  padding: 5px 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   border-bottom: 1px solid var(--border);
   line-height: 1.4;
+  letter-spacing: .03em;
 }
 .compare-item:last-child { border-bottom: none; }
-.compare-item::before { content: "✓"; color: var(--green); font-size: 11px; flex-shrink: 0; }
-.compare-card:not(.phantom) .compare-item::before { content: "✗"; color: #ff4455; }
+.compare-item::before { content: "✓"; color: var(--green); font-size: 10px; flex-shrink: 0; margin-top: 1px; }
+.compare-card:not(.phantom) .compare-item::before { content: "✗"; color: var(--red); }
 
-/* ── Footer ──────────────────────────────────────────────── */
-.site-footer {
-  border-top: 1px solid var(--border);
-  padding-block: 24px;
-}
+/* ── Footer ─────────────────────────────────────── */
+.site-footer { border-top: 1px solid var(--border); padding-block: 20px; }
 .footer-inner {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -569,46 +679,46 @@ esp-web-install-button [slot="activate"] {
   gap: 16px;
   flex-wrap: wrap;
 }
-.footer-text { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--fg-dim); }
-.footer-link { color: var(--accent-dim); text-decoration: none; font-size: 11px; font-family: 'Space Mono', monospace; }
-.footer-link:hover { color: var(--accent); }
+.footer-text { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--fg-dim); letter-spacing: .08em; }
+.footer-link { color: var(--cyan-dim); text-decoration: none; font-size: 10px; font-family: 'Share Tech Mono', monospace; letter-spacing: .1em; }
+.footer-link:hover { color: var(--cyan); }
 
-/* ── Responsive ──────────────────────────────────────────── */
+/* ── Responsive ─────────────────────────────────── */
 @media (max-width: 600px) {
-  .nav-tab { padding: 16px 12px; font-size: 10px; letter-spacing: .08em; }
+  .nav-tab { padding: 15px 10px; font-size: 10px; letter-spacing: .1em; }
   .hero { padding: 48px 0 40px; }
-  .hero-stats { gap: 24px; }
+  .hero-stats { flex-direction: row; }
   .board-grid { grid-template-columns: 1fr; }
   .compat-grid { grid-template-columns: 1fr; }
-  .step { grid-template-columns: 36px 1fr; }
-  .step-num { width: 36px; height: 36px; font-size: 12px; }
-  .step:not(:last-child)::after { left: 17px; }
-  .footer-inner { flex-direction: column; align-items: flex-start; }
+  .step { grid-template-columns: 38px 1fr; }
+  .step-num { width: 38px; height: 38px; font-size: 13px; }
+  .step:not(:last-child)::after { left: 18px; }
   .about-hero { gap: 16px; }
+  .footer-inner { flex-direction: column; align-items: flex-start; }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition: none !important; animation: none !important; }
+  *,*::before,*::after { animation: none !important; transition: none !important; }
 }
 </style>
 
-<!-- ── Canvas background ──────────────────────────────────── -->
+<!-- canvas -->
 <canvas id="bg-canvas"></canvas>
 
 <div class="site-wrap">
 
-<!-- ── Header ────────────────────────────────────────────── -->
+<!-- ── Header ───────────────────────────────────── -->
 <header class="site-header">
   <div class="header-inner">
     <a href="#" class="logo" onclick="switchTab('flash');return false;">
-      <svg class="logo-mark" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="30" height="30" rx="5" fill="#080e1c"/>
-        <rect x=".5" y=".5" width="29" height="29" rx="4.5" stroke="#172035"/>
-        <path d="M6 15L15 6L24 15L15 24L6 15Z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-        <circle cx="15" cy="15" r="2.5" fill="#00d4ff"/>
-        <path d="M15 9V6M15 24V21M21 15H24M6 15H9" stroke="#00d4ff" stroke-width="1" opacity=".35"/>
-      </svg>
-      <span class="logo-text">PHANTOM32<span>OPERATION</span></span>
+      <div class="logo-icon">
+        <div class="logo-ring"></div>
+        <div class="logo-diamond"></div>
+        <div class="logo-dot"></div>
+      </div>
+      <span class="logo-text">
+        <strong>Phantom</strong>32
+        <span>Operation · v3.2.1</span>
+      </span>
     </a>
 
     <nav class="nav-tabs" role="tablist">
@@ -617,148 +727,128 @@ esp-web-install-button [slot="activate"] {
       <button class="nav-tab" role="tab" onclick="switchTab('about')">About</button>
     </nav>
 
-    <span class="header-badge">v3.2.1</span>
+    <div class="status-pill"><div class="status-dot"></div>ONLINE</div>
   </div>
 </header>
 
-<!-- ══════════════════════════════════════════════════════════
-     TAB: FLASH
-══════════════════════════════════════════════════════════ -->
+<!-- ══ TAB: FLASH ══════════════════════════════════ -->
 <div id="tab-flash" class="tab-panel active">
 
   <section class="hero">
-    <p class="hero-eyebrow">Web Firmware Installer</p>
-    <h1>Flash <em>any ESP32</em><br>from your browser</h1>
-    <p class="hero-desc">One click. No drivers. No IDE. Connect your board over USB and install
-      Phantom32 directly — works on Chrome and Edge on any OS.</p>
+    <div class="hero-tag">Web Firmware Installer</div>
+    <h1>Flash <span class="word-phantom">Phantom</span><span class="word-32">32</span><br>from your browser</h1>
+    <p class="hero-desc">One click. No drivers. No IDE. Connect your ESP32 over USB and install
+      the firmware directly — works on Chrome and Edge, any OS.</p>
     <div class="hero-stats">
       <div class="hero-stat">
         <span class="hero-stat-num">13</span>
-        <span class="hero-stat-label">Supported boards</span>
+        <span class="hero-stat-label">Boards</span>
       </div>
       <div class="hero-stat">
         <span class="hero-stat-num">3</span>
-        <span class="hero-stat-label">Chip families</span>
+        <span class="hero-stat-label">Chip Families</span>
       </div>
       <div class="hero-stat">
         <span class="hero-stat-num">0</span>
-        <span class="hero-stat-label">Drivers needed</span>
+        <span class="hero-stat-label">Drivers</span>
       </div>
     </div>
   </section>
 
   <div class="notice">
-    <span class="notice-icon">◈</span>
-    <span>Requires <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>. Firefox is not supported.
-      Plug in your ESP32 before clicking Flash.
-      <a href="#" onclick="switchTab('instructions');return false;">Need help? See the instructions →</a></span>
+    <span class="notice-ico">▸</span>
+    <span>Requires <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>. Firefox unsupported.
+    Plug in your board before clicking Flash.
+    <a href="#" onclick="switchTab('instructions');return false;">Need help? See instructions →</a></span>
   </div>
 
   <div class="section-label"><h2>Firmware builds</h2></div>
 
   <div class="board-group">
     <div class="board-group-header">
-      <span class="board-group-title lite">◈ LITE builds</span>
-      <span class="board-group-count">— 9 boards · core toolkit · ≤ 85% flash</span>
+      <span class="board-group-title lite">// LITE</span>
+      <span class="board-group-count">9 boards · core toolkit · ≤ 85% flash</span>
     </div>
     <div class="board-grid" id="lite-grid"></div>
   </div>
 
   <div class="board-group">
     <div class="board-group-header">
-      <span class="board-group-title psram">◈ PSRAM builds</span>
-      <span class="board-group-count">— 4 boards · all 13 analytics modules · 8 MB PSRAM required</span>
+      <span class="board-group-title psram">// PSRAM</span>
+      <span class="board-group-count">4 boards · all 13 analytics modules · 8 MB PSRAM required</span>
     </div>
     <div class="board-grid" id="psram-grid"></div>
   </div>
 
-</div><!-- /tab-flash -->
+</div>
 
-<!-- ══════════════════════════════════════════════════════════
-     TAB: INSTRUCTIONS
-══════════════════════════════════════════════════════════ -->
+<!-- ══ TAB: INSTRUCTIONS ══════════════════════════ -->
 <div id="tab-instructions" class="tab-panel">
   <div class="instr-wrap">
-    <h1 class="instr-title">How to <em>flash</em> your board</h1>
-    <p class="instr-subtitle">Three steps. Takes about 60 seconds from start to done.</p>
+    <h1 class="page-title">How to <em>flash</em></h1>
+    <p class="page-sub">// three steps · ~60 seconds total</p>
 
     <div class="step-list">
-
       <div class="step">
-        <div class="step-num-col"><div class="step-num">1</div></div>
+        <div class="step-num-col"><div class="step-num">01</div></div>
         <div class="step-body">
           <div class="step-heading">Use the right browser</div>
-          <p class="step-text">Web flashing requires the <strong>Web Serial API</strong>, which is only
-            available in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (desktop).
-            Firefox, Safari, and mobile browsers will not work. If you are already in Chrome or Edge,
-            you're good — move on to step 2.</p>
+          <p class="step-text">Web flashing needs the <strong>Web Serial API</strong> — only available in
+            <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on desktop.
+            Firefox, Safari, and mobile browsers will not work.</p>
         </div>
       </div>
-
       <div class="step">
-        <div class="step-num-col"><div class="step-num">2</div></div>
+        <div class="step-num-col"><div class="step-num">02</div></div>
         <div class="step-body">
           <div class="step-heading">Connect your ESP32 via USB</div>
-          <p class="step-text">Plug your board into your computer with a <strong>data-capable USB
-            cable</strong> (charge-only cables will not work). Most boards will be detected
-            automatically. If you are on a newer ESP32 (S3, C3) with native USB, use the <strong>USB
-            port labelled UART</strong>, not the native USB port, for flashing.</p>
+          <p class="step-text">Use a <strong>data-capable USB cable</strong> (charge-only cables won't work).
+            For ESP32-S3 / C3 boards, use the <strong>UART port</strong>, not the native USB port, for flashing.</p>
           <div class="instr-tip">
-            <strong>Tip:</strong> Some boards (NodeMCU, generic WROOM) need you to hold the
-            <code>BOOT</code> button when clicking Flash, then release it once "Erasing…" appears.
+            <strong>// TIP</strong> — Some boards need you to hold <code>BOOT</code> while clicking Flash,
+            then release once "Erasing…" appears. NodeMCU and generic WROOM boards often require this.
           </div>
         </div>
       </div>
-
       <div class="step">
-        <div class="step-num-col"><div class="step-num">3</div></div>
+        <div class="step-num-col"><div class="step-num">03</div></div>
         <div class="step-body">
-          <div class="step-heading">Pick your board and click Flash</div>
-          <p class="step-text">Go to the <strong>Flash</strong> tab and find your exact board — LITE
-            if it doesn't have PSRAM, PSRAM build if it does. Click
-            <strong>⚡ Flash [Board Name]</strong>, approve the serial port picker that
-            Chrome shows, and wait. The installer downloads the firmware and writes three partitions
-            (bootloader, partition table, app). The whole process takes <strong>20–40 seconds</strong>.</p>
+          <div class="step-heading">Pick your board and flash</div>
+          <p class="step-text">Go to the <strong>Flash</strong> tab, find your board (LITE if no PSRAM, PSRAM build if it has 8 MB PSRAM).
+            Click <strong>⚡ Flash</strong>, approve the Chrome serial port picker, and wait <strong>20–40 seconds</strong>.
+            Three partitions are written automatically: bootloader, partition table, and app firmware.</p>
           <div class="instr-tip">
-            <strong>After flashing:</strong> Press the <code>RST</code> (reset) button on your board
-            or unplug and replug. Phantom32 will boot and start its own WiFi access point within a
-            few seconds.
+            <strong>// AFTER FLASH</strong> — Press <code>RST</code> or replug. Phantom32 boots its own WiFi AP
+            within seconds. Connect to it and open <code>192.168.4.1</code> in a browser.
           </div>
         </div>
       </div>
-
       <div class="step">
-        <div class="step-num-col"><div class="step-num">4</div></div>
+        <div class="step-num-col"><div class="step-num">04</div></div>
         <div class="step-body">
           <div class="step-heading">Connect and configure</div>
-          <p class="step-text">On your phone or laptop, connect to the WiFi network
-            <code>Phantom32</code>. Open a browser and go to <code>192.168.4.1</code>. Log in with
-            the default credentials (see your board's first boot output on a serial monitor for the
-            generated password). From the dashboard you can configure all 13 modules, set channels,
-            and manage everything wirelessly.</p>
+          <p class="step-text">Connect to the <code>Phantom32</code> WiFi network, open <code>192.168.4.1</code>,
+            and log in. From the dashboard you can configure all 13 modules, set channels, and manage
+            everything wirelessly — no cable needed after the initial flash.</p>
         </div>
-      </div>
-
-    </div><!-- /step-list -->
-
-    <div class="compat-box">
-      <div class="compat-title">◈ Browser compatibility</div>
-      <div class="compat-grid">
-        <div class="compat-item"><div class="compat-dot yes"></div> Google Chrome (desktop)</div>
-        <div class="compat-item"><div class="compat-dot yes"></div> Microsoft Edge (desktop)</div>
-        <div class="compat-item"><div class="compat-dot no"></div>  Mozilla Firefox</div>
-        <div class="compat-item"><div class="compat-dot no"></div>  Safari (any platform)</div>
-        <div class="compat-item"><div class="compat-dot no"></div>  Chrome for iOS / Android</div>
-        <div class="compat-item"><div class="compat-dot yes"></div> Chrome on Android (some devices)</div>
       </div>
     </div>
 
+    <div class="compat-box">
+      <div class="compat-title">// Browser compatibility</div>
+      <div class="compat-grid">
+        <div class="compat-item"><div class="compat-dot yes"></div>Google Chrome (desktop)</div>
+        <div class="compat-item"><div class="compat-dot yes"></div>Microsoft Edge (desktop)</div>
+        <div class="compat-item"><div class="compat-dot no"></div>Mozilla Firefox</div>
+        <div class="compat-item"><div class="compat-dot no"></div>Safari (any platform)</div>
+        <div class="compat-item"><div class="compat-dot no"></div>Chrome for iOS</div>
+        <div class="compat-item"><div class="compat-dot yes"></div>Chrome on Android (some)</div>
+      </div>
+    </div>
   </div>
-</div><!-- /tab-instructions -->
+</div>
 
-<!-- ══════════════════════════════════════════════════════════
-     TAB: ABOUT
-══════════════════════════════════════════════════════════ -->
+<!-- ══ TAB: ABOUT ═════════════════════════════════ -->
 <div id="tab-about" class="tab-panel">
   <div class="about-wrap">
 
@@ -772,47 +862,37 @@ esp-web-install-button [slot="activate"] {
 
     <div class="about-section">
       <div class="about-section-label">About me</div>
-      <p class="about-p">
-        I'm <strong>Mehaan Minocha</strong>, a student at <strong>Eagle Ridge Middle School</strong>
-        who builds embedded security tools in my free time. Operation Phantom32 started as a
-        personal project to understand how WiFi and Bluetooth work at a low level — and turned into
-        something much bigger.
-      </p>
-      <p class="about-p">
-        I designed, wrote, and tested every line of code in this project myself —
-        with <strong>Claude</strong> helping me polish the implementation and troubleshoot tricky
-        bugs — from the <em>auth manager</em> and rate limiter to the CI pipeline that enforces
-        85% test coverage across all 13 supported boards.
-      </p>
+      <p class="about-p">I'm <strong>Mehaan Minocha</strong>, a student at <strong>Eagle Ridge Middle School</strong>
+        who builds embedded security tools in my free time. Operation Phantom32 started as a project to
+        understand how WiFi and Bluetooth work at a low level — and grew into something much bigger.</p>
+      <p class="about-p">I designed and wrote every part of this project myself — with <strong>Claude</strong>
+        helping me polish the implementation and troubleshoot tricky bugs — from the
+        <em>auth manager</em> and rate limiter to the CI pipeline that enforces 85% test coverage
+        across all 13 supported boards.</p>
     </div>
 
     <div class="about-section">
       <div class="about-section-label">What is Operation Phantom32</div>
-      <p class="about-p">
-        Operation Phantom32 is a <strong>WiFi and Bluetooth security research toolkit</strong>
-        for ESP32 microcontrollers. It runs entirely on a $5–$15 chip, requires no PC once flashed,
-        and gives you a full web dashboard over its own access point. It's built for
-        <em>education, security research, and authorized network testing</em>.
-      </p>
-      <p class="about-p">
-        The firmware supports <strong>13 different ESP32 boards</strong> across three chip families
-        (ESP32, S3, C3), has a hardened auth system, a hardware-enforced transmit-power safety cap,
-        and ships with a full unit test suite and sanitizer runs in CI.
-      </p>
+      <p class="about-p">Operation Phantom32 is a <strong>WiFi and Bluetooth security research toolkit</strong>
+        for ESP32 microcontrollers. It runs on a $5–$15 chip, requires no PC once flashed, and gives you
+        a full web dashboard over its own WiFi access point. Built for
+        <em>education, security research, and authorized network testing</em>.</p>
+      <p class="about-p">The firmware supports <strong>13 boards</strong> across three chip families
+        (ESP32, S3, C3), features a hardened auth system, hardware-enforced TX power safety, and ships with
+        a full unit test suite, sanitizer runs, and SBOM generation in CI.</p>
     </div>
 
     <div class="about-section">
       <div class="about-section-label">Why Phantom32 is different</div>
-      <p class="about-p">Most ESP32 security tools are unmaintained hobby sketches with no security
-        on the tool itself. Phantom32 is built to a professional standard from day one.</p>
-
+      <p class="about-p">Most ESP32 security tools are unmaintained hobby sketches with no security on the
+        tool itself. Phantom32 is built to a professional standard from day one.</p>
       <div class="compare-grid">
         <div class="compare-card phantom">
           <div class="compare-label">Phantom32</div>
           <div class="compare-item">Auth manager with lockout + sessions</div>
           <div class="compare-item">Hardware safety cap on TX power</div>
           <div class="compare-item">13 boards, 3 chip families</div>
-          <div class="compare-item">CI: tests, sanitizers, coverage</div>
+          <div class="compare-item">CI: tests, sanitizers, 85% coverage</div>
           <div class="compare-item">Browser-based web flasher</div>
           <div class="compare-item">SBOM + secret scanning</div>
           <div class="compare-item">Rate limiter on all HTTP routes</div>
@@ -823,7 +903,7 @@ esp-web-install-button [slot="activate"] {
           <div class="compare-item">No TX power limits</div>
           <div class="compare-item">1–3 boards supported</div>
           <div class="compare-item">No tests or CI</div>
-          <div class="compare-item">Manual esptool flashing only</div>
+          <div class="compare-item">Manual esptool only</div>
           <div class="compare-item">No supply chain security</div>
           <div class="compare-item">No rate limiting</div>
         </div>
@@ -831,165 +911,198 @@ esp-web-install-button [slot="activate"] {
     </div>
 
     <div class="about-section">
-      <div class="about-section-label">Source code</div>
-      <p class="about-p">
-        The full source code, CI configuration, and documentation are available on
-        <a href="https://github.com/MehaanM/Operation-Phantom32_Protocol" target="_blank"
-           style="color:var(--accent);text-decoration:none;">GitHub ↗</a>.
-        Issues, pull requests, and feedback are welcome.
-      </p>
+      <div class="about-section-label">Source</div>
+      <p class="about-p">Full source, CI config, and docs on
+        <a href="https://github.com/MehaanM/Operation-Phantom32" target="_blank"
+           style="color:var(--cyan);text-decoration:none;">GitHub ↗</a>.
+        Issues and pull requests welcome.</p>
     </div>
 
   </div>
-</div><!-- /tab-about -->
+</div>
 
-<!-- ── Footer ────────────────────────────────────────────── -->
+<!-- ── Footer ───────────────────────────────────── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span class="footer-text">© 2026 Mehaan Minocha · Operation Phantom32 v3.2.1</span>
-    <a class="footer-link" href="https://github.com/MehaanM/Operation-Phantom32_Protocol" target="_blank">github ↗</a>
+    <span class="footer-text">© 2026 MEHAAN MINOCHA · OPERATION PHANTOM32 · v3.2.1</span>
+    <a class="footer-link" href="https://github.com/MehaanM/Operation-Phantom32" target="_blank">GITHUB ↗</a>
   </div>
 </footer>
 
 </div><!-- /site-wrap -->
 
 <script>
-// ── Animated particle background ───────────────────────────────────────────
-(function() {
+/* ── Animated grid + particle background ───────────────────────────────── */
+(function () {
   const canvas = document.getElementById('bg-canvas');
   const ctx    = canvas.getContext('2d');
-  const ACCENT = '0,212,255';
-  const COUNT  = 70;
-  const SPEED  = 0.3;
-  const CONNECT_DIST = 140;
-  let W, H, particles;
+  let W, H, particles, tick = 0;
+
+  const CYAN   = '0,240,255';
+  const PURPLE = '139,0,255';
+  const GRID   = 60;
+  const COUNT  = 55;
+  const SPEED  = 0.25;
+  const LINK   = 130;
 
   function resize() {
     W = canvas.width  = window.innerWidth;
     H = canvas.height = window.innerHeight;
   }
 
-  function mkParticle() {
-    return {
-      x:  Math.random() * W,
-      y:  Math.random() * H,
-      vx: (Math.random() - .5) * SPEED,
-      vy: (Math.random() - .5) * SPEED,
-      r:  Math.random() * 1.5 + .5,
-    };
+  function mkP() {
+    return { x: Math.random()*W, y: Math.random()*H,
+             vx:(Math.random()-.5)*SPEED, vy:(Math.random()-.5)*SPEED,
+             r: Math.random()*.8+.4 };
   }
 
-  function init() {
-    resize();
-    particles = Array.from({ length: COUNT }, mkParticle);
+  function init() { resize(); particles = Array.from({length:COUNT},mkP); }
+
+  function drawGrid() {
+    const offset = (tick * .3) % GRID;
+    ctx.strokeStyle = `rgba(${CYAN},.028)`;
+    ctx.lineWidth   = 1;
+    for (let x = -GRID + offset; x < W + GRID; x += GRID) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for (let y = -GRID + offset; y < H + GRID; y += GRID) {
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
   }
 
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
+  function drawParticles() {
     for (let i = 0; i < COUNT; i++) {
       const a = particles[i];
       a.x += a.vx; a.y += a.vy;
-      if (a.x < 0 || a.x > W) a.vx *= -1;
-      if (a.y < 0 || a.y > H) a.vy *= -1;
+      if (a.x < 0||a.x > W) a.vx*=-1;
+      if (a.y < 0||a.y > H) a.vy*=-1;
 
       ctx.beginPath();
-      ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${ACCENT},.7)`;
+      ctx.arc(a.x, a.y, a.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${CYAN},.65)`;
+      ctx.shadowColor = `rgba(${CYAN},1)`;
+      ctx.shadowBlur  = 4;
       ctx.fill();
+      ctx.shadowBlur  = 0;
 
-      for (let j = i + 1; j < COUNT; j++) {
+      for (let j = i+1; j < COUNT; j++) {
         const b = particles[j];
-        const dx = a.x - b.x, dy = a.y - b.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < CONNECT_DIST) {
-          const alpha = (1 - dist / CONNECT_DIST) * .18;
+        const dx = a.x-b.x, dy = a.y-b.y;
+        const d  = Math.sqrt(dx*dx+dy*dy);
+        if (d < LINK) {
+          const alpha = (1-d/LINK)*.12;
           ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = `rgba(${ACCENT},${alpha})`;
-          ctx.lineWidth = .6;
+          ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+          ctx.strokeStyle = `rgba(${CYAN},${alpha})`;
+          ctx.lineWidth   = .5;
           ctx.stroke();
         }
       }
     }
+  }
+
+  function drawSweep() {
+    const cx = W/2, cy = H*1.2;
+    const r  = Math.max(W,H)*1.5;
+    const angle = ((tick*0.004) % (Math.PI*2));
+    const grd = ctx.createConicalGradient
+      ? null
+      : null;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    const sweep = ctx.createLinearGradient(0, -r, 0, 0);
+    sweep.addColorStop(0, `rgba(${PURPLE},.0)`);
+    sweep.addColorStop(.7, `rgba(${PURPLE},.0)`);
+    sweep.addColorStop(1, `rgba(${PURPLE},.025)`);
+    ctx.fillStyle = sweep;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,-0.18,0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    tick++;
+    drawGrid();
+    drawSweep();
+    drawParticles();
     requestAnimationFrame(draw);
   }
 
-  window.addEventListener('resize', () => { resize(); });
-  init();
-  draw();
+  window.addEventListener('resize', resize);
+  init(); draw();
 })();
 
-// ── Tab switching ──────────────────────────────────────────────────────────
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
 function switchTab(name) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  const tabs = ['flash','instructions','about'];
-  document.querySelectorAll('.nav-tab')[tabs.indexOf(name)].classList.add('active');
-  window.scrollTo(0, 0);
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  ['flash','instructions','about'].forEach((t,i)=>{
+    if(t===name) document.querySelectorAll('.nav-tab')[i].classList.add('active');
+  });
+  window.scrollTo(0,0);
 }
 
-// ── Board definitions ──────────────────────────────────────────────────────
-const GITHUB_BASE =
-  'https://github.com/MehaanM/Operation-Phantom32_Protocol/releases/latest/download/';
+/* ── Boards ────────────────────────────────────────────────────────────── */
+const BASE = 'https://github.com/MehaanM/Operation-Phantom32/releases/latest/download/';
 
 const BOARDS = [
-  { id:'doom',         name:'ESP32 Generic',      module:'WROOM-32D / WROOM-32',  chip:'ESP32',    tier:'lite',  desc:'Universal build for most ESP32 development boards with 4 MB flash.',                    offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_nodemcu', name:'NodeMCU-32S',         module:'NodeMCU 32S',           chip:'ESP32',    tier:'lite',  desc:'NodeMCU ESP32 with USB-to-serial bridge; 30-pin DIP form factor.',                      offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_m5stack', name:'M5Stack Basic',       module:'M5Stack Core',          chip:'ESP32',    tier:'lite',  desc:'M5Stack Basic / Gray with built-in 320×240 LCD and Grove connector.',                   offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_m5core2', name:'M5Stack Core2',       module:'M5Core2',               chip:'ESP32',    tier:'lite',  desc:'M5Stack Core2 with capacitive touch display and PMU.',                                  offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_ttgo',    name:'TTGO T-Display',      module:'T-Display v1.1',        chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T-Display with 1.14" ST7789 color LCD (135×240).',                          offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_tcall',   name:'TTGO T-Call',         module:'T-Call SIM800L',        chip:'ESP32',    tier:'lite',  desc:'TTGO T-Call with integrated SIM800L GSM modem for cellular.',                           offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_heltec',  name:'Heltec WiFi Kit 32',  module:'WiFi Kit 32',           chip:'ESP32',    tier:'lite',  desc:'Heltec WiFi Kit 32 with 0.96" SSD1306 OLED display on board.',                          offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_s3_devkit',name:'ESP32-S3 DevKitC',  module:'DevKitC-1 N8',          chip:'ESP32-S3', tier:'lite',  desc:'Official Espressif ESP32-S3 DevKitC-1; dual USB (native + UART).',                      offsets:[0x0,0x8000,0x10000] },
-  { id:'doom_c3',      name:'ESP32-C3 DevKit',     module:'C3 RISC-V',             chip:'ESP32-C3', tier:'lite',  desc:'ESP32-C3 RISC-V core. Ultra-low-power LITE build; native USB CDC.',                     offsets:[0x0,0x8000,0x10000] },
-  { id:'doom_wrover',  name:'ESP-WROVER-KIT',      module:'WROVER-B / WROVER-IB',  chip:'ESP32',    tier:'psram', desc:'Official Espressif WROVER kit with 8 MB PSRAM. Full 13-module build.',                  offsets:[0x1000,0x8000,0x10000] },
-  { id:'doom_s3',      name:'XIAO ESP32-S3',       module:'Seeed XIAO S3',         chip:'ESP32-S3', tier:'psram', desc:'Seeed Studio XIAO ESP32-S3 with 8 MB PSRAM. Stamp-sized form factor.',                 offsets:[0x0,0x8000,0x10000] },
-  { id:'doom_tdisplay_s3',name:'T-Display S3',     module:'LilyGo T-Display-S3',  chip:'ESP32-S3', tier:'psram', desc:'LilyGo T-Display-S3 with 1.9" color LCD and 8 MB PSRAM.',                              offsets:[0x0,0x8000,0x10000] },
-  { id:'doom_m5cores3',name:'M5Stack CoreS3',      module:'M5CoreS3',              chip:'ESP32-S3', tier:'psram', desc:'M5Stack CoreS3 with 2" touch display, 16 MB flash and 8 MB PSRAM.',                    offsets:[0x0,0x8000,0x10000] },
+  {id:'doom',          name:'ESP32 Generic',     module:'WROOM-32D / WROOM-32',  chip:'ESP32',    tier:'lite',  desc:'Universal build for most ESP32 dev boards with 4 MB flash.',          offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_nodemcu',  name:'NodeMCU-32S',        module:'NodeMCU 32S',           chip:'ESP32',    tier:'lite',  desc:'NodeMCU ESP32 with USB-to-serial bridge; 30-pin DIP form factor.',    offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5stack',  name:'M5Stack Basic',      module:'M5Stack Core',          chip:'ESP32',    tier:'lite',  desc:'M5Stack Basic / Gray with built-in 320×240 LCD and Grove port.',      offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5core2',  name:'M5Stack Core2',      module:'M5Core2',               chip:'ESP32',    tier:'lite',  desc:'M5Stack Core2 with capacitive touch display and PMU.',               offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_ttgo',     name:'TTGO T-Display',     module:'T-Display v1.1',        chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T-Display with 1.14" ST7789 color LCD (135×240).',       offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_tcall',    name:'TTGO T-Call',        module:'T-Call SIM800L',        chip:'ESP32',    tier:'lite',  desc:'TTGO T-Call with integrated SIM800L GSM modem.',                     offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_heltec',   name:'Heltec WiFi Kit 32', module:'WiFi Kit 32',           chip:'ESP32',    tier:'lite',  desc:'Heltec WiFi Kit 32 with 0.96" SSD1306 OLED on board.',              offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s3_devkit',name:'ESP32-S3 DevKitC',   module:'DevKitC-1 N8',          chip:'ESP32-S3', tier:'lite',  desc:'Official Espressif ESP32-S3 DevKitC-1; dual USB (native + UART).',   offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3',       name:'ESP32-C3 DevKit',    module:'C3 RISC-V',             chip:'ESP32-C3', tier:'lite',  desc:'ESP32-C3 RISC-V core. Ultra-low-power LITE build; native USB CDC.',  offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_wrover',   name:'ESP-WROVER-KIT',     module:'WROVER-B / WROVER-IB',  chip:'ESP32',    tier:'psram', desc:'Official Espressif WROVER kit with 8 MB PSRAM. Full 13-module build.',offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s3',       name:'XIAO ESP32-S3',      module:'Seeed XIAO S3',         chip:'ESP32-S3', tier:'psram', desc:'Seeed Studio XIAO ESP32-S3 with 8 MB PSRAM. Stamp-sized.',           offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_tdisplay_s3',name:'T-Display S3',     module:'LilyGo T-Display-S3',  chip:'ESP32-S3', tier:'psram', desc:'LilyGo T-Display-S3 with 1.9" color LCD and 8 MB PSRAM.',           offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_m5cores3', name:'M5Stack CoreS3',     module:'M5CoreS3',              chip:'ESP32-S3', tier:'psram', desc:'M5Stack CoreS3 with 2" touch display, 16 MB flash, 8 MB PSRAM.',    offsets:[0x0,0x8000,0x10000]},
 ];
 
-function createManifestURL(board) {
-  const manifest = {
-    name: `Phantom32 for ${board.name}`,
-    version: '3.2.1',
-    new_install_improv_wait_time: 0,
-    builds: [{ chipFamily: board.chip, parts: [
-      { path: `${GITHUB_BASE}firmware_${board.id}_bootloader.bin`, offset: board.offsets[0] },
-      { path: `${GITHUB_BASE}firmware_${board.id}_partitions.bin`, offset: board.offsets[1] },
-      { path: `${GITHUB_BASE}firmware_${board.id}.bin`,            offset: board.offsets[2] },
-    ]}],
-  };
-  return URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+function mkManifest(b) {
+  return URL.createObjectURL(new Blob([JSON.stringify({
+    name:`Phantom32 for ${b.name}`, version:'3.2.1', new_install_improv_wait_time:0,
+    builds:[{chipFamily:b.chip, parts:[
+      {path:`${BASE}firmware_${b.id}_bootloader.bin`, offset:b.offsets[0]},
+      {path:`${BASE}firmware_${b.id}_partitions.bin`, offset:b.offsets[1]},
+      {path:`${BASE}firmware_${b.id}.bin`,            offset:b.offsets[2]},
+    ]}]
+  })], {type:'application/json'}));
 }
 
-function buildCard(board) {
-  const manifestURL = createManifestURL(board);
+function mkCard(b) {
+  const url  = mkManifest(b);
   const card = document.createElement('div');
-  card.className = `board-card ${board.tier}`;
+  card.className = `board-card ${b.tier}`;
   card.innerHTML = `
     <div class="board-card-top">
       <div>
-        <div class="board-name">${board.name}</div>
-        <div class="board-module">${board.module}</div>
+        <div class="board-name">${b.name}</div>
+        <div class="board-module">${b.module}</div>
       </div>
       <div class="badge-row">
-        <span class="badge ${board.tier}">${board.tier === 'lite' ? 'LITE' : 'PSRAM'}</span>
-        <span class="badge chip">${board.chip}</span>
+        <span class="badge ${b.tier}">${b.tier==='lite'?'LITE':'PSRAM'}</span>
+        <span class="badge chip">${b.chip}</span>
       </div>
     </div>
-    <p class="board-desc">${board.desc}</p>
+    <p class="board-desc">${b.desc}</p>
     <div class="board-flash-btn">
-      <esp-web-install-button manifest="${manifestURL}">
-        <button slot="activate">⚡ Flash ${board.name}</button>
+      <esp-web-install-button manifest="${url}">
+        <button slot="activate">⚡ Flash ${b.name}</button>
       </esp-web-install-button>
     </div>`;
   return card;
 }
 
-const liteGrid  = document.getElementById('lite-grid');
-const psramGrid = document.getElementById('psram-grid');
-BOARDS.forEach(b => (b.tier === 'lite' ? liteGrid : psramGrid).appendChild(buildCard(b)));
+const lg = document.getElementById('lite-grid');
+const pg = document.getElementById('psram-grid');
+BOARDS.forEach(b => (b.tier==='lite'?lg:pg).appendChild(mkCard(b)));
 </script>

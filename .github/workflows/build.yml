@@ -165,11 +165,14 @@ jobs:
 
       - name: Generate coverage report
         run: |
+          # geninfo_no_exception_branches=1 suppresses GCC 15 synthetic exception/destructor
+          # branches that inflate the count on Ubuntu 26 vs older GCC versions.
           lcov --capture \
                --directory .pio/build/native_cov/ \
                --output-file coverage.info \
-               --ignore-errors mismatch \
-               --rc lcov_branch_coverage=1 \
+               --ignore-errors mismatch,inconsistent,unsupported,deprecated \
+               --rc branch_coverage=1 \
+               --rc geninfo_no_exception_branches=1 \
                2>/dev/null || true
           lcov --remove coverage.info \
                '/usr/*' \
@@ -178,13 +181,15 @@ jobs:
                '*/.pio/build/unity_config/*' \
                '*/test/unit/*' \
                --output-file coverage_filtered.info \
-               --rc lcov_branch_coverage=1 \
+               --rc branch_coverage=1 \
+               --rc geninfo_no_exception_branches=1 \
+               --ignore-errors deprecated,inconsistent,unsupported \
                2>/dev/null || true
           if [ -f coverage_filtered.info ]; then
-            lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null || true
-            line_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
+            lcov --summary coverage_filtered.info --rc branch_coverage=1 --ignore-errors deprecated 2>/dev/null || true
+            line_cov=$(lcov --summary coverage_filtered.info --rc branch_coverage=1 --ignore-errors deprecated 2>/dev/null \
                         | grep "lines" | grep -oE "[0-9]+\.[0-9]+" | head -1)
-            branch_cov=$(lcov --summary coverage_filtered.info --rc lcov_branch_coverage=1 2>/dev/null \
+            branch_cov=$(lcov --summary coverage_filtered.info --rc branch_coverage=1 --ignore-errors deprecated 2>/dev/null \
                           | grep "branches" | grep -oE "[0-9]+\.[0-9]+" | head -1)
             echo "Line coverage:   ${line_cov}%  (minimum: 85%)"
             echo "Branch coverage: ${branch_cov}%  (minimum: 70%)"

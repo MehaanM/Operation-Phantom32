@@ -461,7 +461,7 @@ void test_session_valid_at_exact_ttl() {
 
 void test_lockout_table_full() {
   reset_all();
-  char ip[16];
+  char ip[20];
   for (int i = 0; i < 16; i++) {
     snprintf(ip, sizeof(ip), "10.0.%d.1", i);
     TEST_ASSERT_NOT_NULL(am_ensure_lockout(ip));

@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible defect in Phantom32
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Before filing: check [docs/troubleshooting.md](../docs/troubleshooting.md) for known issues."
+
+  - type: input
+    id: firmware_version
+    attributes:
+      label: Firmware version
+      placeholder: "v3.2.0 (from serial boot output)"
+    validations:
+      required: true
+
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      placeholder: "ESP32-WROOM-32D / NodeMCU-32 / M5Stack / ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What did you see? Exact error message or behaviour.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Flash firmware
+        2. Connect to AP
+        3. Navigate to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: serial_log
+    attributes:
+      label: Serial log
+      description: Paste relevant serial output (115200 baud). Remove any credential values.
+      render: text
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked the troubleshooting guide
+        - label: I have searched existing issues
+        - label: The serial log does not contain real credentials

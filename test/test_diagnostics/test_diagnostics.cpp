@@ -1,9 +1,8 @@
 // test_diagnostics.cpp — Unit tests for DiagnosticsEngine.
 //
-// Tests run on native (host machine) using the PHANTOM32_NATIVE_TEST mock
-// platform layer. No ESP32 hardware required.
+// Tests run on native (host machine). PHANTOM32_NATIVE_TEST is set via
+// build_flags in platformio.ini for all native environments.
 
-#define PHANTOM32_NATIVE_TEST
 #include "unity.h"
 #include "core/DiagnosticsEngine.h"
 #include <string.h>

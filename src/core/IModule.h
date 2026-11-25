@@ -15,37 +15,37 @@
 //                                             initialize() may also → Error
 
 class IModule {
-public:
-    enum class State : uint8_t {
-        Uninitialized,
-        Running,
-        Stopped,
-        Error,
-    };
+ public:
+  enum class State : uint8_t {
+    Uninitialized,
+    Running,
+    Stopped,
+    Error,
+  };
 
-    virtual ~IModule() = default;
+  virtual ~IModule() = default;
 
-    // Core lifecycle — must be overridden.
-    virtual bool        initialize()     = 0;
-    virtual void        update()         = 0;
-    virtual void        shutdown()       = 0;
+  // Core lifecycle — must be overridden.
+  virtual bool initialize() = 0;
+  virtual void update() = 0;
+  virtual void shutdown() = 0;
 
-    // Metadata — must be overridden; returns a string literal, never nullptr.
-    virtual const char* name()        const = 0;
-    virtual const char* version()     const = 0;
-    virtual const char* description() const = 0;
+  // Metadata — must be overridden; returns a string literal, never nullptr.
+  virtual const char *name() const = 0;
+  virtual const char *version() const = 0;
+  virtual const char *description() const = 0;
 
-    // Introspection.
-    State state()     const { return state_; }
-    bool  isRunning() const { return state_ == State::Running; }
-    bool  hasError()  const { return state_ == State::Error; }
+  // Introspection.
+  State state() const { return state_; }
+  bool isRunning() const { return state_ == State::Running; }
+  bool hasError() const { return state_ == State::Error; }
 
-protected:
-    // Subclasses transition state through these helpers.
-    void setRunning() { state_ = State::Running; }
-    void setStopped() { state_ = State::Stopped; }
-    void setError()   { state_ = State::Error;   }
+ protected:
+  // Subclasses transition state through these helpers.
+  void setRunning() { state_ = State::Running; }
+  void setStopped() { state_ = State::Stopped; }
+  void setError() { state_ = State::Error; }
 
-private:
-    State state_ = State::Uninitialized;
+ private:
+  State state_ = State::Uninitialized;
 };

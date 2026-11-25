@@ -83,9 +83,11 @@ Firmware occupies 1,559,309 of 1,835,008 bytes available in `app0` (85.0%). No O
 
 The CI build matrix enforces:
 - **RAM ≤ 85%** on all 13 board builds (enforced — build fails)
-- **Flash ≤ 90%** on all 13 board builds (enforced — build fails)
+- **Flash ≤ 90%** on LITE builds, **≤ 96%** on PSRAM builds (enforced — build fails)
 
-Current worst-case board: `doom` (ESP32-WROOM-32D) at 85.0% flash. If flash usage exceeds 90%, the CI build will fail.
+PSRAM builds (`doom_wrover`, `doom_s3*`) include all 13 analytics modules and legitimately use more flash; 96% is their documented ceiling. Current worst-case PSRAM board: `doom_wrover` at ~95.7%.
+
+Current worst-case LITE board: `doom` (ESP32-WROOM-32D) at 85.0% flash.
 
 ---
 

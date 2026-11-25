@@ -530,6 +530,59 @@ void test_session_count_all_invalid() {
   TEST_ASSERT_EQUAL(0, am_session_count());
 }
 
+// --- Extra branch-coverage tests (use ASSERT_EQUAL to avoid uncovered branches) ---
+
+void test_validate_password_too_short_no_err() {
+  // Covers the if(err_out) false branch when password is too short
+  TEST_ASSERT_EQUAL(0, (int)am_validate_password("Ab1", nullptr));
+}
+
+void test_validate_password_no_uppercase_no_err() {
+  // Covers the if(err_out) false branch when no uppercase letter present
+  TEST_ASSERT_EQUAL(0, (int)am_validate_password("lowercase1", nullptr));
+}
+
+void test_validate_password_no_digit_no_err() {
+  // Covers the if(err_out) false branch when no digit present
+  TEST_ASSERT_EQUAL(0, (int)am_validate_password("NoDigitsHere", nullptr));
+}
+
+void test_validate_password_too_long_no_err() {
+  char pw[AM_MAX_PASS_LEN + 2];
+  memset(pw, 'a', AM_MAX_PASS_LEN + 1);
+  pw[0] = 'A'; pw[1] = '1';
+  pw[AM_MAX_PASS_LEN + 1] = '\0';
+  TEST_ASSERT_EQUAL(0, (int)am_validate_password(pw, nullptr));
+}
+
+void test_ensure_lockout_twice_same_ip() {
+  reset_all();
+  AmLockout *a = am_ensure_lockout("5.5.5.5");
+  AmLockout *b = am_ensure_lockout("5.5.5.5");
+  // Covers the "find existing entry" loop-return branch in am_ensure_lockout
+  TEST_ASSERT_EQUAL_PTR(a, b);
+}
+
+void test_record_fail_full_table_new_ip() {
+  reset_all();
+  char ip[20];
+  for (int i = 0; i < 16; i++) {
+    snprintf(ip, sizeof(ip), "10.0.%d.1", i);
+    am_ensure_lockout(ip);
+  }
+  // Table full: am_record_fail returns early when am_ensure_lockout returns null
+  am_record_fail("192.168.200.200");
+  TEST_ASSERT_EQUAL(0, (int)am_is_locked("192.168.200.200"));
+}
+
+void test_session_count_three_sessions() {
+  reset_all();
+  am_create_session("10.0.0.1");
+  am_create_session("10.0.0.2");
+  am_create_session("10.0.0.3");
+  TEST_ASSERT_EQUAL(3, am_session_count());
+}
+
 void test_token_hex_chars_only() {
   reset_all();
   AmSession *s = am_create_session("1.2.3.4");
@@ -610,6 +663,14 @@ int main(int argc, char **argv) {
   RUN_TEST(test_session_last_used_updated);
   RUN_TEST(test_lockout_at_exact_expiry_time);
   RUN_TEST(test_session_count_all_invalid);
+
+  RUN_TEST(test_validate_password_too_short_no_err);
+  RUN_TEST(test_validate_password_no_uppercase_no_err);
+  RUN_TEST(test_validate_password_no_digit_no_err);
+  RUN_TEST(test_validate_password_too_long_no_err);
+  RUN_TEST(test_ensure_lockout_twice_same_ip);
+  RUN_TEST(test_record_fail_full_table_new_ip);
+  RUN_TEST(test_session_count_three_sessions);
 
   return UNITY_END();
 }

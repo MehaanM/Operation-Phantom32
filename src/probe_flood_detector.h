@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -93,7 +94,7 @@ struct PfdEvent {
   uint32_t      ts;
 };
 
-static struct {
+typedef struct {
   PfdScanner  scanners[PFD_MAX_SCANNERS];
   uint8_t     count;
   PfdEvent    events[PFD_MAX_EVENTS];
@@ -102,7 +103,13 @@ static struct {
   uint32_t    total_probes;
   uint32_t    total_flood_events;
   uint32_t    total_sweep_events;
-} g_pfd = {};
+} G_PfdState;
+#ifdef BOARD_HAS_PSRAM
+static G_PfdState* _g_pfd_raw;
+#define g_pfd (*_g_pfd_raw)
+#else
+static G_PfdState g_pfd;
+#endif
 
 static bool pfd_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 static bool pfd_is_random(const uint8_t *m) { return (m[0] & 0x02) != 0; }

@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <string.h>
 #include <stdint.h>
+#include "psram_attr.h"
 
 // ── WPS Scanner & Information Element Parser ───────────────────────────────────
 // Passive WPS detection: parse WPS IEs from beacon and probe response frames.
@@ -106,7 +107,7 @@ struct WpsState {
   uint32_t   wps_frames;
 };
 
-static WpsState g_wps = {};
+static P32_EXT_BSS WpsState g_wps;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 static void wps_mac_str(const uint8_t* m, char* out) {

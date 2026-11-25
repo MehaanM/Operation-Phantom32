@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -100,7 +101,7 @@ struct CpdEvent {
   char     reason[48];
 };
 
-static struct {
+typedef struct {
   CpdAP    aps[CPD_MAX_APS];
   CpdEvent events[CPD_MAX_EVENTS];
   uint8_t  ap_count;
@@ -109,7 +110,13 @@ static struct {
   uint16_t total_detected;
   uint16_t total_evil_twin;
   uint16_t total_honeypot;
-} g_cpd = {};
+} G_CpdState;
+#ifdef BOARD_HAS_PSRAM
+static G_CpdState* _g_cpd_raw;
+#define g_cpd (*_g_cpd_raw)
+#else
+static G_CpdState g_cpd;
+#endif
 
 static bool cpd_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

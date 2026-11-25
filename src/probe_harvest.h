@@ -3,6 +3,7 @@
 #include <esp_wifi.h>
 #include "module.h"
 #include "safety.h"
+#include "psram_attr.h"
 
 // Probe Request Harvester — passive recon.
 // Sniffs probe requests and logs the STA MAC + SSID being probed for
@@ -18,7 +19,11 @@ struct PrhEntry {
   int8_t  rssi;
   uint32_t last_seen; // millis()
 };
+#ifdef BOARD_HAS_PSRAM
+static PrhEntry* prh_entries;
+#else
 static PrhEntry prh_entries[PRH_MAX_ENTRIES];
+#endif
 static int prh_count = 0;
 static bool prh_running = false;
 static volatile uint32_t prh_frames = 0;

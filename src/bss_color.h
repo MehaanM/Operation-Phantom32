@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -78,13 +79,19 @@ struct BscAP {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   BscAP   aps[BSC_MAX_APS];
   uint8_t count;
   uint8_t color_map[BSC_COLOR_MAX + 1];  // how many APs use each color
   uint16_t total_collisions;
   uint16_t total_color_changes;
-} g_bsc = {};
+} G_BscState;
+#ifdef BOARD_HAS_PSRAM
+static G_BscState* _g_bsc_raw;
+#define g_bsc (*_g_bsc_raw)
+#else
+static G_BscState g_bsc;
+#endif
 
 static bool bsc_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

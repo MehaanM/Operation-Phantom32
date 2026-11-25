@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -101,12 +102,18 @@ struct SrcEntry {
   bool     is_hidden;    // SSID not broadcast
 };
 
-static struct {
+typedef struct {
   SrcEntry entries[SRC_MAX_ENTRIES];
   uint8_t  count;
   uint32_t total_beacons_seen;
   uint32_t last_age_tick;
-} g_src = {};
+} G_SrcState;
+#ifdef BOARD_HAS_PSRAM
+static G_SrcState* _g_src_raw;
+#define g_src (*_g_src_raw)
+#else
+static G_SrcState g_src;
+#endif
 
 static bool src_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

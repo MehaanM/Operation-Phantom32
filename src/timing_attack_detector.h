@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -87,7 +88,7 @@ struct TadBeaconTrack {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   TadBeaconTrack  aps[TAD_MAX_APS];
   uint8_t         ap_count;
   TadAnomalyEvent anomalies[TAD_MAX_ANOMALIES];
@@ -103,7 +104,13 @@ static struct {
   } probe_sweep;
 
   uint32_t total_anomalies;
-} g_tad = {};
+} G_TadState;
+#ifdef BOARD_HAS_PSRAM
+static G_TadState* _g_tad_raw;
+#define g_tad (*_g_tad_raw)
+#else
+static G_TadState g_tad;
+#endif
 
 static bool tad_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

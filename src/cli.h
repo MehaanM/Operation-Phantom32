@@ -1,7 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include <WiFi.h>
-#include <ESP.h>
+#include <Esp.h>
+#include "psram_attr.h"
 
 // ---------- output helpers ----------
 static String cli_esc(const String& s){
@@ -647,7 +648,11 @@ struct CliScript {
   char lines[CLI_SCRIPT_LINES][CLI_SCRIPT_LINE];
   int  count;
 };
+#ifdef BOARD_HAS_PSRAM
+static CliScript* g_cli_scripts;
+#else
 static CliScript g_cli_scripts[CLI_SCRIPT_MAX];
+#endif
 static int g_cli_script_count = 0;
 
 static CliScript* cli_script_find(const char* name) {

@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "psram_attr.h"
 
 extern WebServer server;
 
@@ -53,11 +54,17 @@ struct PflClient {
   uint32_t last_ts;
 };
 
-static struct {
+typedef struct {
   PflClient clients[PFL_MAX_CLIENTS];
   uint8_t   count;
   uint32_t  total_probes;
-} g_pfl = {};
+} G_PflState;
+#ifdef BOARD_HAS_PSRAM
+static G_PflState* _g_pfl_raw;
+#define g_pfl (*_g_pfl_raw)
+#else
+static G_PflState g_pfl;
+#endif
 
 static bool pfl_mac_eq(const uint8_t *a, const uint8_t *b) { return memcmp(a,b,6)==0; }
 

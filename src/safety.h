@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <esp_timer.h>
+#include "auth_manager.h"
 
 struct SafetyLimits {
   uint16_t deauth_per_sec;

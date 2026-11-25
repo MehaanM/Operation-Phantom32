@@ -1090,6 +1090,10 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(100);
   print_banner();
+  if (!psram_alloc_all()) {
+    Serial.println("[doom] PSRAM alloc failed — halting");
+    for (;;) delay(1000);
+  }
   g_boot_ts = millis();
 
   // ---- LittleFS ----

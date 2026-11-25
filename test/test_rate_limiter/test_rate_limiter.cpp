@@ -312,7 +312,7 @@ void test_rla_many_tools_capacity() {
 void test_http_ip_table_full() {
   rla_reset();
   for (int i = 0; i < RLA_HTTP_MAX_IPS; i++) {
-    char ip[16]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
+    char ip[20]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
     TEST_ASSERT_NOT_NULL(rla_find_or_add_ip(ip));
   }
   // 9th IP must fail — table full
@@ -322,7 +322,7 @@ void test_http_ip_table_full() {
 void test_http_check_table_full_allows() {
   rla_reset();
   for (int i = 0; i < RLA_HTTP_MAX_IPS; i++) {
-    char ip[16]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
+    char ip[20]; snprintf(ip, sizeof(ip), "10.0.0.%d", i + 1);
     rla_find_or_add_ip(ip);
   }
   // Table full: rla_find_or_add_ip returns null, so rla_check_http returns true

@@ -875,6 +875,223 @@ static void test_backoff_shift_cap_at_six_restarts() {
   TEST_ASSERT_TRUE(lc.restartCount("Alternating") >= 6u);
 }
 
+// ── Phase 1 lifecycle state tests ─────────────────────────────────────────
+
+// Module that records its own state() at the START of initialize().
+struct StateCapturingModule : public IModule {
+  IModule::State stateAtInit = IModule::State::Uninitialized;
+  IModule::State stateAtShutdown = IModule::State::Uninitialized;
+
+  bool initialize() override {
+    stateAtInit = state();
+    setRunning();
+    return true;
+  }
+  void update() override {}
+  void shutdown() override {
+    stateAtShutdown = state();
+    setStopped();
+  }
+  const char *name() const override { return "StateCapturing"; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+};
+
+static void test_begin_initializing_sets_state_before_init() {
+  ModuleLifecycle<4> lc;
+  StateCapturingModule m;
+  lc.registerModule(&m);
+  lc.initializeAll();
+  TEST_ASSERT_EQUAL(IModule::State::Initializing, m.stateAtInit);
+}
+
+static void test_begin_stopping_sets_state_before_shutdown() {
+  ModuleLifecycle<4> lc;
+  StateCapturingModule m;
+  lc.registerModule(&m);
+  lc.initializeAll();
+  lc.shutdownAll();
+  TEST_ASSERT_EQUAL(IModule::State::Stopping, m.stateAtShutdown);
+}
+
+static void test_failed_state_when_circuit_opens() {
+  // After kMaxRestarts consecutive failures the circuit opens and module → Failed.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  MockModule m;
+  m.initResult = false;
+  lc.registerModule(&m);
+  lc.initializeAll();  // first attempt → Error
+  // Drive restarts with increasing timestamps so backoff never blocks.
+  uint32_t t = 0;
+  for (int i = 0; i < 20; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+    if (lc.isCircuitOpen(m.name()))
+      break;
+  }
+  TEST_ASSERT_TRUE(m.isFailed());
+  TEST_ASSERT_TRUE(lc.isCircuitOpen(m.name()));
+}
+
+static void test_restart_module_clears_failed_state() {
+  // After circuit opens (Failed), restartModule() with a succeeding module
+  // must bring it back to Running.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  MockModule m;
+  m.initResult = false;
+  lc.registerModule(&m);
+  lc.initializeAll();
+  uint32_t t = 0;
+  for (int i = 0; i < 20; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+    if (lc.isCircuitOpen(m.name()))
+      break;
+  }
+  TEST_ASSERT_TRUE(m.isFailed());
+
+  m.initResult = true;
+  TEST_ASSERT_TRUE(lc.restartModule(m.name()));
+  TEST_ASSERT_TRUE(m.isRunning());
+  TEST_ASSERT_FALSE(lc.isCircuitOpen(m.name()));
+}
+
+// Module that always fails; used for dep-failure propagation tests.
+struct AlwaysFailModule : public IModule {
+  const char *label;
+  explicit AlwaysFailModule(const char *n) : label(n) {}
+  bool initialize() override {
+    setError();
+    return false;
+  }
+  void update() override {}
+  void shutdown() override { setStopped(); }
+  const char *name() const override { return label; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+};
+
+static void test_dep_failure_propagates_to_dependent() {
+  ModuleLifecycle<4> lc;
+  AlwaysFailModule a("DepA");
+  DependentModule b("DepB", "DepA");
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  lc.initializeAll();
+  TEST_ASSERT_TRUE(a.hasError());
+  // b depends on a which failed — b must be Error, not Running
+  TEST_ASSERT_TRUE(b.hasError());
+  TEST_ASSERT_FALSE(b.isRunning());
+}
+
+
+static void test_dep_failure_does_not_call_dependent_initialize() {
+  // initOrder is set only inside initialize(); if propagation skips it, it stays -1.
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  AlwaysFailModule a("DepX");
+  DependentModule b("DepY", "DepX");
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  lc.initializeAll();
+  TEST_ASSERT_EQUAL(-1, b.initOrder);
+}
+
+static void test_health_check_default_running() {
+  MockModule m;
+  m.initialize();
+  TEST_ASSERT_TRUE(m.healthCheck());
+}
+
+static void test_health_check_default_not_running() {
+  MockModule m;
+  TEST_ASSERT_FALSE(m.healthCheck());
+}
+
+static void test_health_check_default_stopped() {
+  MockModule m;
+  m.initialize();
+  m.shutdown();
+  TEST_ASSERT_FALSE(m.healthCheck());
+}
+
+static void test_api_version_matches_constant() {
+  MockModule m;
+  TEST_ASSERT_EQUAL(IModule::kApiVersion, m.apiVersion());
+}
+
+static void test_failed_blocked_from_auto_escape() {
+  // A module in Failed state cannot escape via setError() — it must stay Failed.
+  MockModule m;
+  m.initialize();     // → Running
+  m.markError();      // → Error  (framework call, unrestricted)
+  m.markFailed();     // → Failed
+  // Now simulate a subclass calling setError() — must be ignored.
+  m.markError();      // should be blocked because markError() checks !Failed
+  TEST_ASSERT_TRUE(m.isFailed());
+}
+
+static void test_failed_counted_in_summary() {
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  MockModule m;
+  m.initResult = false;
+  lc.registerModule(&m);
+  lc.initializeAll();
+  uint32_t t = 0;
+  for (int i = 0; i < 20; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+    if (lc.isCircuitOpen(m.name()))
+      break;
+  }
+  TEST_ASSERT_TRUE(m.isFailed());
+  auto s = lc.summary();
+  TEST_ASSERT_EQUAL(1, s.failed);
+}
+
+static void test_is_initializing_helper() {
+  MockModule m;
+  m.beginInitializing();
+  TEST_ASSERT_TRUE(m.isInitializing());
+  TEST_ASSERT_FALSE(m.isRunning());
+}
+
+static void test_is_stopping_helper() {
+  MockModule m;
+  m.initialize();  // → Running
+  m.beginStopping();
+  TEST_ASSERT_TRUE(m.isStopping());
+  TEST_ASSERT_FALSE(m.isRunning());
+}
+
+static void test_is_stopped_helper() {
+  MockModule m;
+  m.initialize();
+  m.shutdown();
+  TEST_ASSERT_TRUE(m.isStopped());
+}
+
+static void test_is_failed_helper() {
+  MockModule m;
+  m.initialize();
+  m.markError();
+  m.markFailed();
+  TEST_ASSERT_TRUE(m.isFailed());
+}
+
+static void test_mark_error_blocked_from_failed() {
+  MockModule m;
+  m.initialize();
+  m.markError();
+  m.markFailed();
+  TEST_ASSERT_TRUE(m.isFailed());
+  m.markError();  // must be a no-op
+  TEST_ASSERT_TRUE(m.isFailed());
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 int main() {
@@ -957,6 +1174,24 @@ int main() {
   RUN_TEST(test_null_dep_module_initializes_normally);
   RUN_TEST(test_null_dep_mixed_with_normal_module);
   RUN_TEST(test_backoff_shift_cap_at_six_restarts);
+
+  RUN_TEST(test_begin_initializing_sets_state_before_init);
+  RUN_TEST(test_begin_stopping_sets_state_before_shutdown);
+  RUN_TEST(test_failed_state_when_circuit_opens);
+  RUN_TEST(test_restart_module_clears_failed_state);
+  RUN_TEST(test_dep_failure_propagates_to_dependent);
+  RUN_TEST(test_dep_failure_does_not_call_dependent_initialize);
+  RUN_TEST(test_health_check_default_running);
+  RUN_TEST(test_health_check_default_not_running);
+  RUN_TEST(test_health_check_default_stopped);
+  RUN_TEST(test_api_version_matches_constant);
+  RUN_TEST(test_failed_blocked_from_auto_escape);
+  RUN_TEST(test_failed_counted_in_summary);
+  RUN_TEST(test_is_initializing_helper);
+  RUN_TEST(test_is_stopping_helper);
+  RUN_TEST(test_is_stopped_helper);
+  RUN_TEST(test_is_failed_helper);
+  RUN_TEST(test_mark_error_blocked_from_failed);
 
   return UNITY_END();
 }

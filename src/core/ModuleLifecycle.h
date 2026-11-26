@@ -10,14 +10,21 @@
 //   - Dependency-aware initialization: modules are initialized in topological
 //     order based on dependency() declarations. Cycle detection fails affected
 //     modules and reports their names; independent modules still run.
+//   - Dependency failure propagation: if any declared dependency is in Error
+//     or Failed state after its own initialization attempt, the dependent
+//     module is also marked Error and skipped, preventing partial initialization
+//     of a module whose prerequisites are unavailable.
 //   - Failure isolation: a failed module does not prevent others from starting
 //     unless it is marked required.
 //   - Auto-restart with backoff: modules that enter Error state during
 //     updateAll() are automatically restarted with exponential backoff.
-//     After kMaxRestarts consecutive failed restarts the circuit opens and
-//     no further automatic restarts are attempted.
-//   - Manual restart: restartModule(name) resets the circuit breaker and
-//     performs an immediate recovery attempt.
+//     After kMaxRestarts consecutive failed restarts the circuit opens,
+//     the module is marked Failed, and no further automatic restarts occur.
+//   - Manual restart: restartModule(name) resets the circuit breaker, clears
+//     the Failed state, and performs an immediate recovery attempt.
+//   - Lifecycle state driven by framework: ModuleLifecycle calls
+//     beginInitializing() / beginStopping() / markFailed() on each module so
+//     the IModule state machine always reflects the current operation.
 //
 // Usage
 //   ModuleLifecycle<8> lifecycle;
@@ -46,7 +53,7 @@ class ModuleLifecycle {
   struct Summary {
     size_t total = 0;
     size_t running = 0;
-    size_t failed = 0;
+    size_t failed = 0;  // includes both Error and Failed states
     size_t stopped = 0;
   };
 
@@ -67,8 +74,12 @@ class ModuleLifecycle {
   }
 
   // Initialize all modules in dependency-resolved order.
-  // Modules involved in a dependency cycle are marked Error and skipped;
-  // independent modules initialize normally.
+  //
+  // Cycle-involved modules are marked Error and skipped; independent modules
+  // initialize normally. If a module's dependency is in Error or Failed state
+  // after its initialization attempt, the dependent is also marked Error and
+  // skipped (dependency failure propagation).
+  //
   // Returns false if a cycle is detected OR a required module fails.
   bool initializeAll() {
     bool ok = true;
@@ -84,6 +95,7 @@ class ModuleLifecycle {
 
     // Fail cycle-involved modules; they cannot initialize safely.
     for (size_t i = 0; i < cycleCount; ++i) {
+      slots_[cycleIdx[i]].module->beginInitializing();
       slots_[cycleIdx[i]].module->markError();
       slots_[cycleIdx[i]].cycleError = true;
       if (slots_[cycleIdx[i]].required)
@@ -93,8 +105,21 @@ class ModuleLifecycle {
       ok = false;
 
     for (size_t i = 0; i < n; ++i) {
-      if (!slots_[order[i]].module->initialize()) {
-        if (slots_[order[i]].required)
+      size_t idx = order[i];
+
+      // Propagate failures from dependencies: if any dep is in Error or Failed,
+      // skip this module rather than trying to initialize it without its prerequisites.
+      if (hasFailedDep(idx)) {
+        slots_[idx].module->beginInitializing();
+        slots_[idx].module->markError();
+        if (slots_[idx].required)
+          ok = false;
+        continue;
+      }
+
+      slots_[idx].module->beginInitializing();
+      if (!slots_[idx].module->initialize()) {
+        if (slots_[idx].required)
           ok = false;
       }
     }
@@ -105,7 +130,7 @@ class ModuleLifecycle {
   //   - Modules that enter Error during update() are restarted immediately.
   //   - Modules already in Error state (from a previous failed restart) are
   //     retried with exponential backoff (up to kMaxRestarts consecutive
-  //     failures before the circuit opens).
+  //     failures before the circuit opens and the module is marked Failed).
   // Pass nowMs = millis() on real hardware; pass 0 in tests (first restart
   // is always immediate when restartAttempts == 0).
   void updateAll(uint32_t nowMs = 0) {
@@ -125,14 +150,16 @@ class ModuleLifecycle {
   void shutdownAll() {
     for (size_t i = count_; i > 0; --i) {
       IModule *m = slots_[i - 1].module;
-      if (m->isRunning())
+      if (m->isRunning()) {
+        m->beginStopping();
         m->shutdown();
+      }
     }
   }
 
-  // Manual recovery: resets the circuit breaker and immediately attempts
-  // shutdown → initialize. Returns false if name is null or not found, or
-  // if re-initialization fails.
+  // Manual recovery: resets the circuit breaker, clears Failed state, and
+  // immediately attempts shutdown → initialize. Returns false if name is null
+  // or not found, or if re-initialization fails.
   bool restartModule(const char *name) {
     if (!name)
       return false;
@@ -168,11 +195,13 @@ class ModuleLifecycle {
           ++s.running;
           break;
         case IModule::State::Error:
+        case IModule::State::Failed:
           ++s.failed;
           break;
         case IModule::State::Stopped:
           ++s.stopped;
           break;
+        // Initializing, Stopping, Uninitialized: transient or not yet started.
         default:
           break;
       }
@@ -267,9 +296,29 @@ class ModuleLifecycle {
     return count_;
   }
 
+  // Returns true if any declared dependency of slot idx is in Error or Failed state.
+  bool hasFailedDep(size_t idx) const {
+    IModule *m = slots_[idx].module;
+    for (size_t d = 0; d < m->dependencyCount(); ++d) {
+      const char *dep = m->dependency(d);
+      if (!dep)
+        continue;
+      size_t depIdx = indexOf(dep);
+      if (depIdx < count_ &&
+          (slots_[depIdx].module->hasError() || slots_[depIdx].module->isFailed()))
+        return true;
+    }
+    return false;
+  }
+
+  // Shutdown (if running) then initialize. Drives beginStopping / beginInitializing
+  // so the IModule state machine is updated around each operation.
   bool doRestart(IModule *m) {
-    if (m->isRunning())
+    if (m->isRunning()) {
+      m->beginStopping();
       m->shutdown();
+    }
+    m->beginInitializing();
     return m->initialize();
   }
 
@@ -277,7 +326,7 @@ class ModuleLifecycle {
   // First restart is always immediate (restartAttempts == 0).
   // Backoff is based on total attempts; circuit on consecutive failures.
   // Successful restart resets consecutiveFails; failed restart increments it.
-  // Circuit opens after kMaxRestarts consecutive failures.
+  // Circuit opens after kMaxRestarts consecutive failures, marking the module Failed.
   void tryAutoRestart(size_t idx, uint32_t nowMs) {
     Registration &slot = slots_[idx];
     if (slot.circuitOpen)
@@ -295,8 +344,10 @@ class ModuleLifecycle {
       slot.consecutiveFails = 0;
     } else {
       ++slot.consecutiveFails;
-      if (slot.consecutiveFails >= kMaxRestarts)
+      if (slot.consecutiveFails >= kMaxRestarts) {
         slot.circuitOpen = true;
+        slot.module->markFailed();
+      }
     }
   }
 

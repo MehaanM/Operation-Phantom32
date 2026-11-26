@@ -42,6 +42,7 @@ extern WebServer server;
 #define AM_SESSION_TTL_S 1800  // 30 minutes idle timeout
 #define AM_TOKEN_LEN 32        // bytes of session token (hex: 64 chars)
 #define AM_PASS_LEN 12         // device-unique password length
+#define AM_WIFI_PASS_LEN 63    // max WiFi AP password length (WPA2 spec)
 #define AM_API_KEY_LEN 32      // API key length
 #define AM_MAX_IPS 16          // IPs to track for lockout
 #define AM_LOCKOUT_ATTEMPTS 5  // failed logins before lockout
@@ -53,6 +54,10 @@ extern WebServer server;
 #define AM_NVS_AP_WIFI_PW_KEY "ap_wifi_pw"  // per-device AP WiFi password
 #define AM_NVS_APIKEY_KEY "api_key"
 #define AM_NVS_INITIALIZED "am_init"
+#define AM_NVS_CRED_VER_KEY "am_cred_ver"
+#define AM_CRED_VER "2"           // bump to force a one-time reset to default credentials
+#define AM_DEFAULT_PASS "password"
+#define AM_DEFAULT_WIFI_PASS "password"
 
 #define AM_PBKDF2_SALT_LEN 16  // random salt bytes
 #define AM_PBKDF2_KEY_LEN 32   // derived key bytes (256-bit)
@@ -86,7 +91,7 @@ static AmSession g_am_sessions[AM_SESSION_MAX] = {};
 static AmIpRecord g_am_ips[AM_MAX_IPS] = {};
 static char g_am_password_hash[AM_PBKDF2_KEY_LEN * 2 + 1] = {};  // PBKDF2 hex
 static uint8_t g_am_password_salt[AM_PBKDF2_SALT_LEN] = {};      // random salt
-static char g_am_ap_wifi_password[AM_PASS_LEN + 1] = {};         // per-device AP WiFi password
+static char g_am_ap_wifi_password[AM_WIFI_PASS_LEN + 1] = {};     // per-device AP WiFi password
 static char g_am_api_key[AM_API_KEY_LEN * 2 + 1] = {};
 static bool g_am_initialized = false;
 
@@ -330,16 +335,18 @@ static void am_load_or_generate_creds() {
   prefs.begin(AM_NVS_NS, false);
 
   bool initialized = prefs.getBool(AM_NVS_INITIALIZED, false);
+  String cred_ver = prefs.getString(AM_NVS_CRED_VER_KEY, "");
   // Migration check: old format has no PBKDF2 salt stored.
   bool has_salt = (prefs.getString(AM_NVS_PASS_SALT_KEY, "").length() == AM_PBKDF2_SALT_LEN * 2);
+  // Reset to defaults when: first boot, missing salt, or credential version changed.
+  bool need_reset = !initialized || !has_salt || (cred_ver != AM_CRED_VER);
 
-  if (!initialized || !has_salt) {
-    if (initialized && !has_salt) {
-      Serial.printf("[AUTH] Upgrading to PBKDF2 key derivation — credentials regenerated\n");
+  if (need_reset) {
+    if (initialized) {
+      Serial.printf("[AUTH] Resetting credentials to defaults\n");
     }
-    // Generate dashboard password.
-    char plaintext[AM_PASS_LEN + 1];
-    am_gen_password(plaintext, AM_PASS_LEN);
+    // Use fixed default dashboard password (user should change via UI or CLI).
+    const char *plaintext = AM_DEFAULT_PASS;
 
     // Generate random per-device PBKDF2 salt.
     uint8_t salt_raw[AM_PBKDF2_SALT_LEN];
@@ -348,11 +355,11 @@ static void am_load_or_generate_creds() {
     am_bytes_to_hex(salt_raw, AM_PBKDF2_SALT_LEN, salt_hex);
     memcpy(g_am_password_salt, salt_raw, AM_PBKDF2_SALT_LEN);
 
-    // Derive PBKDF2 key.
+    // Derive PBKDF2 key from default password.
     am_pbkdf2_password(plaintext, g_am_password_salt, g_am_password_hash);
 
-    // Generate unique AP WiFi password (different from dashboard password).
-    am_gen_password(g_am_ap_wifi_password, AM_PASS_LEN);
+    // Default AP WiFi password.
+    strlcpy(g_am_ap_wifi_password, AM_DEFAULT_WIFI_PASS, AM_WIFI_PASS_LEN + 1);
 
     // Generate API key.
     uint8_t key_raw[AM_API_KEY_LEN];
@@ -364,13 +371,11 @@ static void am_load_or_generate_creds() {
     prefs.putString(AM_NVS_AP_WIFI_PW_KEY, g_am_ap_wifi_password);
     prefs.putString(AM_NVS_APIKEY_KEY, g_am_api_key);
     prefs.putBool(AM_NVS_INITIALIZED, true);
+    prefs.putString(AM_NVS_CRED_VER_KEY, AM_CRED_VER);
 
-    // Print plaintext credentials ONCE — the only time they are recoverable.
-    Serial.printf("[AUTH] First-boot credentials (record now — will not be shown again):\n");
-    Serial.printf("[AUTH]   Dashboard password : %s\n", plaintext);
-    Serial.printf("[AUTH]   AP WiFi password   : %s\n", g_am_ap_wifi_password);
-    Serial.printf("[AUTH]   API key            : %s\n", g_am_api_key);
-    memset(plaintext, 0, sizeof(plaintext));
+    Serial.printf("[AUTH] Default credentials set — change via dashboard or CLI\n");
+    Serial.printf("[AUTH]   Dashboard password : %s\n", AM_DEFAULT_PASS);
+    Serial.printf("[AUTH]   AP WiFi password   : %s\n", AM_DEFAULT_WIFI_PASS);
   } else {
     // Load stored credentials — plaintext is never stored in NVS.
     String h = prefs.getString(AM_NVS_PASS_HASH_KEY, "");
@@ -382,8 +387,8 @@ static void am_load_or_generate_creds() {
     am_hex_to_bytes(s.c_str(), g_am_password_salt, AM_PBKDF2_SALT_LEN);
     strncpy(g_am_api_key, k.c_str(), AM_API_KEY_LEN * 2);
     g_am_api_key[AM_API_KEY_LEN * 2] = '\0';
-    strncpy(g_am_ap_wifi_password, pw.c_str(), AM_PASS_LEN);
-    g_am_ap_wifi_password[AM_PASS_LEN] = '\0';
+    strncpy(g_am_ap_wifi_password, pw.c_str(), AM_WIFI_PASS_LEN);
+    g_am_ap_wifi_password[AM_WIFI_PASS_LEN] = '\0';
     Serial.printf("[AUTH] Credentials loaded from NVS\n");
   }
   prefs.end();
@@ -562,7 +567,7 @@ button:hover{opacity:.85}
     <button type="submit">LOGIN</button>
   </form>
   <div class="err" id="err"></div>
-  <div class="hint">Password shown on Serial at first boot</div>
+  <div class="hint">Default password: <strong>password</strong> &mdash; change in Settings</div>
 </div>
 <script>
 document.getElementById('f').addEventListener('submit',async e=>{
@@ -771,6 +776,34 @@ static void am_handle_change_password() {
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void am_handle_change_wifi_password() {
+  if (!auth_check()) { auth_reject(); return; }
+  String body = server.arg("plain");
+  int idx = body.indexOf("\"new_password\"");
+  if (idx < 0) {
+    server.send(400, "application/json", "{\"error\":\"Provide new_password\"}");
+    return;
+  }
+  int q1 = body.indexOf('"', idx + 14);
+  int q2 = body.indexOf('"', q1 + 1);
+  if (q1 < 0 || q2 <= q1) {
+    server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+    return;
+  }
+  String new_pass = body.substring(q1 + 1, q2);
+  if (new_pass.length() < 8 || new_pass.length() > 63) {
+    server.send(400, "application/json", "{\"error\":\"WiFi password must be 8-63 characters\"}");
+    return;
+  }
+  strlcpy(g_am_ap_wifi_password, new_pass.c_str(), AM_WIFI_PASS_LEN + 1);
+  Preferences prefs;
+  prefs.begin(AM_NVS_NS, false);
+  prefs.putString(AM_NVS_AP_WIFI_PW_KEY, g_am_ap_wifi_password);
+  prefs.end();
+  Serial.printf("[AUTH] WiFi password changed — restart to apply\n");
+  server.send(200, "application/json", "{\"ok\":true,\"note\":\"Restart device to apply new WiFi password\"}");
+}
+
 // ============================================================
 // PUBLIC API
 // ============================================================
@@ -789,6 +822,7 @@ inline void auth_init() {
   server.on("/api/auth/status", HTTP_GET, am_handle_status);
   server.on("/api/auth/reset-creds", HTTP_POST, am_handle_reset_creds);
   server.on("/api/auth/change-password", HTTP_POST, am_handle_change_password);
+  server.on("/api/auth/change-wifi-password", HTTP_POST, am_handle_change_wifi_password);
 
   Serial.printf("[AUTH] Initialized\n");
 }

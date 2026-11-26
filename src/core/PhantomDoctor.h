@@ -10,8 +10,13 @@
 // unfinalized session always yield INCOMPLETE. allPassed() is strict: any
 // PENDING or FAIL returns false.
 
+#ifdef PHANTOM32_LITE
+static constexpr size_t PHANTOM_PD_MAX_CHECKS = 8;
+static constexpr size_t PHANTOM_PD_MAX_WARNINGS = 16;
+#else
 static constexpr size_t PHANTOM_PD_MAX_CHECKS = 16;
 static constexpr size_t PHANTOM_PD_MAX_WARNINGS = 32;
+#endif
 
 enum class CheckStatus : uint8_t { PENDING, PASS, WARN, FAIL, SKIPPED };
 

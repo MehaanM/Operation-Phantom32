@@ -8,8 +8,13 @@
 // Each metric has its own threshold and status; no combined score.
 // Thresholds are validated on registration. Trend requires >= 2 samples.
 
+#ifdef PHANTOM32_LITE
+static constexpr size_t PHANTOM_QS_MAX_METRICS = 10;
+static constexpr size_t PHANTOM_QS_MAX_SNAPSHOTS = 8;
+#else
 static constexpr size_t PHANTOM_QS_MAX_METRICS = 20;
 static constexpr size_t PHANTOM_QS_MAX_SNAPSHOTS = 16;
+#endif
 
 enum class MetricStatus : uint8_t { UNKNOWN, PASS, WARN, FAIL };
 enum class MetricTrend : uint8_t { STABLE, IMPROVING, REGRESSING };

@@ -7,8 +7,13 @@
 // ObservabilityDashboard — unified interface for logs, health, resources,
 // test results, diagnostics, and module status (Phase 19).
 
+#ifdef PHANTOM32_LITE
+static constexpr size_t PHANTOM_OD_MAX_ENTRIES = 16;
+static constexpr size_t PHANTOM_OD_MAX_MODULES = 8;
+#else
 static constexpr size_t PHANTOM_OD_MAX_ENTRIES = 32;
 static constexpr size_t PHANTOM_OD_MAX_MODULES = 16;
+#endif
 
 enum class DashboardEntryType : uint8_t {
   LOG,

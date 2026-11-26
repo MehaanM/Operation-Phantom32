@@ -13,8 +13,13 @@
 #include <esp_system.h>
 #endif
 
+#ifdef PHANTOM32_LITE
+static constexpr size_t PHANTOM_RP_MAX_MODULES = 8;
+static constexpr size_t PHANTOM_RP_MAX_SNAPSHOTS = 4;
+#else
 static constexpr size_t PHANTOM_RP_MAX_MODULES = 16;
 static constexpr size_t PHANTOM_RP_MAX_SNAPSHOTS = 8;
+#endif
 
 struct ModuleProfile {
   char name[32];

@@ -9,9 +9,15 @@
 // Recovery handlers can be registered per-failure-name; attemptRecovery() invokes
 // the handler and only marks a failure resolved if the handler succeeds.
 
+#ifdef PHANTOM32_LITE
+static constexpr size_t PHANTOM_RE_MAX_FAILURES = 8;
+static constexpr size_t PHANTOM_RE_MAX_SNAPSHOTS = 4;
+static constexpr size_t PHANTOM_RE_MAX_HANDLERS = 8;
+#else
 static constexpr size_t PHANTOM_RE_MAX_FAILURES = 16;
 static constexpr size_t PHANTOM_RE_MAX_SNAPSHOTS = 8;
 static constexpr size_t PHANTOM_RE_MAX_HANDLERS = 16;
+#endif
 
 enum class RecoveryState : uint8_t { NORMAL, DEGRADED, SAFE_MODE, RECOVERING, FAILED };
 // Avoid LOW/HIGH — Arduino esp32-hal-gpio.h defines them as 0x0/0x1 macros.

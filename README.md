@@ -404,7 +404,7 @@ requests targeting `main`. The pipeline:
    for `main` branch builds.
 2. **Native unit tests** — Runs all 460+ test cases on Ubuntu (no hardware).
 3. **Sanitizers** — Re-runs all tests under AddressSanitizer + UBSan.
-4. **Coverage** — Enforces 85% line / 65% branch minimums (gcov/lcov).
+4. **Coverage** — Enforces 85% line / 80% branch minimums on source files (gcov/lcov).
 5. **Static analysis** — Checks for hardcoded credentials, unguarded routes,
    clang-format compliance, and `-Wl,-zmuldefs` usage.
 6. **Secret scanning** — gitleaks scans full git history on every push.

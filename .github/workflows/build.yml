@@ -165,10 +165,11 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          # Threshold note: GCC 15 on Ubuntu 26+ generates ~16% more branches than GCC 11/12
-          # (additional MCDC/decision coverage tracking). The branch threshold is set to 65%
-          # for GCC 15+ environments, which is equivalent to ≥70% under GCC 11/12 (measured
-          # locally). Line coverage threshold remains 85% — it is compiler-version-stable.
+          # Coverage measures src/ source files only. Test files are excluded because
+          # Unity assertion macros generate two branches per assertion (pass/fail), but
+          # the fail path is never reached in a passing suite — giving ~50% branch
+          # coverage for each assertion with no actionable remediation. Measuring only
+          # src/ gives a stable, meaningful signal for future regressions.
           lcov --capture \
                --directory .pio/build/native_cov/ \
                --output-file coverage.info \
@@ -180,7 +181,7 @@ jobs:
                '*/.platformio/*' \
                '*/.pio/libdeps/*' \
                '*/.pio/build/unity_config/*' \
-               '*/test/unit/*' \
+               '*/test/*' \
                --output-file coverage_filtered.info \
                --rc branch_coverage=1 \
                --ignore-errors deprecated,inconsistent,unsupported \
@@ -192,7 +193,7 @@ jobs:
             branch_cov=$(lcov --summary coverage_filtered.info --rc branch_coverage=1 --ignore-errors deprecated 2>/dev/null \
                           | grep "branches" | grep -oE "[0-9]+\.[0-9]+" | head -1)
             echo "Line coverage:   ${line_cov}%  (minimum: 85%)"
-            echo "Branch coverage: ${branch_cov}%  (minimum: 65%  [GCC-15-calibrated; ≥70% on GCC 11/12])"
+            echo "Branch coverage: ${branch_cov}%  (minimum: 80%  [src/ files only; test files excluded])"
             failed=0
             if [ -n "$line_cov" ]; then
               under=$(echo "$line_cov < 85.0" | bc -l 2>/dev/null || echo 0)
@@ -205,9 +206,9 @@ jobs:
               failed=1
             fi
             if [ -n "$branch_cov" ]; then
-              under=$(echo "$branch_cov < 65.0" | bc -l 2>/dev/null || echo 0)
+              under=$(echo "$branch_cov < 80.0" | bc -l 2>/dev/null || echo 0)
               if [ "$under" = "1" ]; then
-                echo "ERROR: Branch coverage ${branch_cov}% is below the 65% minimum." >&2
+                echo "ERROR: Branch coverage ${branch_cov}% is below the 80% minimum." >&2
                 failed=1
               fi
             fi

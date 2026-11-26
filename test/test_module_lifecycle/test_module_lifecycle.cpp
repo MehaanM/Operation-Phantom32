@@ -155,12 +155,14 @@ static void test_register_increases_count() {
 }
 
 static void test_register_full_returns_false() {
-  ModuleLifecycle<2> lc;
-  MockModule a, b, c;
+  ModuleLifecycle<4> lc;
+  MockModule a, b, c, d, e;
   lc.registerModule(&a);
   lc.registerModule(&b);
-  TEST_ASSERT_FALSE(lc.registerModule(&c));
-  TEST_ASSERT_EQUAL(2, lc.count());
+  lc.registerModule(&c);
+  lc.registerModule(&d);
+  TEST_ASSERT_FALSE(lc.registerModule(&e));
+  TEST_ASSERT_EQUAL(4, lc.count());
 }
 
 static void test_register_null_returns_false() {
@@ -170,8 +172,8 @@ static void test_register_null_returns_false() {
 }
 
 static void test_capacity_matches_template_param() {
-  ModuleLifecycle<8> lc;
-  TEST_ASSERT_EQUAL(8, lc.capacity());
+  ModuleLifecycle<4> lc;
+  TEST_ASSERT_EQUAL(4, lc.capacity());
 }
 
 // ── ModuleLifecycle initializeAll ──────────────────────────────────────────
@@ -747,6 +749,86 @@ static void test_no_auto_restart_leaves_error_state() {
   TEST_ASSERT_TRUE(f.hasError());
 }
 
+// ── Targeted src-branch coverage tests ───────────────────────────────────
+
+static void test_circuit_open_blocks_further_auto_restarts() {
+  // After the circuit opens, updateAll must NOT call tryAutoRestart for
+  // modules whose circuit is open. Calling updateAll again after opening
+  // exercises the circuitOpen=true early-return branch in tryAutoRestart.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  TripwireModule tw;
+  lc.registerModule(&tw);
+  lc.initializeAll();
+
+  uint32_t t = 0;
+  while (!lc.isCircuitOpen("Tripwire")) {
+    t += 100000u;
+    lc.updateAll(t);
+  }
+  // Capture restart count at circuit open.
+  uint32_t countAtOpen = lc.restartCount("Tripwire");
+  // Call updateAll multiple more times — circuit is open so no new restarts.
+  lc.updateAll(t + 100000u);
+  lc.updateAll(t + 200000u);
+  TEST_ASSERT_EQUAL(countAtOpen, lc.restartCount("Tripwire"));
+}
+
+static void test_summary_counts_uninitialized_modules() {
+  // Calling summary() before initializeAll() exercises the Uninitialized
+  // (default) case of the switch in summary().
+  ModuleLifecycle<4> lc;
+  MockModule m;
+  lc.registerModule(&m);
+  auto s = lc.summary();
+  TEST_ASSERT_EQUAL(1, (int)s.total);
+  TEST_ASSERT_EQUAL(0, (int)s.running);
+  TEST_ASSERT_EQUAL(0, (int)s.failed);
+  TEST_ASSERT_EQUAL(0, (int)s.stopped);
+}
+
+static void test_two_dep_module_queued_after_both_deps_initialized() {
+  // Registers modules A, B, C where C depends on BOTH A and B.
+  // Kahn's BFS decrements inDegree[C] twice: 2→1 (not queued) then 1→0
+  // (queued). This covers the `if (--inDegree[i] == 0)` false branch.
+  ModuleLifecycle<4> lc;
+  NamedModule a("DepA"), b("DepB");
+  struct TwoDep : public IModule {
+    bool initialize() override { setRunning(); return true; }
+    void update() override {}
+    void shutdown() override { setStopped(); }
+    const char *name() const override { return "TwoDepC"; }
+    const char *version() const override { return "1.0"; }
+    const char *description() const override { return ""; }
+    size_t dependencyCount() const override { return 2; }
+    const char *dependency(size_t i) const override {
+      return i == 0 ? "DepA" : "DepB";
+    }
+  } c;
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  lc.registerModule(&c);
+  TEST_ASSERT_TRUE(lc.initializeAll());
+  TEST_ASSERT_FALSE(lc.cycleDetected());
+  TEST_ASSERT_TRUE(a.isRunning());
+  TEST_ASSERT_TRUE(b.isRunning());
+  TEST_ASSERT_TRUE(c.isRunning());
+}
+
+static void test_restart_at_nonzero_index_covers_loop_false_branch() {
+  // Register two modules; restart the SECOND one so the loop passes index 0
+  // (strcmp returns false) before finding the match at index 1. This covers
+  // the false branch of the strcmp condition in restartModule's loop.
+  ModuleLifecycle<4> lc;
+  MockModule first, second;
+  lc.registerModule(&first);
+  lc.registerModule(&second);
+  lc.initializeAll();
+  bool ok = lc.restartModule(second.name());
+  TEST_ASSERT_TRUE(ok);
+  TEST_ASSERT_EQUAL(2, second.initCalls);  // initial + restart
+}
+
 // ── Null-dependency and shift-cap branches ────────────────────────────────
 
 static void test_null_dep_module_initializes_normally() {
@@ -866,6 +948,11 @@ int main() {
   RUN_TEST(test_set_auto_restart);
   RUN_TEST(test_auto_restart_recovers_error_in_update);
   RUN_TEST(test_no_auto_restart_leaves_error_state);
+
+  RUN_TEST(test_circuit_open_blocks_further_auto_restarts);
+  RUN_TEST(test_summary_counts_uninitialized_modules);
+  RUN_TEST(test_two_dep_module_queued_after_both_deps_initialized);
+  RUN_TEST(test_restart_at_nonzero_index_covers_loop_false_branch);
 
   RUN_TEST(test_null_dep_module_initializes_normally);
   RUN_TEST(test_null_dep_mixed_with_normal_module);

@@ -211,6 +211,9 @@ jobs:
                 echo "ERROR: Branch coverage ${branch_cov}% is below the 80% minimum." >&2
                 failed=1
               fi
+            else
+              echo "ERROR: Could not parse branch coverage — no branch data in report." >&2
+              failed=1
             fi
             if [ "$failed" = "1" ]; then exit 1; fi
           else
@@ -359,9 +362,10 @@ jobs:
               'metadata': {
                   'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
                   'component': {
-                      'type': 'firmware',
-                      'name': 'Phantom32',
-                      'version': '3.2.0'
+                      'type': 'application',
+                      'name': 'Phantom32-CI-tooling',
+                      'version': '3.2.0',
+                      'description': 'CI Python tooling environment (not firmware dependencies)'
                   }
               },
               'components': components

@@ -1426,8 +1426,8 @@ void loop() {
     uint32_t heapNow = esp_get_free_heap_size();
     g_quality_scorecard.recordValue("FreeHeap", (double)heapNow);
     if (heapNow < HEAP_CRIT_THRESHOLD) {
-      g_recovery_engine.recordFailure("LowHeap", "Heap below critical", FailureSeverity::SEV_HIGH, true,
-                                      now);
+      g_recovery_engine.recordFailure("LowHeap", "Heap below critical", FailureSeverity::SEV_HIGH,
+                                      true, now);
     }
   }
 

@@ -136,6 +136,86 @@ static void test_pass_warn_fail_counts() {
   TEST_ASSERT_EQUAL(1, (int)pd.failCount());
 }
 
+// ── pendingCount / allPassed with PENDING ─────────────────────────────────────
+
+static void test_pending_count_initial() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.registerCheck("b", "");
+  TEST_ASSERT_EQUAL(2, (int)pd.pendingCount());
+}
+
+static void test_all_passed_blocks_on_pending() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.registerCheck("b", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  // "b" is still PENDING
+  TEST_ASSERT_FALSE(pd.allPassed());
+}
+
+static void test_all_passed_no_pending() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  TEST_ASSERT_TRUE(pd.allPassed());
+}
+
+// ── overallStatus ─────────────────────────────────────────────────────────────
+
+static void test_overall_status_incomplete_before_finalise() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  // Not finalised yet
+  TEST_ASSERT_EQUAL((int)DiagStatus::INCOMPLETE, (int)pd.overallStatus());
+}
+
+static void test_overall_status_incomplete_with_pending() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.registerCheck("b", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  pd.finalise(1000);
+  // "b" still PENDING
+  TEST_ASSERT_EQUAL((int)DiagStatus::INCOMPLETE, (int)pd.overallStatus());
+}
+
+static void test_overall_status_fail() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.setCheckResult("a", CheckStatus::FAIL, "");
+  pd.finalise(1000);
+  TEST_ASSERT_EQUAL((int)DiagStatus::FAIL, (int)pd.overallStatus());
+}
+
+static void test_overall_status_warn() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.setCheckResult("a", CheckStatus::WARN, "");
+  pd.finalise(1000);
+  TEST_ASSERT_EQUAL((int)DiagStatus::WARN, (int)pd.overallStatus());
+}
+
+static void test_overall_status_warn_via_string_warnings() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  pd.addWarning("something suspicious");
+  pd.finalise(1000);
+  TEST_ASSERT_EQUAL((int)DiagStatus::WARN, (int)pd.overallStatus());
+}
+
+static void test_overall_status_pass() {
+  PhantomDoctor pd;
+  pd.registerCheck("a", "");
+  pd.registerCheck("b", "");
+  pd.setCheckResult("a", CheckStatus::PASS, "");
+  pd.setCheckResult("b", CheckStatus::SKIPPED, "");
+  pd.finalise(1000);
+  TEST_ASSERT_EQUAL((int)DiagStatus::PASS, (int)pd.overallStatus());
+}
+
 // ── checkFor / generateReport ─────────────────────────────────────────────────
 
 static void test_check_for_null_returns_null() {
@@ -150,7 +230,7 @@ static void test_check_for_unknown_returns_null() {
 
 static void test_generate_report_null_safe() {
   PhantomDoctor pd;
-  pd.generateReport(nullptr); // must not crash
+  pd.generateReport(nullptr);  // must not crash
 }
 
 static void test_generate_report_produces_output() {
@@ -195,6 +275,17 @@ int main() {
   RUN_TEST(test_all_passed_with_failure);
 
   RUN_TEST(test_pass_warn_fail_counts);
+
+  RUN_TEST(test_pending_count_initial);
+  RUN_TEST(test_all_passed_blocks_on_pending);
+  RUN_TEST(test_all_passed_no_pending);
+
+  RUN_TEST(test_overall_status_incomplete_before_finalise);
+  RUN_TEST(test_overall_status_incomplete_with_pending);
+  RUN_TEST(test_overall_status_fail);
+  RUN_TEST(test_overall_status_warn);
+  RUN_TEST(test_overall_status_warn_via_string_warnings);
+  RUN_TEST(test_overall_status_pass);
 
   RUN_TEST(test_check_for_null_returns_null);
   RUN_TEST(test_check_for_unknown_returns_null);

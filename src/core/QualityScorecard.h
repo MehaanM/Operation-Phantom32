@@ -6,10 +6,7 @@
 
 // QualityScorecard — independent per-metric quality tracking (Phase 18).
 // Each metric has its own threshold and status; no combined score.
-
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
+// Thresholds are validated on registration. Trend requires >= 2 samples.
 
 static constexpr size_t PHANTOM_QS_MAX_METRICS = 20;
 static constexpr size_t PHANTOM_QS_MAX_SNAPSHOTS = 16;
@@ -26,6 +23,7 @@ struct QualityMetric {
   bool higherIsBetter;
   MetricStatus status;
   MetricTrend trend;
+  uint32_t sampleCount;  // trend requires >= 2
   bool valid;
 };
 
@@ -38,9 +36,16 @@ struct MetricSnapshot {
 };
 
 struct QualityScorecard {
+  // Registers (or updates) a metric. Validates thresholds:
+  //   higherIsBetter=true  → warnThreshold must be > failThreshold
+  //   higherIsBetter=false → warnThreshold must be < failThreshold
   bool trackMetric(const char *name, const char *unit, double warnThreshold, double failThreshold,
                    bool higherIsBetter) {
     if (!name || !name[0])
+      return false;
+    if (higherIsBetter && warnThreshold <= failThreshold)
+      return false;
+    if (!higherIsBetter && warnThreshold >= failThreshold)
       return false;
     for (size_t i = 0; i < metricCount_; ++i) {
       if (strncmp(metrics_[i].name, name, 31) == 0) {
@@ -64,6 +69,7 @@ struct QualityScorecard {
     m.higherIsBetter = higherIsBetter;
     m.status = MetricStatus::UNKNOWN;
     m.trend = MetricTrend::STABLE;
+    m.sampleCount = 0;
     m.valid = true;
     return true;
   }
@@ -76,7 +82,9 @@ struct QualityScorecard {
         double prev = metrics_[i].value;
         metrics_[i].value = value;
         metrics_[i].status = computeStatus(metrics_[i], value);
-        if (metrics_[i].status != MetricStatus::UNKNOWN) {
+        ++metrics_[i].sampleCount;
+        // Trend requires at least 2 samples; first sample stays STABLE.
+        if (metrics_[i].sampleCount >= 2) {
           bool improved = metrics_[i].higherIsBetter ? (value > prev) : (value < prev);
           bool worsened = metrics_[i].higherIsBetter ? (value < prev) : (value > prev);
           if (improved)
@@ -85,6 +93,8 @@ struct QualityScorecard {
             metrics_[i].trend = MetricTrend::REGRESSING;
           else
             metrics_[i].trend = MetricTrend::STABLE;
+        } else {
+          metrics_[i].trend = MetricTrend::STABLE;
         }
         return true;
       }
@@ -180,7 +190,12 @@ struct QualityScorecard {
         tag = "WARN";
       else if (metrics_[i].status == MetricStatus::FAIL)
         tag = "FAIL";
-      fprintf(out, "  %-24s %s (%.2f %s)\n", metrics_[i].name, tag, metrics_[i].value,
+      const char *trend = "";
+      if (metrics_[i].trend == MetricTrend::IMPROVING)
+        trend = " ^";
+      else if (metrics_[i].trend == MetricTrend::REGRESSING)
+        trend = " v";
+      fprintf(out, "  %-24s %s%s (%.2f %s)\n", metrics_[i].name, tag, trend, metrics_[i].value,
               metrics_[i].unit);
     }
   }

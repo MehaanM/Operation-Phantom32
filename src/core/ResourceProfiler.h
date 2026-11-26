@@ -5,9 +5,12 @@
 #include <string.h>
 
 // ResourceProfiler — per-module RAM/CPU/storage profiling and regression detection (Phase 19).
+// sampleSystem() populates real ESP32 heap metrics on firmware builds (guarded by
+// PHANTOM32_NATIVE_TEST, which the native/native_asan/native_cov envs set via -D).
 
 #ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
+#include <esp_heap_caps.h>
+#include <esp_system.h>
 #endif
 
 static constexpr size_t PHANTOM_RP_MAX_MODULES = 16;
@@ -138,6 +141,31 @@ struct ResourceProfiler {
 
   size_t moduleCount() const { return modCount_; }
 
+  // Samples the ESP32 system heap and updates the "System" module profile.
+  // On native test builds (PHANTOM32_NATIVE_TEST defined) this is a no-op
+  // so tests can call it safely without linking ESP32 SDK headers.
+  void sampleSystem(uint64_t nowMs) {
+    (void)nowMs;
+#ifndef PHANTOM32_NATIVE_TEST
+    uint32_t freeHeap = esp_get_free_heap_size();
+    uint32_t totalHeap = (uint32_t)heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    systemFreeRam_ = freeHeap;
+    systemTotalRam_ = totalHeap;
+    // Register "System" module if not yet present, then update its RAM.
+    registerModule("System");
+    for (size_t i = 0; i < modCount_; ++i) {
+      if (strncmp(mods_[i].name, "System", 31) == 0) {
+        mods_[i].ramBytes = freeHeap;
+        ++mods_[i].sampleCount;
+        break;
+      }
+    }
+#endif
+  }
+
+  uint32_t systemFreeRam() const { return systemFreeRam_; }
+  uint32_t systemTotalRam() const { return systemTotalRam_; }
+
   void generateReport(FILE *out) const {
     if (!out)
       return;
@@ -155,6 +183,8 @@ struct ResourceProfiler {
   ProfileSnapshot snaps_[PHANTOM_RP_MAX_SNAPSHOTS] = {};
   size_t modCount_ = 0;
   size_t snapCount_ = 0;
+  uint32_t systemFreeRam_ = 0;
+  uint32_t systemTotalRam_ = 0;
 
   ModuleProfile *findMod(const char *name) {
     if (!name)

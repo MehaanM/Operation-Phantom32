@@ -34,6 +34,20 @@ static void test_track_updates_existing() {
   TEST_ASSERT_EQUAL(85, (int)m->warnThreshold);
 }
 
+static void test_track_invalid_threshold_higher_is_better() {
+  QualityScorecard qs;
+  // warnThreshold <= failThreshold when higherIsBetter=true is invalid
+  TEST_ASSERT_FALSE(qs.trackMetric("cov", "%", 70.0, 80.0, true));
+  TEST_ASSERT_FALSE(qs.trackMetric("cov", "%", 70.0, 70.0, true));
+}
+
+static void test_track_invalid_threshold_lower_is_better() {
+  QualityScorecard qs;
+  // warnThreshold >= failThreshold when higherIsBetter=false is invalid
+  TEST_ASSERT_FALSE(qs.trackMetric("warn", "n", 10.0, 5.0, false));
+  TEST_ASSERT_FALSE(qs.trackMetric("warn", "n", 10.0, 10.0, false));
+}
+
 static void test_track_full_fails() {
   QualityScorecard qs;
   for (size_t i = 0; i < PHANTOM_QS_MAX_METRICS; ++i) {
@@ -109,6 +123,15 @@ static void test_status_for_unrecorded_unknown() {
 
 // ── trend ─────────────────────────────────────────────────────────────────────
 
+static void test_first_sample_trend_stable() {
+  QualityScorecard qs;
+  qs.trackMetric("cov", "%", 80.0, 70.0, true);
+  qs.recordValue("cov", 75.0);  // first sample — no prior to compare against
+  const QualityMetric *m = qs.metricFor("cov");
+  TEST_ASSERT_NOT_NULL(m);
+  TEST_ASSERT_EQUAL((int)MetricTrend::STABLE, (int)m->trend);
+}
+
 static void test_trend_improving() {
   QualityScorecard qs;
   qs.trackMetric("cov", "%", 80.0, 70.0, true);
@@ -136,9 +159,9 @@ static void test_pass_warn_fail_counts() {
   qs.trackMetric("a", "", 80.0, 70.0, true);
   qs.trackMetric("b", "", 80.0, 70.0, true);
   qs.trackMetric("c", "", 80.0, 70.0, true);
-  qs.recordValue("a", 90.0); // PASS
-  qs.recordValue("b", 75.0); // WARN
-  qs.recordValue("c", 60.0); // FAIL
+  qs.recordValue("a", 90.0);  // PASS
+  qs.recordValue("b", 75.0);  // WARN
+  qs.recordValue("c", 60.0);  // FAIL
   TEST_ASSERT_EQUAL(1, (int)qs.passCount());
   TEST_ASSERT_EQUAL(1, (int)qs.warnCount());
   TEST_ASSERT_EQUAL(1, (int)qs.failCount());
@@ -172,7 +195,7 @@ static void test_regression_positive() {
   qs.trackMetric("cov", "%", 80.0, 70.0, true);
   qs.recordValue("cov", 90.0);
   qs.saveSnapshot("v1", 1000);
-  qs.recordValue("cov", 80.0); // dropped 10 → regression = 10
+  qs.recordValue("cov", 80.0);  // dropped 10 → regression = 10
   TEST_ASSERT_EQUAL(10, (int)qs.regressionVs("v1", "cov"));
 }
 
@@ -181,7 +204,7 @@ static void test_regression_negative_on_improvement() {
   qs.trackMetric("cov", "%", 80.0, 70.0, true);
   qs.recordValue("cov", 80.0);
   qs.saveSnapshot("v1", 1000);
-  qs.recordValue("cov", 90.0); // improved → regression = -10
+  qs.recordValue("cov", 90.0);  // improved → regression = -10
   TEST_ASSERT_EQUAL(-10, (int)qs.regressionVs("v1", "cov"));
 }
 
@@ -207,7 +230,7 @@ static void test_metric_for_null_returns_null() {
 
 static void test_generate_report_null_safe() {
   QualityScorecard qs;
-  qs.generateReport(nullptr); // must not crash
+  qs.generateReport(nullptr);  // must not crash
 }
 
 static void test_generate_report_produces_output() {
@@ -232,6 +255,8 @@ int main() {
   RUN_TEST(test_track_null_fails);
   RUN_TEST(test_track_empty_fails);
   RUN_TEST(test_track_updates_existing);
+  RUN_TEST(test_track_invalid_threshold_higher_is_better);
+  RUN_TEST(test_track_invalid_threshold_lower_is_better);
   RUN_TEST(test_track_full_fails);
 
   RUN_TEST(test_record_value_pass);
@@ -244,6 +269,7 @@ int main() {
   RUN_TEST(test_status_for_null_unknown);
   RUN_TEST(test_status_for_unrecorded_unknown);
 
+  RUN_TEST(test_first_sample_trend_stable);
   RUN_TEST(test_trend_improving);
   RUN_TEST(test_trend_regressing);
 

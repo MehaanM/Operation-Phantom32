@@ -6,10 +6,7 @@
 
 // TestGenerator — produces test skeleton descriptors from module interfaces (Phase 19).
 // Generates happy-path, null-input, boundary, error-path, and state-machine test cases.
-
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
+// generateFile() writes a compilable Unity .cpp to disk.
 
 static constexpr size_t PHANTOM_TG_MAX_SPECS = 16;
 static constexpr size_t PHANTOM_TG_MAX_CASES = 32;
@@ -116,6 +113,46 @@ struct TestGenerator {
   }
 
   size_t specCount() const { return specCount_; }
+
+  // Writes a compilable Unity test .cpp to outputPath.
+  // The file includes unity.h and includeHeader, setUp/tearDown stubs,
+  // one test function per case with the setupHint as a comment, and a
+  // main() that runs all of them. Returns false on null params or file error.
+  bool generateFile(const char *moduleName, const char *includeHeader,
+                    const char *outputPath) const {
+    if (!moduleName || !includeHeader || !outputPath)
+      return false;
+    const ModuleTestSpec *s = specFor(moduleName);
+    if (!s)
+      return false;
+    FILE *f = fopen(outputPath, "w");
+    if (!f)
+      return false;
+
+    fprintf(f, "#include \"unity.h\"\n");
+    fprintf(f, "#include \"%s\"\n\n", includeHeader);
+    fprintf(f, "void setUp() {}\n");
+    fprintf(f, "void tearDown() {}\n\n");
+
+    for (size_t i = 0; i < s->caseCount; ++i) {
+      fprintf(f, "static void %s() {\n", s->cases[i].name);
+      if (s->cases[i].setupHint[0])
+        fprintf(f, "  // Setup: %s\n", s->cases[i].setupHint);
+      fprintf(f, "  // %s\n", s->cases[i].description);
+      fprintf(f, "  TEST_PASS(); // TODO: implement\n");
+      fprintf(f, "}\n\n");
+    }
+
+    fprintf(f, "int main() {\n");
+    fprintf(f, "  UNITY_BEGIN();\n");
+    for (size_t i = 0; i < s->caseCount; ++i)
+      fprintf(f, "  RUN_TEST(%s);\n", s->cases[i].name);
+    fprintf(f, "  return UNITY_END();\n");
+    fprintf(f, "}\n");
+
+    fclose(f);
+    return true;
+  }
 
   void printSkeleton(const char *moduleName, FILE *out) const {
     if (!out)

@@ -6,15 +6,17 @@
 
 // PhantomDoctor — automated firmware diagnosis report (Phase 19).
 // Registers named checks, records their results, and generates a report.
-
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
+// overallStatus() reflects PASS/WARN/FAIL/INCOMPLETE — PENDING checks or an
+// unfinalized session always yield INCOMPLETE. allPassed() is strict: any
+// PENDING or FAIL returns false.
 
 static constexpr size_t PHANTOM_PD_MAX_CHECKS = 16;
 static constexpr size_t PHANTOM_PD_MAX_WARNINGS = 32;
 
 enum class CheckStatus : uint8_t { PENDING, PASS, WARN, FAIL, SKIPPED };
+
+// Overall diagnostic session result.
+enum class DiagStatus : uint8_t { PASS, WARN, FAIL, INCOMPLETE };
 
 struct DiagnosticCheck {
   char name[32];
@@ -101,11 +103,39 @@ struct PhantomDoctor {
     return n;
   }
 
+  size_t pendingCount() const {
+    size_t n = 0;
+    for (size_t i = 0; i < checkCount_; ++i)
+      if (checks_[i].status == CheckStatus::PENDING)
+        ++n;
+    return n;
+  }
+
+  // Returns false if any check is FAIL or PENDING (incomplete diagnostic).
   bool allPassed() const {
     for (size_t i = 0; i < checkCount_; ++i)
-      if (checks_[i].status == CheckStatus::FAIL)
+      if (checks_[i].status == CheckStatus::FAIL || checks_[i].status == CheckStatus::PENDING)
         return false;
     return true;
+  }
+
+  // Strict overall status:
+  //   INCOMPLETE — not finalized, or any check still PENDING
+  //   FAIL       — any check is FAIL
+  //   WARN       — any check is WARN, or any string warnings were added
+  //   PASS       — all checks PASS or SKIPPED
+  DiagStatus overallStatus() const {
+    if (!complete_ || pendingCount() > 0)
+      return DiagStatus::INCOMPLETE;
+    for (size_t i = 0; i < checkCount_; ++i)
+      if (checks_[i].status == CheckStatus::FAIL)
+        return DiagStatus::FAIL;
+    for (size_t i = 0; i < checkCount_; ++i)
+      if (checks_[i].status == CheckStatus::WARN)
+        return DiagStatus::WARN;
+    if (warnCount_ > 0)
+      return DiagStatus::WARN;
+    return DiagStatus::PASS;
   }
 
   bool isComplete() const { return complete_; }
@@ -124,7 +154,15 @@ struct PhantomDoctor {
   void generateReport(FILE *out) const {
     if (!out)
       return;
-    fprintf(out, "PHANTOM DOCTOR\n\n");
+    const char *statusStr = "INCOMPLETE";
+    DiagStatus ds = overallStatus();
+    if (ds == DiagStatus::PASS)
+      statusStr = "PASS";
+    else if (ds == DiagStatus::WARN)
+      statusStr = "WARN";
+    else if (ds == DiagStatus::FAIL)
+      statusStr = "FAIL";
+    fprintf(out, "PHANTOM DOCTOR  [%s]\n\n", statusStr);
     for (size_t i = 0; i < checkCount_; ++i) {
       const char *tag = "PENDING";
       if (checks_[i].status == CheckStatus::PASS)
@@ -135,7 +173,10 @@ struct PhantomDoctor {
         tag = "WARN";
       else if (checks_[i].status == CheckStatus::SKIPPED)
         tag = "SKIPPED";
-      fprintf(out, "  %-30s %s\n", checks_[i].name, tag);
+      fprintf(out, "  %-30s %s", checks_[i].name, tag);
+      if (checks_[i].detail[0])
+        fprintf(out, "  (%s)", checks_[i].detail);
+      fputc('\n', out);
     }
     if (warnCount_ > 0) {
       fprintf(out, "\nWarnings:\n");

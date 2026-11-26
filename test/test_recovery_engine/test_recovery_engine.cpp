@@ -152,6 +152,67 @@ static void test_failure_at_out_of_range_null() {
   TEST_ASSERT_NULL(re.failureAt(0));
 }
 
+// ── registerHandler / handler callbacks ───────────────────────────────────────
+
+static bool s_handler_called = false;
+static bool handler_succeeds(const char * /*name*/, void * /*ctx*/) {
+  s_handler_called = true;
+  return true;
+}
+static bool handler_fails(const char * /*name*/, void * /*ctx*/) {
+  s_handler_called = true;
+  return false;
+}
+
+static void test_register_handler_ok() {
+  RecoveryEngine re;
+  TEST_ASSERT_TRUE(re.registerHandler("wifi", handler_succeeds));
+  TEST_ASSERT_EQUAL(1, (int)re.handlerCount());
+}
+
+static void test_register_handler_null_name_fails() {
+  RecoveryEngine re;
+  TEST_ASSERT_FALSE(re.registerHandler(nullptr, handler_succeeds));
+}
+
+static void test_register_handler_null_fn_fails() {
+  RecoveryEngine re;
+  TEST_ASSERT_FALSE(re.registerHandler("wifi", nullptr));
+}
+
+static void test_register_handler_upserts() {
+  RecoveryEngine re;
+  re.registerHandler("wifi", handler_succeeds);
+  TEST_ASSERT_TRUE(re.registerHandler("wifi", handler_fails));
+  TEST_ASSERT_EQUAL(1, (int)re.handlerCount());
+}
+
+static void test_handler_invoked_on_recovery() {
+  RecoveryEngine re;
+  s_handler_called = false;
+  re.registerHandler("wifi", handler_succeeds);
+  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.attemptRecovery("wifi", 2000);
+  TEST_ASSERT_TRUE(s_handler_called);
+}
+
+static void test_handler_failure_prevents_resolution() {
+  RecoveryEngine re;
+  re.registerHandler("wifi", handler_fails);
+  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  TEST_ASSERT_FALSE(re.attemptRecovery("wifi", 2000));
+  // Still active — not resolved
+  TEST_ASSERT_EQUAL(1, (int)re.activeFailureCount());
+}
+
+static void test_no_handler_still_resolves() {
+  RecoveryEngine re;
+  // No handler registered — backward compat: resolve unconditionally
+  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  TEST_ASSERT_TRUE(re.attemptRecovery("wifi", 2000));
+  TEST_ASSERT_EQUAL(0, (int)re.activeFailureCount());
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -183,6 +244,14 @@ int main() {
 
   RUN_TEST(test_failure_at_ok);
   RUN_TEST(test_failure_at_out_of_range_null);
+
+  RUN_TEST(test_register_handler_ok);
+  RUN_TEST(test_register_handler_null_name_fails);
+  RUN_TEST(test_register_handler_null_fn_fails);
+  RUN_TEST(test_register_handler_upserts);
+  RUN_TEST(test_handler_invoked_on_recovery);
+  RUN_TEST(test_handler_failure_prevents_resolution);
+  RUN_TEST(test_no_handler_still_resolves);
 
   return UNITY_END();
 }

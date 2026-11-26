@@ -6,16 +6,18 @@
 
 // RecoveryEngine — safe-mode boot and controlled recovery state machine (Phase 19).
 // Tracks active failures, transitions system state, and preserves diagnostics.
-
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
+// Recovery handlers can be registered per-failure-name; attemptRecovery() invokes
+// the handler and only marks a failure resolved if the handler succeeds.
 
 static constexpr size_t PHANTOM_RE_MAX_FAILURES = 16;
 static constexpr size_t PHANTOM_RE_MAX_SNAPSHOTS = 8;
+static constexpr size_t PHANTOM_RE_MAX_HANDLERS = 16;
 
 enum class RecoveryState : uint8_t { NORMAL, DEGRADED, SAFE_MODE, RECOVERING, FAILED };
 enum class FailureSeverity : uint8_t { LOW, MEDIUM, HIGH, CRITICAL };
+
+// Handler signature: returns true if recovery succeeded, false if it failed.
+using RecoveryHandler = bool (*)(const char *failureName, void *ctx);
 
 struct FailureRecord {
   char name[32];
@@ -32,6 +34,13 @@ struct DiagnosticSnapshot {
   RecoveryState state;
   size_t activeFailures;
   uint64_t timestampMs;
+  bool valid;
+};
+
+struct HandlerRecord {
+  char name[32];
+  RecoveryHandler fn;
+  void *ctx;
   bool valid;
 };
 
@@ -65,13 +74,53 @@ struct RecoveryEngine {
     return true;
   }
 
+  // Register a recovery handler for a named failure.
+  // handler must not be null. Updates the handler if one is already registered
+  // for this name. Returns false on null/empty name or null handler.
+  bool registerHandler(const char *name, RecoveryHandler handler, void *ctx = nullptr) {
+    if (!name || !name[0] || !handler)
+      return false;
+    for (size_t i = 0; i < handlerCount_; ++i) {
+      if (strncmp(handlers_[i].name, name, 31) == 0) {
+        handlers_[i].fn = handler;
+        handlers_[i].ctx = ctx;
+        return true;
+      }
+    }
+    if (handlerCount_ >= PHANTOM_RE_MAX_HANDLERS)
+      return false;
+    HandlerRecord &h = handlers_[handlerCount_++];
+    memset(&h, 0, sizeof(h));
+    strncpy(h.name, name, 31);
+    h.fn = handler;
+    h.ctx = ctx;
+    h.valid = true;
+    return true;
+  }
+
   RecoveryState currentState() const { return state_; }
 
+  // If a handler is registered for this failure, it is invoked first.
+  // The failure is only marked resolved if no handler is registered,
+  // or if the registered handler returns true.
   bool attemptRecovery(const char *failureName, uint64_t nowMs) {
     if (!failureName)
       return false;
     for (size_t i = 0; i < failCount_; ++i) {
       if (!failures_[i].resolved && strncmp(failures_[i].name, failureName, 31) == 0) {
+        // Look up handler
+        RecoveryHandler fn = nullptr;
+        void *ctx = nullptr;
+        for (size_t h = 0; h < handlerCount_; ++h) {
+          if (strncmp(handlers_[h].name, failureName, 31) == 0) {
+            fn = handlers_[h].fn;
+            ctx = handlers_[h].ctx;
+            break;
+          }
+        }
+        // Handler registered: must succeed to resolve
+        if (fn && !fn(failureName, ctx))
+          return false;
         failures_[i].resolved = true;
         failures_[i].timestampMs = nowMs;
         recomputeState();
@@ -130,12 +179,15 @@ struct RecoveryEngine {
   }
 
   size_t totalFailureCount() const { return failCount_; }
+  size_t handlerCount() const { return handlerCount_; }
 
  private:
   FailureRecord failures_[PHANTOM_RE_MAX_FAILURES] = {};
   DiagnosticSnapshot snaps_[PHANTOM_RE_MAX_SNAPSHOTS] = {};
+  HandlerRecord handlers_[PHANTOM_RE_MAX_HANDLERS] = {};
   size_t failCount_ = 0;
   size_t snapCount_ = 0;
+  size_t handlerCount_ = 0;
   RecoveryState state_ = RecoveryState::NORMAL;
 
   void recomputeState() {

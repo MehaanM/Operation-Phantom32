@@ -92,6 +92,13 @@ uint16_t g_seq = 0;
 // ---- Extended analytical modules (all sessions) ----
 #include "extended_modules.h"
 
+// ---- Phase 18-20 diagnostic runtime ----
+#include "core/PhantomDoctor.h"
+#include "core/RecoveryEngine.h"
+#include "core/ResourceProfiler.h"
+#include "core/QualityScorecard.h"
+#include "core/ObservabilityDashboard.h"
+
 // ============================================================
 // SYSTEM CONSTANTS
 // ============================================================
@@ -110,6 +117,13 @@ uint16_t g_seq = 0;
 // ============================================================
 // GLOBAL STATE
 // ============================================================
+
+// Phase 18-20 diagnostic instances
+static PhantomDoctor g_phantom_doctor;
+static RecoveryEngine g_recovery_engine;
+static ResourceProfiler g_resource_profiler;
+static QualityScorecard g_quality_scorecard;
+static ObservabilityDashboard g_observability;
 
 static uint32_t g_boot_ts = 0;
 static bool g_promisc_active = false;
@@ -1292,12 +1306,59 @@ void setup() {
   // ---- Extended analytical module routes ----
   ext_register_routes();
 
+  // ---- Phase 18-20 API routes ----
+  server.on("/api/phantom-doctor", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    DiagStatus ds = g_phantom_doctor.overallStatus();
+    const char *statusStr = "INCOMPLETE";
+    if (ds == DiagStatus::PASS) statusStr = "PASS";
+    else if (ds == DiagStatus::WARN) statusStr = "WARN";
+    else if (ds == DiagStatus::FAIL) statusStr = "FAIL";
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+      "{\"status\":\"%s\",\"pass\":%u,\"warn\":%u,\"fail\":%u,\"pending\":%u}",
+      statusStr, (unsigned)g_phantom_doctor.passCount(),
+      (unsigned)g_phantom_doctor.warnCount(), (unsigned)g_phantom_doctor.failCount(),
+      (unsigned)g_phantom_doctor.pendingCount());
+    server.send(200, "application/json", buf);
+  });
+
+  server.on("/api/resource-profile", HTTP_GET, []() {
+    if (!auth_check()) { auth_reject(); return; }
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+      "{\"freeHeap\":%u,\"totalHeap\":%u}",
+      (unsigned)g_resource_profiler.systemFreeRam(),
+      (unsigned)g_resource_profiler.systemTotalRam());
+    server.send(200, "application/json", buf);
+  });
+
   // ---- 404 handler ----
   server.onNotFound([]() {
     // Try to redirect unknown requests to dashboard for captive portal UX
     server.sendHeader("Location", "http://192.168.4.1/dashboard");
     server.send(302, "text/plain", "");
   });
+
+  // ---- Phase 18-20 diagnostics ----
+  g_phantom_doctor.registerCheck("Heap", "Free heap above critical threshold");
+  g_phantom_doctor.registerCheck("Storage", "LittleFS mounted and readable");
+  g_phantom_doctor.registerCheck("WiFi", "AP interface up");
+
+  uint32_t freeHeap = esp_get_free_heap_size();
+  g_phantom_doctor.setCheckResult("Heap",
+    freeHeap > HEAP_CRIT_THRESHOLD ? CheckStatus::PASS : CheckStatus::FAIL,
+    freeHeap > HEAP_CRIT_THRESHOLD ? "OK" : "Critical");
+  g_phantom_doctor.setCheckResult("Storage",
+    LittleFS.totalBytes() > 0 ? CheckStatus::PASS : CheckStatus::FAIL, "");
+  g_phantom_doctor.setCheckResult("WiFi",
+    WiFi.softAPIP() != IPAddress() ? CheckStatus::PASS : CheckStatus::FAIL, "");
+  g_phantom_doctor.finalise(millis());
+
+  g_resource_profiler.sampleSystem(millis());
+
+  g_quality_scorecard.trackMetric("FreeHeap", "bytes", HEAP_WARN_THRESHOLD, HEAP_CRIT_THRESHOLD, true);
+  g_quality_scorecard.recordValue("FreeHeap", (double)freeHeap);
 
   // ---- Start server ----
   server.begin();
@@ -1348,6 +1409,19 @@ void loop() {
   (void)last_age;
   (void)now;
 #endif
+
+  // Phase 18-20: periodic resource sampling every 30 s
+  static uint32_t g_last_profiler_sample = 0;
+  if (now - g_last_profiler_sample >= 30000) {
+    g_last_profiler_sample = now;
+    g_resource_profiler.sampleSystem(now);
+    uint32_t heapNow = esp_get_free_heap_size();
+    g_quality_scorecard.recordValue("FreeHeap", (double)heapNow);
+    if (heapNow < HEAP_CRIT_THRESHOLD) {
+      g_recovery_engine.recordFailure("LowHeap", "Heap below critical",
+                                      FailureSeverity::HIGH, true, now);
+    }
+  }
 
   // Watchdog tap
   g_watchdog_ts = now;

@@ -6,10 +6,6 @@
 
 // ProgressReporter — progress tracking for long-running operations (Phase 20).
 
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
-
 static constexpr size_t PHANTOM_PROG_MAX_OPS = 8;
 
 struct ProgressOp {

@@ -7,10 +7,6 @@
 // ObservabilityDashboard — unified interface for logs, health, resources,
 // test results, diagnostics, and module status (Phase 19).
 
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
-
 static constexpr size_t PHANTOM_OD_MAX_ENTRIES = 32;
 static constexpr size_t PHANTOM_OD_MAX_MODULES = 16;
 

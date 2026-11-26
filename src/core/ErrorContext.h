@@ -7,10 +7,6 @@
 // ErrorContext — standardized error handling with actionable messages (Phase 20).
 // Registers named error codes with hints, tracks active errors, and reports them.
 
-#ifndef PHANTOM32_NATIVE_TEST
-#define PHANTOM32_NATIVE_TEST
-#endif
-
 static constexpr size_t PHANTOM_EC_MAX_CODES = 32;
 static constexpr size_t PHANTOM_EC_MAX_ACTIVE = 16;
 

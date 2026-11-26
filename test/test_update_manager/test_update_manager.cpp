@@ -239,6 +239,39 @@ static void test_transaction_recorded_on_rollback() {
   TEST_ASSERT_FALSE(um.transactionAt(0)->success);
 }
 
+static void test_zero_expected_size_progress() {
+  UpdateManager um;
+  um.loadManifest(makeManifest("1.2.0", 0, 0xCAFE));  // expectedSize=0
+  um.startUpdate("1.0.0", 1000);
+  TEST_ASSERT_TRUE(um.setDownloadProgress(999));  // no overflow check when size==0
+}
+
+static void test_zero_expected_size_complete() {
+  UpdateManager um;
+  um.loadManifest(makeManifest("1.2.0", 0, 0xCAFE));  // expectedSize=0
+  um.startUpdate("1.0.0", 1000);
+  um.setDownloadProgress(0);
+  TEST_ASSERT_TRUE(um.completeDownload(0xCAFE, 2000));  // no incomplete check
+  TEST_ASSERT_EQUAL((int)UpdateState::DONE, (int)um.state());
+}
+
+static void test_transaction_log_rotation() {
+  UpdateManager um;
+  for (size_t i = 0; i <= PHANTOM_UM_MAX_TRANSACTIONS; ++i) {
+    um.reset();
+    um.loadManifest(makeManifest("1.2.0", 0, 0xCAFE));
+    um.startUpdate("1.0.0", (uint64_t)i * 1000);
+    um.completeDownload(0xCAFE, (uint64_t)(i + 1) * 1000);
+  }
+  TEST_ASSERT_EQUAL((int)PHANTOM_UM_MAX_TRANSACTIONS, (int)um.transactionCount());
+}
+
+static void test_null_from_version_in_start_update() {
+  UpdateManager um;
+  um.loadManifest(makeManifest("1.2.0", 0, 0xCAFE));
+  TEST_ASSERT_TRUE(um.startUpdate(nullptr, 1000));
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -277,6 +310,10 @@ int main() {
   RUN_TEST(test_transaction_recorded_on_success);
   RUN_TEST(test_transaction_at_null_out_of_range);
   RUN_TEST(test_transaction_recorded_on_rollback);
+  RUN_TEST(test_zero_expected_size_progress);
+  RUN_TEST(test_zero_expected_size_complete);
+  RUN_TEST(test_transaction_log_rotation);
+  RUN_TEST(test_null_from_version_in_start_update);
 
   return UNITY_END();
 }

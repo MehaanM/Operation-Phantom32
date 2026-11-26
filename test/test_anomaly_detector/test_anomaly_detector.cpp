@@ -111,10 +111,6 @@ static void test_observer_rssi_trend_improving() {
 
 // ── AnomalyDetector ───────────────────────────────────────────────────────────
 
-static void makeBaselineBssid(uint8_t bssid[6], uint8_t v) {
-  for (int i = 0; i < 6; ++i) bssid[i] = v;
-}
-
 static void test_add_baseline_ok() {
   AnomalyDetector ad;
   uint8_t bssid[6] = {1, 2, 3, 4, 5, 6};
@@ -223,6 +219,63 @@ static void test_clear_all() {
   TEST_ASSERT_EQUAL(0, (int)ad.anomalyCount());
 }
 
+static void test_no_match_ssid_returns_false() {
+  AnomalyDetector ad;
+  uint8_t bssid[6] = {1, 2, 3, 4, 5, 6};
+  ad.addBaseline("corp", bssid, -80, -40, 6, 3);
+  NetworkObservation obs = makeObs("unknown_net", 11, -60, 3, 1000);
+  memcpy(obs.bssid, bssid, 6);
+  TEST_ASSERT_FALSE(ad.analyze(obs, 1000));
+}
+
+static void test_confidence_capped_at_100() {
+  AnomalyDetector ad;
+  uint8_t bssid[6] = {1, 2, 3, 4, 5, 6};
+  ad.addBaseline("corp", bssid, -80, -40, 6, 3);
+  // channel change (60) + encryption change (70) + signal deviation (30) = 160, capped to 100
+  NetworkObservation obs = makeObs("corp", 11, -99, 0, 1000);
+  memcpy(obs.bssid, bssid, 6);
+  ad.analyze(obs, 1000);
+  if (ad.anomalyCount() > 0)
+    TEST_ASSERT_EQUAL(100, (int)ad.anomalyAt(0)->confidence);
+}
+
+static void test_baseline_registry_full_rejects() {
+  AnomalyDetector ad;
+  uint8_t bssid[6] = {};
+  for (size_t i = 0; i < PHANTOM_AD_MAX_BASELINES; ++i) {
+    char ssid[8];
+    ssid[0] = (char)('a' + i % 26);
+    ssid[1] = '\0';
+    ad.addBaseline(ssid, bssid, -80, -40, 6, 3);
+  }
+  TEST_ASSERT_FALSE(ad.addBaseline("overflow", bssid, -80, -40, 6, 3));
+}
+
+static void test_observer_rssi_trend_declining() {
+  NetworkObserver no;
+  for (int i = 0; i < 8; ++i) {
+    int8_t rssi = (int8_t)(-40 - i * 5);
+    no.observe(makeObs("ap", 6, rssi, 3, (uint64_t)i * 1000));
+  }
+  TEST_ASSERT_EQUAL(-1, (int)no.rssiTrend("ap"));
+}
+
+static void test_observer_rssi_trend_too_few_obs() {
+  NetworkObserver no;
+  no.observe(makeObs("ap", 6, -60, 3, 1000));
+  no.observe(makeObs("ap", 6, -60, 3, 2000));
+  TEST_ASSERT_EQUAL(0, (int)no.rssiTrend("ap"));
+}
+
+static void test_observer_expire_all_entries() {
+  NetworkObserver no;
+  no.observe(makeObs("a", 6, -60, 3, 100));
+  no.observe(makeObs("b", 6, -70, 3, 200));
+  no.expireOlderThan(10000);
+  TEST_ASSERT_EQUAL(0, (int)no.observationCount());
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -249,6 +302,12 @@ int main() {
   RUN_TEST(test_false_positive_threshold_suppresses);
   RUN_TEST(test_clear_anomalies_only);
   RUN_TEST(test_clear_all);
+  RUN_TEST(test_no_match_ssid_returns_false);
+  RUN_TEST(test_confidence_capped_at_100);
+  RUN_TEST(test_baseline_registry_full_rejects);
+  RUN_TEST(test_observer_rssi_trend_declining);
+  RUN_TEST(test_observer_rssi_trend_too_few_obs);
+  RUN_TEST(test_observer_expire_all_entries);
 
   return UNITY_END();
 }

@@ -205,6 +205,32 @@ static void test_export_json_null_buf_safe() {
   log.exportJson(nullptr, 0);  // must not crash
 }
 
+static void test_export_json_empty_log() {
+  SecurityAuditLog log;
+  char buf[64];
+  log.exportJson(buf, sizeof(buf));
+  TEST_ASSERT_EQUAL_STRING("{\"events\":[]}", buf);
+}
+
+static void test_critical_severity_logged_in_report() {
+  SecurityAuditLog log;
+  log.logEvent(SecurityCategory::PRIVILEGE_ESCALATION, SecuritySeverity::CRITICAL,
+               "proc", "root escalation", 1000);
+  char buf[512];
+  FILE *f = fmemopen(buf, sizeof(buf), "w");
+  TEST_ASSERT_NOT_NULL(f);
+  log.generateReport(f);
+  fclose(f);
+  TEST_ASSERT_NOT_NULL(strstr(buf, "CRITICAL"));
+}
+
+static void test_zero_threshold_always_false() {
+  SecurityAuditLog log;
+  log.logAuthFailure("x", 1000);
+  TEST_ASSERT_FALSE(log.hasRepeatedAuthFailures("x", 0, 10000, 10000));
+  TEST_ASSERT_FALSE(log.hasSuspiciousConfigChanges("x", 0, 10000, 10000));
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -240,6 +266,9 @@ int main() {
   RUN_TEST(test_generate_report_does_not_crash);
   RUN_TEST(test_export_json_valid_format);
   RUN_TEST(test_export_json_null_buf_safe);
+  RUN_TEST(test_export_json_empty_log);
+  RUN_TEST(test_critical_severity_logged_in_report);
+  RUN_TEST(test_zero_threshold_always_false);
 
   return UNITY_END();
 }

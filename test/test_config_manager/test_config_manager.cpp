@@ -304,6 +304,62 @@ static void test_field_for_null_returns_null() {
   TEST_ASSERT_NULL(cm.fieldFor(nullptr));
 }
 
+static void test_get_bool_null_out_ptr_fails() {
+  ConfigManager cm;
+  cm.define("b", false);
+  TEST_ASSERT_FALSE(cm.getBool("b", nullptr));
+}
+
+static void test_get_float_null_out_ptr_fails() {
+  ConfigManager cm;
+  cm.define("f", 1.0f);
+  TEST_ASSERT_FALSE(cm.getFloat("f", nullptr));
+}
+
+static void test_get_string_null_buf_fails() {
+  ConfigManager cm;
+  cm.define("s", "hello");
+  TEST_ASSERT_FALSE(cm.getString("s", nullptr, 0));
+}
+
+static void test_set_bool_unknown_key_fails() {
+  ConfigManager cm;
+  TEST_ASSERT_FALSE(cm.setBool("missing", true));
+}
+
+static void test_set_float_unknown_key_fails() {
+  ConfigManager cm;
+  TEST_ASSERT_FALSE(cm.setFloat("missing", 1.0f));
+}
+
+static void test_set_string_unknown_key_fails() {
+  ConfigManager cm;
+  TEST_ASSERT_FALSE(cm.setString("missing", "val"));
+}
+
+static void test_set_string_truncates_to_size() {
+  ConfigManager cm;
+  cm.define("s", "default");
+  char long_val[64];
+  memset(long_val, 'x', sizeof(long_val) - 1);
+  long_val[sizeof(long_val) - 1] = '\0';
+  cm.setString("s", long_val);
+  char buf[32];
+  cm.getString("s", buf, sizeof(buf));
+  TEST_ASSERT_EQUAL(PHANTOM_CM_STRING_SIZE - 1, (int)strlen(buf));
+}
+
+static void test_listener_fires_for_multiple_fields() {
+  gListenerCount = 0;
+  ConfigManager cm;
+  cm.define("a", (int32_t)1);
+  cm.define("b", false);
+  cm.addListener(onConfigChange);
+  cm.setInt("a", 2);
+  cm.setBool("b", true);
+  TEST_ASSERT_EQUAL(2, gListenerCount);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main() {
@@ -354,6 +410,14 @@ int main() {
   RUN_TEST(test_registry_full_returns_false);
   RUN_TEST(test_field_for_returns_field);
   RUN_TEST(test_field_for_null_returns_null);
+  RUN_TEST(test_get_bool_null_out_ptr_fails);
+  RUN_TEST(test_get_float_null_out_ptr_fails);
+  RUN_TEST(test_get_string_null_buf_fails);
+  RUN_TEST(test_set_bool_unknown_key_fails);
+  RUN_TEST(test_set_float_unknown_key_fails);
+  RUN_TEST(test_set_string_unknown_key_fails);
+  RUN_TEST(test_set_string_truncates_to_size);
+  RUN_TEST(test_listener_fires_for_multiple_fields);
 
   return UNITY_END();
 }

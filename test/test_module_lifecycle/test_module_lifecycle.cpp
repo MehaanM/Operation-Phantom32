@@ -476,6 +476,19 @@ static void test_cycle_name_out_of_bounds_returns_null() {
 
 // Module that starts Running on first initialize(), but fails on all
 // subsequent calls; update() always sets Error.
+// Module whose name() returns nullptr — should be rejected by registerModule.
+struct NullNameModule : public IModule {
+  bool initialize() override {
+    setRunning();
+    return true;
+  }
+  void update() override {}
+  void shutdown() override { setStopped(); }
+  const char *name() const override { return nullptr; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+};
+
 struct TripwireModule : public IModule {
   int initCalls = 0;
   bool initialize() override {
@@ -555,6 +568,26 @@ static void test_manual_restart_resets_circuit() {
 }
 
 // ── Hardened registration ──────────────────────────────────────────────────
+
+static void test_register_null_module_name_rejected() {
+  ModuleLifecycle<4> lc;
+  NullNameModule nm;
+  TEST_ASSERT_FALSE(lc.registerModule(&nm));
+  TEST_ASSERT_EQUAL(0, (int)lc.count());
+}
+
+static void test_stopped_module_not_restarted_by_auto_restart() {
+  // A Stopped module (not in Error) is never retried even when autoRestart is on.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  MockModule m;
+  lc.registerModule(&m);
+  lc.initializeAll();
+  lc.shutdownAll();  // m is now Stopped, not Error
+  int prevInitCalls = m.initCalls;
+  lc.updateAll(0);
+  TEST_ASSERT_EQUAL(prevInitCalls, m.initCalls);
+}
 
 static void test_no_auto_restart_no_retry_on_error() {
   // With autoRestart off, modules stuck in Error state are never retried.
@@ -731,6 +764,8 @@ int main() {
   RUN_TEST(test_restart_backoff_blocks_too_soon);
   RUN_TEST(test_manual_restart_resets_circuit);
 
+  RUN_TEST(test_register_null_module_name_rejected);
+  RUN_TEST(test_stopped_module_not_restarted_by_auto_restart);
   RUN_TEST(test_no_auto_restart_no_retry_on_error);
   RUN_TEST(test_restart_count_and_circuit_accessors_on_unknown);
 

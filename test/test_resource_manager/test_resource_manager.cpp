@@ -235,6 +235,14 @@ static void test_mismatch_unknown_module_returns_false() {
 
 // ── overflow detection ─────────────────────────────────────────────────────
 
+static void test_alloc_zero_bytes_succeeds() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  TEST_ASSERT_TRUE(rm.recordAlloc("Mod", 0));
+  TEST_ASSERT_EQUAL(0, (int)rm.heapUsed("Mod"));
+  TEST_ASSERT_EQUAL(1, (int)rm.allocCount("Mod"));
+}
+
 static void test_alloc_overflow_rejected() {
   ResourceManager rm;
   rm.registerModule("Mod", {});
@@ -318,6 +326,7 @@ int main() {
   RUN_TEST(test_no_mismatch_when_balanced);
   RUN_TEST(test_mismatch_when_alloc_exceeds_free);
   RUN_TEST(test_mismatch_unknown_module_returns_false);
+  RUN_TEST(test_alloc_zero_bytes_succeeds);
   RUN_TEST(test_alloc_overflow_rejected);
   RUN_TEST(test_reset_clears_all_counters);
   RUN_TEST(test_alloc_count_unknown_returns_zero);

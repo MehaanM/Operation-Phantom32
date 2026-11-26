@@ -1426,7 +1426,7 @@ function switchTab(name) {
 }
 
 /* ── Boards ────────────────────────────────────────────────────────────── */
-const BASE = 'firmware/';
+const BASE = new URL('firmware/', location.href).href;
 
 const BOARDS = [
   {id:'doom',          name:'ESP32 Generic',     module:'WROOM-32D / WROOM-32',  chip:'ESP32',    tier:'lite',  desc:'Universal build for most ESP32 dev boards with 4 MB flash.',          offsets:[0x1000,0x8000,0x10000]},
@@ -1515,7 +1515,6 @@ const EWT_CSS = `
   border-radius:3px!important;
   box-shadow:0 0 60px rgba(0,240,255,.18),0 0 0 1px rgba(0,240,255,.06),0 24px 60px rgba(0,0,0,.85)!important;
   font-family:'Share Tech Mono',monospace!important;
-  overflow:hidden!important;
   min-width:300px!important;
   max-width:420px!important;
   color:#b8d8ea!important;
@@ -1598,9 +1597,13 @@ function injectIntoShadow(root) {
   s.setAttribute('data-ph32','1');
   s.textContent = EWT_CSS;
   root.appendChild(s);
-  // recurse into nested shadow roots
+  // recurse into nested shadow roots but skip mwc-button internals —
+  // injecting there overrides its layout and breaks click detection
   root.querySelectorAll('*').forEach(el => {
-    if (el.shadowRoot) injectIntoShadow(el.shadowRoot);
+    const tag = (el.tagName || '').toLowerCase();
+    if (el.shadowRoot && !tag.includes('button') && !tag.includes('ripple')) {
+      injectIntoShadow(el.shadowRoot);
+    }
   });
 }
 

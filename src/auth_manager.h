@@ -55,7 +55,7 @@ extern WebServer server;
 #define AM_NVS_APIKEY_KEY "api_key"
 #define AM_NVS_INITIALIZED "am_init"
 #define AM_NVS_CRED_VER_KEY "am_cred_ver"
-#define AM_CRED_VER "2"           // bump to force a one-time reset to default credentials
+#define AM_CRED_VER "2"  // bump to force a one-time reset to default credentials
 #define AM_DEFAULT_PASS "password"
 #define AM_DEFAULT_WIFI_PASS "password"
 
@@ -91,7 +91,7 @@ static AmSession g_am_sessions[AM_SESSION_MAX] = {};
 static AmIpRecord g_am_ips[AM_MAX_IPS] = {};
 static char g_am_password_hash[AM_PBKDF2_KEY_LEN * 2 + 1] = {};  // PBKDF2 hex
 static uint8_t g_am_password_salt[AM_PBKDF2_SALT_LEN] = {};      // random salt
-static char g_am_ap_wifi_password[AM_WIFI_PASS_LEN + 1] = {};     // per-device AP WiFi password
+static char g_am_ap_wifi_password[AM_WIFI_PASS_LEN + 1] = {};    // per-device AP WiFi password
 static char g_am_api_key[AM_API_KEY_LEN * 2 + 1] = {};
 static bool g_am_initialized = false;
 
@@ -777,7 +777,10 @@ static void am_handle_change_password() {
 }
 
 static void am_handle_change_wifi_password() {
-  if (!auth_check()) { auth_reject(); return; }
+  if (!auth_check()) {
+    auth_reject();
+    return;
+  }
   String body = server.arg("plain");
   int idx = body.indexOf("\"new_password\"");
   if (idx < 0) {
@@ -801,7 +804,8 @@ static void am_handle_change_wifi_password() {
   prefs.putString(AM_NVS_AP_WIFI_PW_KEY, g_am_ap_wifi_password);
   prefs.end();
   Serial.printf("[AUTH] WiFi password changed — restart to apply\n");
-  server.send(200, "application/json", "{\"ok\":true,\"note\":\"Restart device to apply new WiFi password\"}");
+  server.send(200, "application/json",
+              "{\"ok\":true,\"note\":\"Restart device to apply new WiFi password\"}");
 }
 
 // ============================================================

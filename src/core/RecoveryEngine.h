@@ -14,7 +14,8 @@ static constexpr size_t PHANTOM_RE_MAX_SNAPSHOTS = 8;
 static constexpr size_t PHANTOM_RE_MAX_HANDLERS = 16;
 
 enum class RecoveryState : uint8_t { NORMAL, DEGRADED, SAFE_MODE, RECOVERING, FAILED };
-enum class FailureSeverity : uint8_t { LOW, MEDIUM, HIGH, CRITICAL };
+// Avoid LOW/HIGH — Arduino esp32-hal-gpio.h defines them as 0x0/0x1 macros.
+enum class FailureSeverity : uint8_t { SEV_LOW, SEV_MEDIUM, SEV_HIGH, SEV_CRITICAL };
 
 // Handler signature: returns true if recovery succeeded, false if it failed.
 using RecoveryHandler = bool (*)(const char *failureName, void *ctx);
@@ -195,11 +196,11 @@ struct RecoveryEngine {
     for (size_t i = 0; i < failCount_; ++i) {
       if (failures_[i].resolved)
         continue;
-      if (failures_[i].severity == FailureSeverity::CRITICAL)
+      if (failures_[i].severity == FailureSeverity::SEV_CRITICAL)
         hasCritical = true;
-      if (failures_[i].severity == FailureSeverity::HIGH)
+      if (failures_[i].severity == FailureSeverity::SEV_HIGH)
         hasHigh = true;
-      if (failures_[i].severity == FailureSeverity::MEDIUM)
+      if (failures_[i].severity == FailureSeverity::SEV_MEDIUM)
         hasMedium = true;
     }
     if (hasCritical)

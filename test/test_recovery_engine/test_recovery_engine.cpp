@@ -15,36 +15,36 @@ static void test_initial_state_normal() {
 
 static void test_low_failure_degraded() {
   RecoveryEngine re;
-  re.recordFailure("wifi", "scan slow", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "scan slow", FailureSeverity::SEV_LOW, true, 1000);
   TEST_ASSERT_EQUAL((int)RecoveryState::DEGRADED, (int)re.currentState());
 }
 
 static void test_medium_failure_degraded() {
   RecoveryEngine re;
-  re.recordFailure("ble", "init failed", FailureSeverity::MEDIUM, true, 1000);
+  re.recordFailure("ble", "init failed", FailureSeverity::SEV_MEDIUM, true, 1000);
   TEST_ASSERT_EQUAL((int)RecoveryState::DEGRADED, (int)re.currentState());
 }
 
 static void test_high_failure_safe_mode() {
   RecoveryEngine re;
-  re.recordFailure("storage", "corrupt", FailureSeverity::HIGH, false, 1000);
+  re.recordFailure("storage", "corrupt", FailureSeverity::SEV_HIGH, false, 1000);
   TEST_ASSERT_EQUAL((int)RecoveryState::SAFE_MODE, (int)re.currentState());
 }
 
 static void test_critical_failure_failed_state() {
   RecoveryEngine re;
-  re.recordFailure("watchdog", "reset", FailureSeverity::CRITICAL, false, 1000);
+  re.recordFailure("watchdog", "reset", FailureSeverity::SEV_CRITICAL, false, 1000);
   TEST_ASSERT_EQUAL((int)RecoveryState::FAILED, (int)re.currentState());
 }
 
 static void test_record_null_name_fails() {
   RecoveryEngine re;
-  TEST_ASSERT_FALSE(re.recordFailure(nullptr, "desc", FailureSeverity::LOW, true, 0));
+  TEST_ASSERT_FALSE(re.recordFailure(nullptr, "desc", FailureSeverity::SEV_LOW, true, 0));
 }
 
 static void test_record_empty_name_fails() {
   RecoveryEngine re;
-  TEST_ASSERT_FALSE(re.recordFailure("", "desc", FailureSeverity::LOW, true, 0));
+  TEST_ASSERT_FALSE(re.recordFailure("", "desc", FailureSeverity::SEV_LOW, true, 0));
 }
 
 static void test_record_full_fails() {
@@ -55,16 +55,16 @@ static void test_record_full_fails() {
     name[1] = (char)('0' + i % 10);
     name[2] = (char)('a' + i / 10);
     name[3] = '\0';
-    re.recordFailure(name, "", FailureSeverity::LOW, true, 0);
+    re.recordFailure(name, "", FailureSeverity::SEV_LOW, true, 0);
   }
-  TEST_ASSERT_FALSE(re.recordFailure("overflow", "", FailureSeverity::LOW, true, 0));
+  TEST_ASSERT_FALSE(re.recordFailure("overflow", "", FailureSeverity::SEV_LOW, true, 0));
 }
 
 // ── attemptRecovery ───────────────────────────────────────────────────────────
 
 static void test_attempt_recovery_resolves() {
   RecoveryEngine re;
-  re.recordFailure("wifi", "fail", FailureSeverity::MEDIUM, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_MEDIUM, true, 1000);
   TEST_ASSERT_TRUE(re.attemptRecovery("wifi", 2000));
   TEST_ASSERT_EQUAL(0, (int)re.activeFailureCount());
   TEST_ASSERT_EQUAL((int)RecoveryState::NORMAL, (int)re.currentState());
@@ -82,7 +82,7 @@ static void test_attempt_recovery_unknown_fails() {
 
 static void test_recovery_clears_safe_mode() {
   RecoveryEngine re;
-  re.recordFailure("storage", "fail", FailureSeverity::HIGH, true, 1000);
+  re.recordFailure("storage", "fail", FailureSeverity::SEV_HIGH, true, 1000);
   TEST_ASSERT_EQUAL((int)RecoveryState::SAFE_MODE, (int)re.currentState());
   re.attemptRecovery("storage", 2000);
   TEST_ASSERT_EQUAL((int)RecoveryState::NORMAL, (int)re.currentState());
@@ -100,13 +100,13 @@ static void test_enter_safe_mode_explicit() {
 
 static void test_has_recoverable_true() {
   RecoveryEngine re;
-  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_LOW, true, 1000);
   TEST_ASSERT_TRUE(re.hasRecoverable());
 }
 
 static void test_has_recoverable_false() {
   RecoveryEngine re;
-  re.recordFailure("storage", "fail", FailureSeverity::HIGH, false, 1000);
+  re.recordFailure("storage", "fail", FailureSeverity::SEV_HIGH, false, 1000);
   TEST_ASSERT_FALSE(re.hasRecoverable());
 }
 
@@ -114,7 +114,7 @@ static void test_has_recoverable_false() {
 
 static void test_save_snapshot_ok() {
   RecoveryEngine re;
-  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_LOW, true, 1000);
   TEST_ASSERT_TRUE(re.saveSnapshot("snap1", 1000));
   const DiagnosticSnapshot *s = re.snapshotFor("snap1");
   TEST_ASSERT_NOT_NULL(s);
@@ -141,7 +141,7 @@ static void test_snapshot_for_unknown_null() {
 
 static void test_failure_at_ok() {
   RecoveryEngine re;
-  re.recordFailure("wifi", "scan slow", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "scan slow", FailureSeverity::SEV_LOW, true, 1000);
   const FailureRecord *r = re.failureAt(0);
   TEST_ASSERT_NOT_NULL(r);
   TEST_ASSERT_EQUAL_STRING("wifi", r->name);
@@ -191,7 +191,7 @@ static void test_handler_invoked_on_recovery() {
   RecoveryEngine re;
   s_handler_called = false;
   re.registerHandler("wifi", handler_succeeds);
-  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_LOW, true, 1000);
   re.attemptRecovery("wifi", 2000);
   TEST_ASSERT_TRUE(s_handler_called);
 }
@@ -199,7 +199,7 @@ static void test_handler_invoked_on_recovery() {
 static void test_handler_failure_prevents_resolution() {
   RecoveryEngine re;
   re.registerHandler("wifi", handler_fails);
-  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_LOW, true, 1000);
   TEST_ASSERT_FALSE(re.attemptRecovery("wifi", 2000));
   // Still active — not resolved
   TEST_ASSERT_EQUAL(1, (int)re.activeFailureCount());
@@ -208,7 +208,7 @@ static void test_handler_failure_prevents_resolution() {
 static void test_no_handler_still_resolves() {
   RecoveryEngine re;
   // No handler registered — backward compat: resolve unconditionally
-  re.recordFailure("wifi", "fail", FailureSeverity::LOW, true, 1000);
+  re.recordFailure("wifi", "fail", FailureSeverity::SEV_LOW, true, 1000);
   TEST_ASSERT_TRUE(re.attemptRecovery("wifi", 2000));
   TEST_ASSERT_EQUAL(0, (int)re.activeFailureCount());
 }

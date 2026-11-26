@@ -489,6 +489,44 @@ struct NullNameModule : public IModule {
   const char *description() const override { return ""; }
 };
 
+// Module with dependencyCount=1 but dependency(0) returns nullptr.
+// Exercises the defensive null guard inside topoSort's inner loop.
+struct NullDepModule : public IModule {
+  const char *label;
+  explicit NullDepModule(const char *n) : label(n) {}
+  bool initialize() override {
+    setRunning();
+    return true;
+  }
+  void update() override {}
+  void shutdown() override { setStopped(); }
+  const char *name() const override { return label; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+  size_t dependencyCount() const override { return 1; }
+  const char *dependency(size_t /*i*/) const override { return nullptr; }
+};
+
+// Module that succeeds on odd initialize() calls and fails on even ones.
+// Used to drive many restart attempts without opening the circuit.
+struct AlternatingModule : public IModule {
+  int initCalls = 0;
+  bool initialize() override {
+    ++initCalls;
+    if (initCalls % 2 == 1) {
+      setRunning();
+      return true;
+    }
+    setError();
+    return false;
+  }
+  void update() override { setError(); }
+  void shutdown() override { setStopped(); }
+  const char *name() const override { return "Alternating"; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+};
+
 struct TripwireModule : public IModule {
   int initCalls = 0;
   bool initialize() override {
@@ -709,6 +747,52 @@ static void test_no_auto_restart_leaves_error_state() {
   TEST_ASSERT_TRUE(f.hasError());
 }
 
+// ── Null-dependency and shift-cap branches ────────────────────────────────
+
+static void test_null_dep_module_initializes_normally() {
+  // NullDepModule declares dependencyCount=1 but dependency(0)=nullptr.
+  // topoSort must not crash on the nullptr guard; the module should still run.
+  ModuleLifecycle<4> lc;
+  NullDepModule nd("NullDep");
+  lc.registerModule(&nd);
+  TEST_ASSERT_TRUE(lc.initializeAll());
+  TEST_ASSERT_FALSE(lc.cycleDetected());
+  TEST_ASSERT_TRUE(nd.isRunning());
+}
+
+static void test_null_dep_mixed_with_normal_module() {
+  // A normal module + a NullDepModule: both initialize, no cycle.
+  ModuleLifecycle<4> lc;
+  MockModule m;
+  NullDepModule nd("NullDepB");
+  lc.registerModule(&m);
+  lc.registerModule(&nd);
+  TEST_ASSERT_TRUE(lc.initializeAll());
+  TEST_ASSERT_TRUE(m.isRunning());
+  TEST_ASSERT_TRUE(nd.isRunning());
+}
+
+static void test_backoff_shift_cap_at_six_restarts() {
+  // Drive restartAttempts past 5 to hit the capped-shift branch (shift=5).
+  // AlternatingModule succeeds on odd initialize() calls so the circuit never
+  // opens while consecutiveFails resets on each success.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  AlternatingModule alt;
+  lc.registerModule(&alt);
+  lc.initializeAll();     // initCalls=1 (odd → Running)
+  // updateAll drives update()->Error, then tryAutoRestart.
+  // We use large time steps so backoff never blocks.
+  uint32_t t = 0;
+  for (int i = 0; i < 8; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+  }
+  // After many attempts restartAttempts must be >= 6, confirming the
+  // capped-shift branch was exercised.
+  TEST_ASSERT_TRUE(lc.restartCount("Alternating") >= 6u);
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 int main() {
@@ -782,6 +866,10 @@ int main() {
   RUN_TEST(test_set_auto_restart);
   RUN_TEST(test_auto_restart_recovers_error_in_update);
   RUN_TEST(test_no_auto_restart_leaves_error_state);
+
+  RUN_TEST(test_null_dep_module_initializes_normally);
+  RUN_TEST(test_null_dep_mixed_with_normal_module);
+  RUN_TEST(test_backoff_shift_cap_at_six_restarts);
 
   return UNITY_END();
 }

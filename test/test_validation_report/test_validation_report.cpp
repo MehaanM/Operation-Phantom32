@@ -1,6 +1,8 @@
 // test_validation_report.cpp — Tests for ValidationReport (Phase 2).
 
+#ifndef PHANTOM32_NATIVE_TEST
 #define PHANTOM32_NATIVE_TEST
+#endif
 #include "unity.h"
 #include "core/ValidationReport.h"
 #include <string.h>
@@ -158,7 +160,7 @@ static void test_check_at_out_of_bounds_returns_null() {
 static void test_run_prints_to_file() {
   ValidationReport rpt;
   rpt.add("Architecture", "Module dependency validation", [] { return true; });
-  rpt.add("Memory",       "Leak detection",              [] { return true; });
+  rpt.add("Memory", "Leak detection", [] { return true; });
   rpt.addSkip("Reliability", "Hardware long-duration test");
   char buf[1024] = {};
   FILE *f = fmemopen(buf, sizeof(buf) - 1, "w");

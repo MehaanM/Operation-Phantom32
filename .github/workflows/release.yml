@@ -1,11 +1,14 @@
 name: Release
 
+# Triggered by pushing a version tag (e.g. git tag v3.2.0 && git push origin v3.2.0).
+# Builds all 13 boards and publishes a GitHub Release with all firmware binaries.
+# The web flasher at website/index.html fetches binaries from releases/latest/download/.
+
 on:
   push:
     tags:
       - 'v*'
 
-# Write access is needed to create the release and upload assets.
 permissions:
   contents: write
 
@@ -14,9 +17,9 @@ env:
 
 jobs:
   # ----------------------------------------------------------------
-  # Job 1: Build all 13 firmware environments in parallel
+  # Job 1: Build all boards in parallel, upload binaries as artifacts
   # ----------------------------------------------------------------
-  build-firmware:
+  build:
     name: Build ${{ matrix.env }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -26,6 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         env:
+          # Non-PSRAM boards (PHANTOM32_LITE)
           - doom
           - doom_nodemcu
           - doom_m5stack
@@ -33,11 +37,14 @@ jobs:
           - doom_ttgo
           - doom_tcall
           - doom_heltec
+          # PSRAM boards (full analytics)
           - doom_wrover
           - doom_s3
           - doom_tdisplay_s3
           - doom_m5cores3
+          # C3 (RISC-V, PHANTOM32_LITE)
           - doom_c3
+          # S3 DevKitC-1 (unknown PSRAM variant, PHANTOM32_LITE)
           - doom_s3_devkit
 
     steps:
@@ -66,141 +73,95 @@ jobs:
       - name: Build ${{ matrix.env }}
         run: pio run -e ${{ matrix.env }}
 
-      - name: Collect and rename firmware binaries
+      - name: Rename firmware to web-flasher convention
+        # The web flasher (website/index.html) fetches:
+        #   firmware_<id>.bin, firmware_<id>_bootloader.bin, firmware_<id>_partitions.bin
         run: |
-          ENV="${{ matrix.env }}"
-          mkdir -p firmware_out
-
-          # Rename to the flat names the web flasher manifests expect:
-          #   firmware_<env>.bin
-          #   firmware_<env>_bootloader.bin
-          #   firmware_<env>_partitions.bin
-          cp ".pio/build/${ENV}/firmware.bin"    "firmware_out/firmware_${ENV}.bin"
-          cp ".pio/build/${ENV}/bootloader.bin"  "firmware_out/firmware_${ENV}_bootloader.bin"
-          cp ".pio/build/${ENV}/partitions.bin"  "firmware_out/firmware_${ENV}_partitions.bin"
-
-          sha256sum firmware_out/*.bin > "firmware_out/firmware_${ENV}_SHA256SUMS.txt"
-          echo "Built:"
-          ls -lh firmware_out/
+          mkdir -p dist
+          cp .pio/build/${{ matrix.env }}/firmware.bin \
+             dist/firmware_${{ matrix.env }}.bin
+          cp .pio/build/${{ matrix.env }}/bootloader.bin \
+             dist/firmware_${{ matrix.env }}_bootloader.bin
+          cp .pio/build/${{ matrix.env }}/partitions.bin \
+             dist/firmware_${{ matrix.env }}_partitions.bin
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: firmware-${{ matrix.env }}
-          path: firmware_out/
+          path: dist/
           retention-days: 1
 
   # ----------------------------------------------------------------
-  # Job 2: Gather all binaries and publish a GitHub Release
+  # Job 2: Collect all boards' binaries and publish the GitHub Release
   # ----------------------------------------------------------------
-  create-release:
+  release:
     name: Publish GitHub Release
-    needs: build-firmware
+    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: write
-
     steps:
-      - name: Checkout (for tag metadata)
+      - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Download all firmware artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@fa0a91b85d4f404e444306234a9f308a0f93c98c  # v4
         with:
-          path: all_firmware/
+          path: firmware-all/
           pattern: firmware-*
           merge-multiple: true
 
-      - name: List collected files
+      - name: Generate SHA256 checksums
         run: |
-          echo "Files to upload:"
-          ls -lh all_firmware/*.bin | sort
+          cd firmware-all
+          sha256sum *.bin > SHA256SUMS.txt
+          echo "=== SHA256SUMS.txt ==="
+          cat SHA256SUMS.txt
 
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+      - name: List release assets
+        run: ls -lh firmware-all/
 
-      - name: Collect build environment metadata
-        id: meta
-        run: |
-          echo "gcc_version=$(gcc --version | head -1)" >> "$GITHUB_OUTPUT"
-          echo "python_version=$(python3 --version)" >> "$GITHUB_OUTPUT"
-          echo "runner_os=$(uname -srm)" >> "$GITHUB_OUTPUT"
-          echo "built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
-
-      - name: Build release notes
-        id: notes
-        run: |
-          TAG="${{ steps.version.outputs.version }}"
-          cat > release_notes.md <<EOF
-          ## Phantom32 ${TAG}
-
-          Flash any of the 13 supported ESP32 boards directly from your browser at the
-          [operationphantom32 web flasher](https://operationphantom32.pages.dev) — no drivers, no IDE required.
-
-          ### Supported boards
-          | Build | Environment | Chip |
-          |-------|-------------|------|
-          | LITE  | doom | ESP32 (WROOM-32D) |
-          | LITE  | doom_nodemcu | ESP32 (NodeMCU-32S) |
-          | LITE  | doom_m5stack | ESP32 (M5Stack Basic) |
-          | LITE  | doom_m5core2 | ESP32 (M5Stack Core2) |
-          | LITE  | doom_ttgo | ESP32 (TTGO T-Display) |
-          | LITE  | doom_tcall | ESP32 (TTGO T-Call) |
-          | LITE  | doom_heltec | ESP32 (Heltec WiFi Kit 32) |
-          | LITE  | doom_s3_devkit | ESP32-S3 (DevKitC-1) |
-          | LITE  | doom_c3 | ESP32-C3 (RISC-V DevKit) |
-          | PSRAM | doom_wrover | ESP32 (WROVER-B/IB) |
-          | PSRAM | doom_s3 | ESP32-S3 (XIAO S3) |
-          | PSRAM | doom_tdisplay_s3 | ESP32-S3 (T-Display S3) |
-          | PSRAM | doom_m5cores3 | ESP32-S3 (M5Stack CoreS3) |
-
-          ### Manual flashing
-          Each environment ships three files:
-          - \`firmware_<env>_bootloader.bin\`  → offset \`0x1000\` (ESP32) or \`0x0\` (S3/C3)
-          - \`firmware_<env>_partitions.bin\`  → offset \`0x8000\`
-          - \`firmware_<env>.bin\`             → offset \`0x10000\`
-
-          \`\`\`bash
-          esptool.py --chip esp32 write_flash \\
-            0x1000  firmware_doom_bootloader.bin \\
-            0x8000  firmware_doom_partitions.bin \\
-            0x10000 firmware_doom.bin
-          \`\`\`
-
-          ### SHA-256 checksums
-          Per-environment \`SHA256SUMS.txt\` files are included in this release.
-
-          ### Reproducibility
-          | Field | Value |
-          |---|---|
-          | Source commit | \`${{ github.sha }}\` |
-          | Git ref | \`${{ github.ref }}\` |
-          | PlatformIO | ${{ env.PIO_VERSION }} |
-          | GCC | ${{ steps.meta.outputs.gcc_version }} |
-          | Python | ${{ steps.meta.outputs.python_version }} |
-          | Runner OS | ${{ steps.meta.outputs.runner_os }} |
-          | Built at | ${{ steps.meta.outputs.built_at }} |
-          | Workflow run | [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
-
-          To verify a binary, download the matching \`SHA256SUMS.txt\` and run:
-          \`\`\`bash
-          sha256sum --check firmware_<env>_SHA256SUMS.txt
-          \`\`\`
-          EOF
-
-      - name: Create GitHub Release and upload assets
+      - name: Create GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ steps.version.outputs.version }}"
+          tag="${{ github.ref_name }}"
+          gh release create "$tag" \
+            --title "Phantom32 ${tag}" \
+            --notes "## Phantom32 ${tag}
 
-          gh release create "${TAG}" \
-            --repo "${{ github.repository }}" \
-            --title "Phantom32 ${TAG}" \
-            --notes-file release_notes.md \
-            all_firmware/*.bin \
-            all_firmware/*_SHA256SUMS.txt
+          ### Flash from browser
+          Use the [Phantom32 web flasher](https://github.com/MehaanM/Operation-Phantom32) to
+          flash any supported ESP32 board directly from Chrome or Edge — no drivers, no IDE.
 
-          echo "Release published: https://github.com/${{ github.repository }}/releases/tag/${TAG}"
+          ### Included boards (13 total)
+          | Board ID | Chip | Variant |
+          |---|---|---|
+          | \`doom\` | ESP32 | Generic / WROOM-32 |
+          | \`doom_nodemcu\` | ESP32 | NodeMCU-32S |
+          | \`doom_m5stack\` | ESP32 | M5Stack Basic / Gray |
+          | \`doom_m5core2\` | ESP32 | M5Stack Core2 |
+          | \`doom_ttgo\` | ESP32 | TTGO T-Display |
+          | \`doom_tcall\` | ESP32 | TTGO T-Call SIM800L |
+          | \`doom_heltec\` | ESP32 | Heltec WiFi Kit 32 |
+          | \`doom_wrover\` | ESP32 | ESP-WROVER-KIT (8 MB PSRAM) |
+          | \`doom_s3\` | ESP32-S3 | XIAO ESP32-S3 (8 MB PSRAM) |
+          | \`doom_tdisplay_s3\` | ESP32-S3 | T-Display-S3 (8 MB PSRAM) |
+          | \`doom_m5cores3\` | ESP32-S3 | M5Stack CoreS3 (8 MB PSRAM) |
+          | \`doom_c3\` | ESP32-C3 | C3 DevKit (RISC-V) |
+          | \`doom_s3_devkit\` | ESP32-S3 | ESP32-S3 DevKitC-1 |
+
+          ### File naming
+          Each board ships three files:
+          - \`firmware_<board>.bin\` — application firmware
+          - \`firmware_<board>_bootloader.bin\` — bootloader
+          - \`firmware_<board>_partitions.bin\` — partition table
+
+          ### Verification
+          \`\`\`
+          sha256sum -c SHA256SUMS.txt
+          \`\`\`
+
+          **FOR AUTHORIZED USE IN ENVIRONMENTS YOU OWN OR HAVE WRITTEN PERMISSION TO TEST.**" \
+            firmware-all/*.bin firmware-all/SHA256SUMS.txt

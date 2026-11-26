@@ -1,0 +1,29 @@
+# markdownlint configuration for Phantom32
+# Full rule reference: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+default: true
+
+# MD013: line-length
+# Disabled — tables and code blocks routinely exceed 80 chars; enforcing would
+# add noise without benefit given the technical content.
+MD013: false
+
+# MD024: no-duplicate-heading
+# Disabled — same heading text appears in different sections (e.g. "Overview").
+MD024: false
+
+# MD033: no-inline-html
+# Disabled — HTML is used for formatting in a few docs.
+MD033: false
+
+# MD041: first-line-heading
+# Disabled — some docs (ADRs, etc.) open with metadata before the title.
+MD041: false
+
+# MD026: no-trailing-punctuation
+# Disabled — colons in headings are common for section labels.
+MD026: false
+
+# MD036: no-emphasis-as-heading
+# Disabled — bold text is used for emphasis, not as headings.
+MD036: false

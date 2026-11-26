@@ -457,6 +457,7 @@ Track all open issues at:
 
 | Document | Description |
 |---|---|
+| [docs/CLAIM_EVIDENCE_MATRIX.md](./docs/CLAIM_EVIDENCE_MATRIX.md) | Every quality/capability claim linked to its evidence, verification method, and status |
 | [docs/installation.md](./docs/installation.md) | Complete installation guide with preflight checker |
 | [docs/architecture.md](./docs/architecture.md) | System design, module map, memory layout, authentication flow |
 | [docs/hardware-compatibility.md](./docs/hardware-compatibility.md) | Per-board feature matrix, limitations, configuration |

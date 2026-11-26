@@ -1,0 +1,151 @@
+name: Hardware-in-the-Loop (HIL)
+
+# Disabled until a self-hosted runner with label 'hil-esp32' is registered.
+# To enable on every push to main, change the trigger below to:
+#   on:
+#     push:
+#       branches: [ main ]
+#     workflow_dispatch:
+#
+# See docs/hil-testing.md for setup instructions.
+on:
+  workflow_dispatch:
+    inputs:
+      board_env:
+        description: "PlatformIO board environment to flash"
+        required: false
+        default: "doom"
+      serial_port:
+        description: "Serial port of the DUT (e.g. /dev/ttyUSB0)"
+        required: false
+        default: "/dev/ttyUSB0"
+
+permissions:
+  contents: read
+
+jobs:
+  # ----------------------------------------------------------------
+  # Build firmware artifact for the target board
+  # ----------------------------------------------------------------
+  build-hil-firmware:
+    name: Build firmware (${{ github.event.inputs.board_env || 'doom' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      env: ${{ steps.set-env.outputs.env }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install "platformio==6.2.0"
+
+      - name: Set board env
+        id: set-env
+        run: echo "env=${{ github.event.inputs.board_env || 'doom' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build firmware
+        run: pio run -e ${{ steps.set-env.outputs.env }}
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: hil-firmware-${{ steps.set-env.outputs.env }}-${{ github.sha }}
+          path: |
+            .pio/build/${{ steps.set-env.outputs.env }}/firmware.bin
+            .pio/build/${{ steps.set-env.outputs.env }}/partitions.bin
+            .pio/build/${{ steps.set-env.outputs.env }}/bootloader.bin
+          retention-days: 3
+
+  # ----------------------------------------------------------------
+  # Flash and run HIL tests on the self-hosted runner with hardware
+  # ----------------------------------------------------------------
+  hil-tests:
+    name: HIL tests (${{ needs.build-hil-firmware.outputs.env }})
+    needs: build-hil-firmware
+    # Requires a self-hosted runner registered with the label 'hil-esp32'.
+    # Register one with:
+    #   ./config.sh --labels hil-esp32 --url https://github.com/MehaanM/Operation-Phantom32
+    runs-on: [ self-hosted, hil-esp32 ]
+    timeout-minutes: 30
+    env:
+      SERIAL_PORT: ${{ github.event.inputs.serial_port || '/dev/ttyUSB0' }}
+      BOARD_ENV:   ${{ needs.build-hil-firmware.outputs.env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: Download firmware artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444306234df0c9b8a0d4a83a  # v4
+        with:
+          name: hil-firmware-${{ env.BOARD_ENV }}-${{ github.sha }}
+          path: hil_fw/
+
+      - name: Install Python dependencies
+        run: pip install pyserial
+
+      - name: Flash firmware
+        run: |
+          esptool.py \
+            --chip esp32 \
+            --port "$SERIAL_PORT" \
+            --baud 460800 \
+            --before default_reset \
+            --after hard_reset \
+            write_flash \
+              --flash_mode dio \
+              --flash_freq 40m \
+              --flash_size detect \
+              0x1000  hil_fw/bootloader.bin \
+              0x8000  hil_fw/partitions.bin \
+              0x10000 hil_fw/firmware.bin
+
+      - name: Run HIL test harness
+        run: |
+          python3 scripts/hil_runner.py \
+            --port "$SERIAL_PORT" \
+            --baud 115200 \
+            --timeout 120 \
+            --report hil_report.json
+        # scripts/hil_runner.py is the reference serial harness.
+        # It performs the test categories documented in docs/hil-testing.md:
+        #   - Boot validation (banner, PhantomDoctor, free heap)
+        #   - Heap stability under 60 s load
+        #   - NVS round-trip credential persistence
+        #   - Rate limiter enforcement (HTTP)
+        #   - Session expiry assertion
+        # Exit code 0 = all assertions passed.
+
+      - name: Upload HIL report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: hil-report-${{ env.BOARD_ENV }}-${{ github.sha }}
+          path: hil_report.json
+          retention-days: 14
+
+      - name: Print pass/fail summary
+        if: always()
+        run: |
+          if [ -f hil_report.json ]; then
+            python3 - <<'EOF'
+          import json, sys
+          r = json.load(open("hil_report.json"))
+          passed = sum(1 for t in r["tests"] if t["result"] == "PASS")
+          failed = sum(1 for t in r["tests"] if t["result"] == "FAIL")
+          print(f"HIL results: {passed} passed, {failed} failed")
+          for t in r["tests"]:
+              mark = "✓" if t["result"] == "PASS" else "✗"
+              print(f"  {mark} {t['name']}: {t.get('detail', '')}")
+          sys.exit(0 if failed == 0 else 1)
+          EOF
+          else
+            echo "ERROR: hil_report.json not found" >&2
+            exit 1
+          fi

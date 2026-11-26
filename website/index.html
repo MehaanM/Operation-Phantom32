@@ -1,7 +1,11 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Operation Phantom32</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Flash Phantom32 firmware to any supported ESP32 board directly from your browser. No drivers, no IDE required.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&family=Rajdhani:wght@700&display=swap">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 
 <style>
@@ -899,7 +903,7 @@ body::after {
 .board-card::after {
   content: "";
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: 3px;
   background: linear-gradient(120deg, transparent 0%, rgba(0,240,255,.18) 50%, transparent 100%);
   background-size: 200% 200%;
@@ -1065,6 +1069,8 @@ esp-web-install-button [slot="activate"]::after {
    The CSS below is the string that gets injected.
    ═════════════════════════════════════════════════ */
 </style>
+</head>
+<body>
 
 <!-- canvas -->
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -1084,7 +1090,7 @@ esp-web-install-button [slot="activate"]::after {
       </div>
       <span class="logo-text">
         <strong>Phantom</strong>32
-        <span>Operation · v3.2.1</span>
+        <span>Operation · v3.4.0</span>
       </span>
     </a>
 
@@ -1124,7 +1130,7 @@ esp-web-install-button [slot="activate"]::after {
     </div>
     <div class="hero-release">
       <a class="release-link" href="https://github.com/MehaanM/Operation-Phantom32/releases/latest" target="_blank" rel="noopener">
-        <span class="release-tag">v3.2.1</span>
+        <span class="release-tag">v3.4.0</span>
         <span>Latest release &amp; checksums ↗</span>
       </a>
     </div>
@@ -1299,7 +1305,7 @@ esp-web-install-button [slot="activate"]::after {
 <!-- ── Footer ───────────────────────────────────── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span class="footer-text">© 2026 MEHAAN MINOCHA · OPERATION PHANTOM32 · v3.2.1</span>
+    <span class="footer-text">© 2026 MEHAAN MINOCHA · OPERATION PHANTOM32 · v3.4.0</span>
     <a class="footer-link" href="https://github.com/MehaanM/Operation-Phantom32" target="_blank">GITHUB ↗</a>
   </div>
 </footer>
@@ -1380,9 +1386,6 @@ esp-web-install-button [slot="activate"]::after {
     const cx = W/2, cy = H*1.2;
     const r  = Math.max(W,H)*1.5;
     const angle = ((tick*0.004) % (Math.PI*2));
-    const grd = ctx.createConicalGradient
-      ? null
-      : null;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
@@ -1446,7 +1449,7 @@ const BOARDS = [
 
 function mkManifest(b) {
   return URL.createObjectURL(new Blob([JSON.stringify({
-    name:`Phantom32 for ${b.name}`, version:'3.2.1', new_install_improv_wait_time:0,
+    name:`Phantom32 for ${b.name}`, version:'3.4.0', new_install_improv_wait_time:0,
     builds:[{chipFamily:b.chip, parts:[
       {path:`${BASE}firmware_${b.id}_bootloader.bin`, offset:b.offsets[0]},
       {path:`${BASE}firmware_${b.id}_partitions.bin`, offset:b.offsets[1]},
@@ -1491,7 +1494,6 @@ BOARDS.forEach((b,i) => {
 
 /* ── ESP-Web-Tools dialog theming via shadow DOM ───────────────────────── */
 const EWT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700&display=swap');
 :host {
   --mdc-typography-font-family:'Share Tech Mono',monospace;
   --mdc-theme-primary:#00f0ff;
@@ -1665,3 +1667,5 @@ document.querySelectorAll('.hero-stat-num').forEach(el => {
   setTimeout(tick, 400);
 });
 </script>
+</body>
+</html>

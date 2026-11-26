@@ -88,8 +88,8 @@ class IModule {
 
   // Transition to Initializing. Valid from: Uninitialized, Stopped, Error, Failed.
   void beginInitializing() {
-    if (state_ == State::Uninitialized || state_ == State::Stopped ||
-        state_ == State::Error || state_ == State::Failed)
+    if (state_ == State::Uninitialized || state_ == State::Stopped || state_ == State::Error ||
+        state_ == State::Failed)
       state_ = State::Initializing;
   }
 

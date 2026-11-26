@@ -134,7 +134,12 @@ struct SemanticVersion {
       return;
     int n = snprintf(buf, len, "%u.%u.%u", (unsigned)major, (unsigned)minor, (unsigned)patch);
     if (preRelease[0] && n > 0 && (size_t)n < len) {
-      snprintf(buf + n, len - (size_t)n, "-%s", preRelease);
+      size_t rem = len - (size_t)n;
+      if (rem >= 2) {
+        buf[n] = '-';
+        strncpy(buf + n + 1, preRelease, rem - 1);
+        buf[len - 1] = '\0';
+      }
     }
   }
 };

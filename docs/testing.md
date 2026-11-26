@@ -162,3 +162,50 @@ For NVS-dependent logic, use in-memory stubs as shown in `test_auth_manager.cpp`
 | `dep-scan` | All pushes/PRs | Known CVE in CI Python dependencies |
 | `build` (matrix) | All pushes/PRs | Compile error on any of 13 boards |
 | `build` memory check | All pushes/PRs | Flash > 90% (LITE) / 96% (PSRAM), RAM > 85% |
+
+---
+
+## Requirements Traceability Matrix
+
+Each row maps a stated requirement to the source file that implements it
+and the test suite that verifies it. "Verified" means a passing automated
+test exists; "HW validated" means the behavior has also been confirmed on
+physical hardware.
+
+| Requirement | Source | Test suite | Status |
+|---|---|---|---|
+| Authentication is required for all protected routes | `src/auth_manager.h` | `test/test_auth_manager/` · `test/test_security/` | Verified |
+| Session tokens expire after 30 minutes | `src/auth_manager.h` | `test/test_security/` (`test_session_expiry_*`) | Verified |
+| IP lockout after 5 failed attempts | `src/auth_manager.h` | `test/test_security/` (`test_lockout_*`) | Verified |
+| All credential comparisons use constant-time algorithms | `src/auth_manager.h` | `test/test_security/` (`test_timing_*`) | Verified |
+| Passwords are stored as PBKDF2-HMAC-SHA256 (100k iter) | `src/auth_manager.h` | `test/test_security/` (`test_pbkdf2_*`) | Verified |
+| SSID, MAC, channel, and integer inputs are validated | `src/input_validator.h` | `test/test_input_validator/` (76 tests) | Verified |
+| TX rate is capped at 200 fps globally | `src/rate_limiter_adv.h` | `test/test_rate_limiter/` | Verified |
+| HTTP requests are rate-limited per client IP | `src/rate_limiter_adv.h` | `test/test_rate_limiter/` | Verified |
+| Boot diagnostic checks Heap, Storage, and WiFi | `src/core/PhantomDoctor.h` · `src/main.cpp` | `test/test_phantom_doctor/` (28 tests) | Verified · HW validated (WROOM-32D) |
+| `allPassed()` returns false when any check is PENDING | `src/core/PhantomDoctor.h` | `test/test_phantom_doctor/` (`test_all_passed_blocks_on_pending`) | Verified |
+| `overallStatus()` returns INCOMPLETE/FAIL/WARN/PASS correctly | `src/core/PhantomDoctor.h` | `test/test_phantom_doctor/` (`test_overall_status_*`) | Verified |
+| Recovery handler is invoked on `attemptRecovery()` | `src/core/RecoveryEngine.h` | `test/test_recovery_engine/` (`test_handler_invoked_*`) | Verified |
+| Handler failure prevents failure resolution | `src/core/RecoveryEngine.h` | `test/test_recovery_engine/` (`test_handler_failure_prevents_resolution`) | Verified |
+| No handler → resolves unconditionally (backward compat) | `src/core/RecoveryEngine.h` | `test/test_recovery_engine/` (`test_no_handler_still_resolves`) | Verified |
+| HIGH failure transitions engine to SAFE_MODE | `src/core/RecoveryEngine.h` | `test/test_recovery_engine/` (`test_high_failure_safe_mode`) | Verified |
+| CRITICAL failure transitions engine to FAILED | `src/core/RecoveryEngine.h` | `test/test_recovery_engine/` (`test_critical_failure_failed_state`) | Verified |
+| Heap is sampled every 30 seconds in loop() | `src/main.cpp` | — (firmware integration, not unit-testable in native) | HW validated (WROOM-32D) |
+| LowHeap detection triggers RecoveryEngine failure | `src/main.cpp` | — (firmware integration) | Verified by code path; HW timing not validated |
+| `sampleSystem()` reads real ESP32 heap APIs | `src/core/ResourceProfiler.h` | `test/test_resource_profiler/` (native: no-op path) | Verified in firmware via serial log |
+| Invalid threshold rejected in `trackMetric()` | `src/core/QualityScorecard.h` | `test/test_quality_scorecard/` (`test_track_invalid_threshold_*`) | Verified |
+| First metric sample always has STABLE trend | `src/core/QualityScorecard.h` | `test/test_quality_scorecard/` (`test_first_sample_trend_stable`) | Verified |
+| 802.11 frame type/subtype/MAC parsed correctly | `src/` frame parsing | `test/test_frame_parsing/` (42 tests) | Verified |
+| Evil Twin credential ring stores and ages entries | `src/evil_twin.h` | `test/test_evil_twin/` (29 tests) | Verified |
+| Device Tracker deduplicates by MAC address | `src/device_tracker.h` | `test/test_device_tracker/` (28 tests) | Verified |
+| Session token is not stored in NVS or flash | `src/auth_manager.h` | `test/test_security/` (`test_session_not_persisted`) | Verified |
+| All 13 board environments compile without error | `platformio.ini` + all `src/` | CI build matrix (13 environments) | CI-validated on every push |
+| Coverage ≥ 85% line, ≥ 80% branch on src/ | All `src/` files | CI `native-coverage` job | Enforced by CI |
+| No secrets appear in git history | — | CI `secret-scan` job (gitleaks) | Enforced by CI |
+| CycloneDX SBOM is generated on every build | `build.yml` | CI `sbom-gen` job | CI-validated |
+
+**Legend:**
+- **Verified** — passing automated test exists in the named test suite
+- **HW validated** — additionally confirmed on physical hardware with recorded output
+- **CI-validated** — enforced by a CI job on every push; no separate unit test exists
+- **—** — no test exists for this requirement (gap)

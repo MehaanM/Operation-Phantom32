@@ -22,6 +22,8 @@ Read [LEGAL.md](./LEGAL.md) before deploying this firmware.
 
 **Navigation**
 
+[Why Phantom32](#why-phantom32) ·
+[Principles](#design-principles) ·
 [Overview](#overview) ·
 [Showcase](#showcase) ·
 [Status](#project-status) ·
@@ -32,10 +34,71 @@ Read [LEGAL.md](./LEGAL.md) before deploying this firmware.
 [Installation](#installation) ·
 [Configuration](#configuration) ·
 [Testing](#testing-architecture) ·
+[Failure Analysis](#failure-analysis) ·
 [Security](#security) ·
 [Roadmap](#roadmap) ·
 [Contributing](#contributing) ·
 [License](#license)
+
+---
+
+## Why Phantom32?
+
+Most ESP32 Wi-Fi research tools are single-file sketches: they demonstrate
+a technique but are not engineered for reliability, testability, or
+long-term maintenance. Phantom32 was built with a different set of
+priorities.
+
+**What is different about this project:**
+
+| Property | Typical ESP32 tool | Phantom32 |
+|---|---|---|
+| Test coverage | None or manual | 1461 automated tests; ≥ 85% line coverage enforced in CI |
+| Memory safety | Unchecked | AddressSanitizer + UBSan on every commit |
+| Board support | One board | 13 environments in CI build matrix |
+| Authentication | Hardcoded password or none | PBKDF2-HMAC-SHA256 (100k iterations), device-unique, session-scoped |
+| Failure handling | Crash or silent | RecoveryEngine with handler callbacks; PhantomDoctor boot diagnostics |
+| Build reproducibility | Dev-machine-only | Pinned platform + lib versions; CI artifacts with SHA-256 |
+| Secret scanning | None | gitleaks on full git history, every push |
+| SBOM | None | CycloneDX generated on every build |
+
+**What Phantom32 does not claim:**
+
+- It is not faster, stealthier, or more effective than other tools at any
+  specific 802.11 technique. The promiscuous capture rate and injection
+  performance are limited by the ESP32 Wi-Fi stack, the same hardware
+  all similar tools run on.
+- It does not replace professional audit tooling (commercial Wi-Fi adapters,
+  airodump-ng, Wireshark on a laptop). It fills a different niche: a
+  self-contained pocket device for authorized audits on networks you own.
+- Stability tests have not been published yet. Long-duration reliability
+  claims are not made until that data exists.
+
+The differentiator is the engineering infrastructure around the tool, not
+the tools themselves. If you care about running on constrained hardware with
+verifiable correctness guarantees, Phantom32 is designed for that.
+
+---
+
+## Design Principles
+
+The following principles govern how Phantom32 is built and extended.
+Each is listed alongside the mechanism that enforces it.
+
+| Principle | How it is applied |
+|---|---|
+| **Modular isolation** | Each tool is a self-contained `ToolModule` struct. Tools communicate only through explicitly named globals, never by calling each other's internals. |
+| **Explicit platform dependencies** | ESP32 SDK calls are gated by `#ifndef PHANTOM32_NATIVE_TEST`. Any file that compiles on native has no hidden platform calls. |
+| **Security at the boundary** | All HTTP routes pass through `auth_check()` before any handler runs. All web inputs pass through `input_validator.h`. Neither is optional. |
+| **Fault isolation** | A tool that crashes does not take down the HTTP server. The WebServer and FreeRTOS scheduler continue; the tool is marked inactive. |
+| **Measurable reliability** | RecoveryEngine tracks failure counts and state transitions. ResourceProfiler samples heap every 30 seconds. QualityScorecard enforces metric thresholds. These are not for display — they feed real decisions in `loop()`. |
+| **Hardware abstraction in one place** | All board-specific pin assignments and LED behavior live in `src/board.h`. Tool code never references hardware directly. |
+| **Reproducible builds** | PlatformIO platform and library versions are pinned. CI publishes SHA-256 checksums for every firmware artifact. |
+| **Automated verification** | No claim in this README is accepted on faith. Each has a corresponding test, CI job, or hardware measurement. |
+| **Honest status** | The Feature Maturity Matrix distinguishes HW-validated, CI-compiled, and unimplemented. Stability tests not yet published are stated as such. |
+| **Maintainability over complexity** | No dynamic module loading, no dependency injection framework, no coroutine scheduler. Each system uses the simplest data structure that fits the constraint. |
+
+For the reasoning behind specific decisions, see [docs/decisions/](./docs/decisions/).
 
 ---
 
@@ -1450,6 +1513,77 @@ Track all open issues at:
 
 ---
 
+## Failure Analysis
+
+This section documents how Phantom32 behaves when things go wrong. For each
+failure mode: how it is detected, how it is reported, how it is handled,
+whether recovery is possible, and what happens if recovery fails.
+
+### Boot-time failures (PhantomDoctor)
+
+| Failure | Detection | Reporting | Handling | Recoverable? | If not recovered |
+|---|---|---|---|---|---|
+| Free heap < 16 KB at boot | `esp_get_free_heap_size()` in `setup()` | `PhantomDoctor` check → FAIL; `GET /api/phantom-doctor` returns `"status":"FAIL"` | Boot continues; dashboard shows FAIL status | No automatic action | Device runs degraded; operator must reboot or free memory |
+| LittleFS not mounted | `LittleFS.begin()` returns false | `PhantomDoctor` check → FAIL | PCAP capture disabled; web UI still serves | No | PCAP routes return 500; device operates without filesystem |
+| Soft AP has no IP | `WiFi.softAPIP() == INADDR_NONE` | `PhantomDoctor` check → FAIL | HTTP server still starts on the AP interface | No automatic action | Web UI may be unreachable; operator must recheck AP config |
+
+### Runtime failures (RecoveryEngine)
+
+| Failure | Detection | Reporting | Handling | Recoverable? | If recovery fails |
+|---|---|---|---|---|---|
+| Heap drops below 16 KB | `esp_get_free_heap_size() < HEAP_CRIT_THRESHOLD` in `loop()` every 30 s | `RecoveryEngine.recordFailure("LowHeap", HIGH)` | Registered handler called (default: attempt to stop active tool); state → SAFE_MODE | Yes, if handler frees memory | RecoveryEngine stays DEGRADED/SAFE_MODE; active tool may keep running; next 30 s check re-evaluates |
+| Module records a HIGH failure | `re.recordFailure(name, HIGH, ...)` | RecoveryEngine state → SAFE_MODE; `GET /api/resource-profile` reflects current heap | Handler invoked; resolution only on handler returning true | Yes, if handler returns true | Failure stays active; `activeFailureCount()` > 0; state does not return to NORMAL |
+| Module records a CRITICAL failure | `re.recordFailure(name, CRITICAL, ...)` | RecoveryEngine state → FAILED | No automatic recovery | No (FAILED state has no auto-recovery path in v3.2) | Device stays in FAILED state; operator reboot required |
+
+### Input validation failures
+
+| Failure | Detection | Reporting | Handling | Recoverable? |
+|---|---|---|---|---|
+| Invalid SSID (length, characters) | `input_validator.h` on each web request | HTTP 400 JSON: `{"ok":false,"error":"invalid_ssid"}` | Request rejected; no tool state change | N/A — client error |
+| Invalid MAC address format | `input_validator.h` | HTTP 400 JSON | Request rejected | N/A |
+| Out-of-range channel number | `input_validator.h` | HTTP 400 JSON | Request rejected | N/A |
+| Oversized input | `input_validator.h` | HTTP 400 JSON | Request rejected; connection closed | N/A |
+
+### Authentication failures
+
+| Failure | Detection | Reporting | Handling | Recoverable? |
+|---|---|---|---|---|
+| Wrong password | PBKDF2 comparison fails | HTTP 401; failed-attempt counter incremented | IP temporarily locked after 5 failures | N/A — client error |
+| IP lockout | Failed-attempt count ≥ 5 | HTTP 429 `{"error":"too_many_attempts"}` | All requests from that IP rejected for 5 min | Yes — wait 5 minutes |
+| Expired session token | Token TTL check fails | HTTP 401; redirect to `/login` | Client must re-authenticate | Yes |
+| Invalid/replayed token | Token not found in RAM store | HTTP 401 | Same as expired | Yes |
+
+### Configuration failures
+
+| Failure | Detection | Reporting | Handling | Recoverable? |
+|---|---|---|---|---|
+| Invalid metric threshold in QualityScorecard | `warnThreshold` / `failThreshold` relationship invalid | `trackMetric()` returns false | Metric not registered; no data collected | Yes — caller must fix threshold values |
+| NVS read error at boot | `nvs_get_*` returns non-OK | Credential regenerated; new credentials printed to serial | First-boot initialization runs again | Yes — NVS is re-initialized |
+| NVS namespace full | `nvs_set_*` returns `ESP_ERR_NVS_NOT_ENOUGH_SPACE` | Error logged to serial | Setting not persisted; in-memory value used | Partial — in-memory only until reboot |
+
+### Diagnostic system failures
+
+| Failure | Detection | Reporting | Handling | Recoverable? |
+|---|---|---|---|---|
+| `PhantomDoctor.finalise()` called twice | `complete_` flag already set | `finalise()` returns false | Report already complete; no changes | N/A |
+| Check set after finalise | `setCheckResult()` after `complete_` | Returns false | Check ignored | N/A |
+| All checks PENDING at finalise | `pendingCount() > 0` after `finalise()` | `overallStatus()` returns INCOMPLETE | Report shows INCOMPLETE; `/api/phantom-doctor` reflects this | No automatic re-check; operator must investigate |
+
+### Recovery system limitations
+
+The RecoveryEngine tracks failure state and invokes handlers but does not:
+- Restart modules or tools after resolution (the handler must do this)
+- Persist failure state across reboots
+- Handle more than 16 concurrent tracked failures or 16 registered handlers
+- Prevent hardware-level failures (watchdog reset, stack overflow) from
+  bypassing the engine entirely
+
+A watchdog reset or stack overflow produces an ESP32 panic and reboot. The
+RecoveryEngine has no visibility into these events; the firmware starts fresh
+with a clean state on the next boot.
+
+---
+
 ## Troubleshooting
 
 | Problem | Likely cause | Solution |
@@ -1666,7 +1800,12 @@ and the tool development walkthrough, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 | [docs/hardware-compatibility.md](./docs/hardware-compatibility.md) | Per-board feature matrix, limitations, configuration |
 | [docs/hardware-validation.md](./docs/hardware-validation.md) | Physical hardware test results |
 | [docs/api-reference.md](./docs/api-reference.md) | Full HTTP API reference (all endpoints, schemas) |
-| [docs/testing.md](./docs/testing.md) | Test strategy, coverage guide, running tests locally |
+| [docs/testing.md](./docs/testing.md) | Test strategy, coverage guide, running tests locally, requirements traceability matrix |
+| [docs/decisions/ADR-001](./docs/decisions/ADR-001-header-only-platform-agnostic-core.md) | Why core modules are header-only and platform-agnostic |
+| [docs/decisions/ADR-002](./docs/decisions/ADR-002-tool-module-registry.md) | Why the static ToolModule registry pattern was chosen |
+| [docs/decisions/ADR-003](./docs/decisions/ADR-003-pbkdf2-100k-iterations.md) | Why PBKDF2-HMAC-SHA256 at 100,000 iterations |
+| [docs/decisions/ADR-004](./docs/decisions/ADR-004-unity-native-testing.md) | Why Unity and no mocking framework |
+| [docs/decisions/ADR-005](./docs/decisions/ADR-005-dram-not-psram-for-security-state.md) | Why security-sensitive state is in DRAM, not PSRAM |
 | [docs/roadmap.md](./docs/roadmap.md) | Planned milestones with issue links |
 | [docs/faq.md](./docs/faq.md) | Frequently asked questions |
 | [docs/troubleshooting.md](./docs/troubleshooting.md) | Common issues and solutions |

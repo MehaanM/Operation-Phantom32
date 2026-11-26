@@ -1,6 +1,8 @@
 name: Deploy Web Flasher
 
-# Deploys website/index.html to GitHub Pages on every push to main.
+# Deploys website/ to GitHub Pages on every push to main or workflow_dispatch.
+# Firmware binaries are downloaded from the latest GitHub Release and bundled
+# into website/firmware/ so they are served same-origin (no CORS issues).
 # The live URL is: https://mehaanm.github.io/Operation-Phantom32/
 
 on:
@@ -28,6 +30,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: Download latest firmware binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p website/firmware
+          # Download all .bin files from the latest release into website/firmware/
+          gh release download --repo MehaanM/Operation-Phantom32 \
+            --pattern '*.bin' \
+            --dir website/firmware \
+            --clobber || echo "No release found yet — deploying without firmware binaries"
 
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5

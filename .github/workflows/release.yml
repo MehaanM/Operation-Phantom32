@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 env:
   PIO_VERSION: "6.2.0"
@@ -165,3 +166,21 @@ jobs:
 
           **FOR AUTHORIZED USE IN ENVIRONMENTS YOU OWN OR HAVE WRITTEN PERMISSION TO TEST.**" \
             firmware-all/*.bin firmware-all/SHA256SUMS.txt
+
+  # ----------------------------------------------------------------
+  # Job 3: Re-deploy GitHub Pages so new firmware is served same-origin
+  # ----------------------------------------------------------------
+  pages:
+    name: Redeploy Web Flasher
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run pages.yml \
+            --repo MehaanM/Operation-Phantom32 \
+            --ref main

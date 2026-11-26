@@ -1308,28 +1308,35 @@ void setup() {
 
   // ---- Phase 18-20 API routes ----
   server.on("/api/phantom-doctor", HTTP_GET, []() {
-    if (!auth_check()) { auth_reject(); return; }
+    if (!auth_check()) {
+      auth_reject();
+      return;
+    }
     DiagStatus ds = g_phantom_doctor.overallStatus();
     const char *statusStr = "INCOMPLETE";
-    if (ds == DiagStatus::PASS) statusStr = "PASS";
-    else if (ds == DiagStatus::WARN) statusStr = "WARN";
-    else if (ds == DiagStatus::FAIL) statusStr = "FAIL";
+    if (ds == DiagStatus::PASS)
+      statusStr = "PASS";
+    else if (ds == DiagStatus::WARN)
+      statusStr = "WARN";
+    else if (ds == DiagStatus::FAIL)
+      statusStr = "FAIL";
     char buf[256];
     snprintf(buf, sizeof(buf),
-      "{\"status\":\"%s\",\"pass\":%u,\"warn\":%u,\"fail\":%u,\"pending\":%u}",
-      statusStr, (unsigned)g_phantom_doctor.passCount(),
-      (unsigned)g_phantom_doctor.warnCount(), (unsigned)g_phantom_doctor.failCount(),
-      (unsigned)g_phantom_doctor.pendingCount());
+             "{\"status\":\"%s\",\"pass\":%u,\"warn\":%u,\"fail\":%u,\"pending\":%u}", statusStr,
+             (unsigned)g_phantom_doctor.passCount(), (unsigned)g_phantom_doctor.warnCount(),
+             (unsigned)g_phantom_doctor.failCount(), (unsigned)g_phantom_doctor.pendingCount());
     server.send(200, "application/json", buf);
   });
 
   server.on("/api/resource-profile", HTTP_GET, []() {
-    if (!auth_check()) { auth_reject(); return; }
+    if (!auth_check()) {
+      auth_reject();
+      return;
+    }
     char buf[256];
-    snprintf(buf, sizeof(buf),
-      "{\"freeHeap\":%u,\"totalHeap\":%u}",
-      (unsigned)g_resource_profiler.systemFreeRam(),
-      (unsigned)g_resource_profiler.systemTotalRam());
+    snprintf(buf, sizeof(buf), "{\"freeHeap\":%u,\"totalHeap\":%u}",
+             (unsigned)g_resource_profiler.systemFreeRam(),
+             (unsigned)g_resource_profiler.systemTotalRam());
     server.send(200, "application/json", buf);
   });
 
@@ -1346,18 +1353,19 @@ void setup() {
   g_phantom_doctor.registerCheck("WiFi", "AP interface up");
 
   uint32_t freeHeap = esp_get_free_heap_size();
-  g_phantom_doctor.setCheckResult("Heap",
-    freeHeap > HEAP_CRIT_THRESHOLD ? CheckStatus::PASS : CheckStatus::FAIL,
-    freeHeap > HEAP_CRIT_THRESHOLD ? "OK" : "Critical");
-  g_phantom_doctor.setCheckResult("Storage",
-    LittleFS.totalBytes() > 0 ? CheckStatus::PASS : CheckStatus::FAIL, "");
-  g_phantom_doctor.setCheckResult("WiFi",
-    WiFi.softAPIP() != IPAddress() ? CheckStatus::PASS : CheckStatus::FAIL, "");
+  g_phantom_doctor.setCheckResult(
+      "Heap", freeHeap > HEAP_CRIT_THRESHOLD ? CheckStatus::PASS : CheckStatus::FAIL,
+      freeHeap > HEAP_CRIT_THRESHOLD ? "OK" : "Critical");
+  g_phantom_doctor.setCheckResult(
+      "Storage", LittleFS.totalBytes() > 0 ? CheckStatus::PASS : CheckStatus::FAIL, "");
+  g_phantom_doctor.setCheckResult(
+      "WiFi", WiFi.softAPIP() != IPAddress() ? CheckStatus::PASS : CheckStatus::FAIL, "");
   g_phantom_doctor.finalise(millis());
 
   g_resource_profiler.sampleSystem(millis());
 
-  g_quality_scorecard.trackMetric("FreeHeap", "bytes", HEAP_WARN_THRESHOLD, HEAP_CRIT_THRESHOLD, true);
+  g_quality_scorecard.trackMetric("FreeHeap", "bytes", HEAP_WARN_THRESHOLD, HEAP_CRIT_THRESHOLD,
+                                  true);
   g_quality_scorecard.recordValue("FreeHeap", (double)freeHeap);
 
   // ---- Start server ----
@@ -1418,8 +1426,8 @@ void loop() {
     uint32_t heapNow = esp_get_free_heap_size();
     g_quality_scorecard.recordValue("FreeHeap", (double)heapNow);
     if (heapNow < HEAP_CRIT_THRESHOLD) {
-      g_recovery_engine.recordFailure("LowHeap", "Heap below critical",
-                                      FailureSeverity::HIGH, true, now);
+      g_recovery_engine.recordFailure("LowHeap", "Heap below critical", FailureSeverity::HIGH, true,
+                                      now);
     }
   }
 

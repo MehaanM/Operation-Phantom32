@@ -24,6 +24,11 @@ static constexpr size_t PHANTOM_RM_MAX_MODULES = 16;
 
 // ResourceManager — tracks heap allocations per module and enforces budgets.
 //
+// Allocation-failure injection:
+//   rm.setFailAfter(2) causes the next 2 recordAlloc() calls to return false,
+//   simulating an allocator that runs out of memory. Use this in tests to
+//   verify error-handling paths without touching the real heap.
+//
 // Usage:
 //   ResourceManager rm;
 //   rm.registerModule("WiFiScanner", {.maxHeapBytes = 32768});
@@ -64,8 +69,19 @@ class ResourceManager {
     return false;
   }
 
-  // Returns false if name not registered or if bytes would overflow size_t.
+  // Allocation-failure injection: the next `n` recordAlloc() calls will
+  // return false without modifying state, as if the allocator failed.
+  // Pass 0 to disable injection.
+  void setFailAfter(uint32_t n) { failRemaining_ = n; }
+  uint32_t failRemaining() const { return failRemaining_; }
+
+  // Returns false if name not registered, if bytes would overflow size_t,
+  // or if allocation-failure injection is active (failRemaining_ > 0).
   bool recordAlloc(const char *name, size_t bytes) {
+    if (failRemaining_ > 0) {
+      --failRemaining_;
+      return false;
+    }
     ModuleResources *e = find(name);
     if (!e)
       return false;
@@ -161,4 +177,5 @@ class ResourceManager {
 
   ModuleResources entries_[PHANTOM_RM_MAX_MODULES] = {};
   size_t count_ = 0;
+  uint32_t failRemaining_ = 0;
 };

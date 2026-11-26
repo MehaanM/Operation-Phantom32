@@ -304,6 +304,259 @@ static void test_json_contains_psram_free() {
     ph_platform::_mock_psram_total = 0;
 }
 
+// ── DiagRingBuffer (Phase 3) ───────────────────────────────────────────────
+
+static void test_ring_buffer_empty_initially() {
+    DiagRingBuffer<8> rb;
+    TEST_ASSERT_EQUAL(0, (int)rb.size());
+    TEST_ASSERT_TRUE(rb.empty());
+}
+
+static void test_ring_buffer_push_increases_size() {
+    DiagRingBuffer<8> rb;
+    DiagEvent ev;
+    rb.push(ev);
+    TEST_ASSERT_EQUAL(1, (int)rb.size());
+}
+
+static void test_ring_buffer_capacity() {
+    DiagRingBuffer<4> rb;
+    TEST_ASSERT_EQUAL(4, (int)rb.capacity());
+}
+
+static void test_ring_buffer_at_returns_null_when_empty() {
+    DiagRingBuffer<4> rb;
+    TEST_ASSERT_NULL(rb.at(0));
+}
+
+static void test_ring_buffer_wraps_on_overflow() {
+    DiagRingBuffer<2> rb;
+    DiagEvent a, b, c;
+    a.id = 1; b.id = 2; c.id = 3;
+    strncpy(a.code, "A", sizeof(a.code));
+    strncpy(b.code, "B", sizeof(b.code));
+    strncpy(c.code, "C", sizeof(c.code));
+    strncpy(a.module, "M", sizeof(a.module));
+    strncpy(b.module, "N", sizeof(b.module));
+    strncpy(c.module, "O", sizeof(c.module));
+    rb.push(a); rb.push(b); rb.push(c);
+    TEST_ASSERT_EQUAL(2, (int)rb.size());
+    // Oldest is b (index 0), newest is c (index 1).
+    TEST_ASSERT_EQUAL_UINT32(2, rb.at(0)->id);
+    TEST_ASSERT_EQUAL_UINT32(3, rb.at(1)->id);
+}
+
+static void test_ring_buffer_dedup_same_severity_code_module() {
+    DiagRingBuffer<8> rb;
+    DiagEvent ev;
+    ev.severity = DiagSeverity::WARN;
+    strncpy(ev.code, "HEAP", sizeof(ev.code));
+    strncpy(ev.module, "WiFi", sizeof(ev.module));
+    ev.count = 1;
+    rb.push(ev);
+    rb.push(ev);  // same severity+code+module → dedup
+    TEST_ASSERT_EQUAL(1, (int)rb.size());
+    TEST_ASSERT_EQUAL(2, (int)rb.at(0)->count);
+}
+
+static void test_ring_buffer_no_dedup_different_code() {
+    DiagRingBuffer<8> rb;
+    DiagEvent a, b;
+    a.severity = b.severity = DiagSeverity::WARN;
+    strncpy(a.code, "HEAP", sizeof(a.code));
+    strncpy(b.code, "PSRM", sizeof(b.code));
+    strncpy(a.module, "M", sizeof(a.module));
+    strncpy(b.module, "M", sizeof(b.module));
+    rb.push(a); rb.push(b);
+    TEST_ASSERT_EQUAL(2, (int)rb.size());
+}
+
+static void test_ring_buffer_clear() {
+    DiagRingBuffer<4> rb;
+    DiagEvent ev; rb.push(ev);
+    rb.clear();
+    TEST_ASSERT_EQUAL(0, (int)rb.size());
+    TEST_ASSERT_TRUE(rb.empty());
+}
+
+// ── DiagnosticsEngine events (Phase 3) ────────────────────────────────────
+
+static void test_add_event_increases_count() {
+    DiagnosticsEngine eng;
+    eng.addEvent(DiagSeverity::INFO, "M", "TEST", "msg");
+    TEST_ASSERT_EQUAL(1, (int)eng.eventCount());
+}
+
+static void test_add_event_respects_min_severity() {
+    DiagnosticsEngine eng;
+    eng.setMinEventSeverity(DiagSeverity::ERROR);
+    eng.addEvent(DiagSeverity::INFO, "M", "T", "m");   // below min — dropped
+    eng.addEvent(DiagSeverity::WARN, "M", "T", "m");   // below min — dropped
+    eng.addEvent(DiagSeverity::ERROR, "M", "T", "m");  // exactly at min — kept
+    TEST_ASSERT_EQUAL(1, (int)eng.eventCount());
+}
+
+static void test_event_at_returns_correct_event() {
+    DiagnosticsEngine eng;
+    eng.addEvent(DiagSeverity::WARN, "WiFi", "HEAP", "heap low");
+    const DiagEvent *ev = eng.eventAt(0);
+    TEST_ASSERT_NOT_NULL(ev);
+    TEST_ASSERT_EQUAL(DiagSeverity::WARN, ev->severity);
+    TEST_ASSERT_EQUAL_STRING("WiFi", ev->module);
+    TEST_ASSERT_EQUAL_STRING("HEAP", ev->code);
+}
+
+static void test_clear_events_empties_buffer() {
+    DiagnosticsEngine eng;
+    eng.addEvent(DiagSeverity::INFO, "M", "T", "m");
+    eng.clearEvents();
+    TEST_ASSERT_EQUAL(0, (int)eng.eventCount());
+}
+
+static void test_log_warn_convenience() {
+    DiagnosticsEngine eng;
+    eng.logWarn("Mod", "W001", "warning");
+    TEST_ASSERT_EQUAL(1, (int)eng.eventCount());
+    TEST_ASSERT_EQUAL(DiagSeverity::WARN, eng.eventAt(0)->severity);
+}
+
+static void test_log_error_convenience() {
+    DiagnosticsEngine eng;
+    eng.logError("Mod", "E001", "error");
+    TEST_ASSERT_EQUAL(DiagSeverity::ERROR, eng.eventAt(0)->severity);
+}
+
+static void test_log_critical_convenience() {
+    DiagnosticsEngine eng;
+    eng.logCritical("Mod", "C001", "crit");
+    TEST_ASSERT_EQUAL(DiagSeverity::CRITICAL, eng.eventAt(0)->severity);
+}
+
+static void test_severity_string_all_values() {
+    TEST_ASSERT_EQUAL_STRING("DEBUG",    DiagnosticsEngine::severityString(DiagSeverity::DEBUG));
+    TEST_ASSERT_EQUAL_STRING("INFO",     DiagnosticsEngine::severityString(DiagSeverity::INFO));
+    TEST_ASSERT_EQUAL_STRING("WARN",     DiagnosticsEngine::severityString(DiagSeverity::WARN));
+    TEST_ASSERT_EQUAL_STRING("ERROR",    DiagnosticsEngine::severityString(DiagSeverity::ERROR));
+    TEST_ASSERT_EQUAL_STRING("CRITICAL", DiagnosticsEngine::severityString(DiagSeverity::CRITICAL));
+}
+
+// ── Crash-loop detection (Phase 3) ────────────────────────────────────────
+
+static void test_crash_loop_not_detected_initially() {
+    DiagnosticsEngine eng;
+    TEST_ASSERT_FALSE(eng.crashLoopDetected());
+    TEST_ASSERT_EQUAL_UINT32(0, eng.bootCount());
+}
+
+static void test_record_boot_increments_count() {
+    DiagnosticsEngine eng;
+    eng.recordBoot(100);
+    TEST_ASSERT_EQUAL_UINT32(1, eng.bootCount());
+}
+
+static void test_crash_loop_detected_after_threshold() {
+    DiagnosticsEngine eng;
+    // 5 boots within 60 s → crash loop
+    for (uint32_t i = 0; i < DiagnosticsEngine::kCrashLoopThreshold; ++i)
+        eng.recordBoot((uint32_t)(i * 1000u));  // 0, 1000, 2000, 3000, 4000 ms
+    TEST_ASSERT_TRUE(eng.crashLoopDetected());
+}
+
+static void test_crash_loop_not_detected_outside_window() {
+    DiagnosticsEngine eng;
+    // 5 boots spread over 2 × window → not a crash loop
+    uint32_t window2 = DiagnosticsEngine::kCrashWindowMs * 2u;
+    for (uint32_t i = 0; i < DiagnosticsEngine::kCrashLoopThreshold; ++i)
+        eng.recordBoot(i * (window2 / DiagnosticsEngine::kCrashLoopThreshold));
+    TEST_ASSERT_FALSE(eng.crashLoopDetected());
+}
+
+static void test_reset_crash_loop_clears_state() {
+    DiagnosticsEngine eng;
+    for (uint32_t i = 0; i < DiagnosticsEngine::kCrashLoopThreshold; ++i)
+        eng.recordBoot((uint32_t)(i * 1000u));
+    TEST_ASSERT_TRUE(eng.crashLoopDetected());
+    eng.resetCrashLoop();
+    TEST_ASSERT_FALSE(eng.crashLoopDetected());
+    TEST_ASSERT_EQUAL_UINT32(0, eng.bootCount());
+}
+
+// ── Health scoring (Phase 3) ───────────────────────────────────────────────
+
+static void test_health_score_100_when_healthy() {
+    ph_platform::_mock_free  = 150000;
+    ph_platform::_mock_total = 327680;
+    DiagnosticsEngine eng;
+    eng.initialize();
+    // No events, no crash loop, low heap usage → 100.
+    TEST_ASSERT_EQUAL(100, (int)eng.healthScore());
+}
+
+static void test_health_score_deducted_for_critical_event() {
+    ph_platform::_mock_free  = 150000;
+    ph_platform::_mock_total = 327680;
+    DiagnosticsEngine eng;
+    eng.initialize();
+    eng.logCritical("M", "C", "crit");
+    TEST_ASSERT_TRUE(eng.healthScore() < 100);
+}
+
+static void test_health_score_deducted_for_crash_loop() {
+    ph_platform::_mock_free  = 150000;
+    ph_platform::_mock_total = 327680;
+    DiagnosticsEngine eng;
+    for (uint32_t i = 0; i < DiagnosticsEngine::kCrashLoopThreshold; ++i)
+        eng.recordBoot(i * 1000u);
+    TEST_ASSERT_TRUE(eng.healthScore() < 100);
+}
+
+static void test_health_score_minimum_zero() {
+    ph_platform::_mock_free  = 0;
+    ph_platform::_mock_total = 327680;
+    DiagnosticsEngine eng;
+    eng.initialize();
+    // Flood the ring with CRITICAL events to drive score to 0.
+    for (int i = 0; i < 10; ++i) {
+        char code[8];
+        code[0] = 'A' + i; code[1] = '\0';
+        eng.logCritical("M", code, "crit");
+    }
+    TEST_ASSERT_EQUAL(0, (int)eng.healthScore());
+}
+
+// ── JSON events (Phase 3) ──────────────────────────────────────────────────
+
+static void test_json_events_empty_array_when_no_events() {
+    DiagnosticsEngine eng;
+    char buf[64];
+    size_t n = eng.toJsonEvents(buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_EQUAL_STRING("[]", buf);
+}
+
+static void test_json_events_contains_event_fields() {
+    DiagnosticsEngine eng;
+    eng.logWarn("WiFi", "HEAP", "heap low");
+    char buf[512];
+    size_t n = eng.toJsonEvents(buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"severity\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"module\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"code\""));
+}
+
+static void test_json_includes_boot_count_and_crash_loop() {
+    DiagnosticsEngine eng;
+    eng.initialize();
+    char buf[512];
+    size_t n = eng.toJson(buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"boot_count\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"crash_loop\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"health_score\""));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"event_count\""));
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 int main() {
@@ -350,6 +603,39 @@ int main() {
 
     RUN_TEST(test_snapshot_psram_free_matches_mock);
     RUN_TEST(test_json_contains_psram_free);
+
+    RUN_TEST(test_ring_buffer_empty_initially);
+    RUN_TEST(test_ring_buffer_push_increases_size);
+    RUN_TEST(test_ring_buffer_capacity);
+    RUN_TEST(test_ring_buffer_at_returns_null_when_empty);
+    RUN_TEST(test_ring_buffer_wraps_on_overflow);
+    RUN_TEST(test_ring_buffer_dedup_same_severity_code_module);
+    RUN_TEST(test_ring_buffer_no_dedup_different_code);
+    RUN_TEST(test_ring_buffer_clear);
+
+    RUN_TEST(test_add_event_increases_count);
+    RUN_TEST(test_add_event_respects_min_severity);
+    RUN_TEST(test_event_at_returns_correct_event);
+    RUN_TEST(test_clear_events_empties_buffer);
+    RUN_TEST(test_log_warn_convenience);
+    RUN_TEST(test_log_error_convenience);
+    RUN_TEST(test_log_critical_convenience);
+    RUN_TEST(test_severity_string_all_values);
+
+    RUN_TEST(test_crash_loop_not_detected_initially);
+    RUN_TEST(test_record_boot_increments_count);
+    RUN_TEST(test_crash_loop_detected_after_threshold);
+    RUN_TEST(test_crash_loop_not_detected_outside_window);
+    RUN_TEST(test_reset_crash_loop_clears_state);
+
+    RUN_TEST(test_health_score_100_when_healthy);
+    RUN_TEST(test_health_score_deducted_for_critical_event);
+    RUN_TEST(test_health_score_deducted_for_crash_loop);
+    RUN_TEST(test_health_score_minimum_zero);
+
+    RUN_TEST(test_json_events_empty_array_when_no_events);
+    RUN_TEST(test_json_events_contains_event_fields);
+    RUN_TEST(test_json_includes_boot_count_and_crash_loop);
 
     return UNITY_END();
 }

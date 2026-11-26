@@ -293,6 +293,52 @@ static void test_reset_keeps_budget_intact() {
   TEST_ASSERT_TRUE(rm.isOverBudget("Mod"));  // budget still enforced
 }
 
+// ── Allocation-failure injection (Phase 4) ────────────────────────────────
+
+static void test_fail_after_zero_disables_injection() {
+  ResourceManager rm;
+  rm.registerModule("M", {});
+  rm.setFailAfter(0);
+  TEST_ASSERT_TRUE(rm.recordAlloc("M", 100));
+}
+
+static void test_fail_after_one_blocks_next_alloc() {
+  ResourceManager rm;
+  rm.registerModule("M", {});
+  rm.setFailAfter(1);
+  TEST_ASSERT_FALSE(rm.recordAlloc("M", 100));  // injected failure
+  // State must not have changed.
+  TEST_ASSERT_EQUAL_UINT32(0, rm.allocCount("M"));
+  TEST_ASSERT_EQUAL_UINT32(0, rm.heapUsed("M"));
+}
+
+static void test_fail_after_resumes_after_n() {
+  ResourceManager rm;
+  rm.registerModule("M", {});
+  rm.setFailAfter(2);
+  TEST_ASSERT_FALSE(rm.recordAlloc("M", 100));  // 1st injection
+  TEST_ASSERT_FALSE(rm.recordAlloc("M", 100));  // 2nd injection
+  TEST_ASSERT_TRUE(rm.recordAlloc("M", 100));   // succeeds again
+  TEST_ASSERT_EQUAL_UINT32(100, rm.heapUsed("M"));
+}
+
+static void test_fail_remaining_counts_down() {
+  ResourceManager rm;
+  rm.setFailAfter(3);
+  TEST_ASSERT_EQUAL_UINT32(3, rm.failRemaining());
+  rm.registerModule("M", {});
+  rm.recordAlloc("M", 1);  // fails but decrements
+  TEST_ASSERT_EQUAL_UINT32(2, rm.failRemaining());
+}
+
+static void test_fail_injection_unregistered_module_still_counts() {
+  // The injection fires even for unregistered modules (to simplify test setup).
+  ResourceManager rm;
+  rm.setFailAfter(1);
+  TEST_ASSERT_FALSE(rm.recordAlloc("nobody", 100));
+  TEST_ASSERT_EQUAL_UINT32(0, rm.failRemaining());
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 int main() {
@@ -333,5 +379,12 @@ int main() {
   RUN_TEST(test_free_count_unknown_returns_zero);
   RUN_TEST(test_reset_unknown_module_returns_false);
   RUN_TEST(test_reset_keeps_budget_intact);
+
+  RUN_TEST(test_fail_after_zero_disables_injection);
+  RUN_TEST(test_fail_after_one_blocks_next_alloc);
+  RUN_TEST(test_fail_after_resumes_after_n);
+  RUN_TEST(test_fail_remaining_counts_down);
+  RUN_TEST(test_fail_injection_unregistered_module_still_counts);
+
   return UNITY_END();
 }

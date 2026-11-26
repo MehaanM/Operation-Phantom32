@@ -441,6 +441,18 @@ static void test_cycle_module_count_and_names() {
   TEST_ASSERT_TRUE(foundBeta);
 }
 
+static void test_cycle_required_module_fails_overall() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  DependentModule a("CycA", "CycB");
+  DependentModule b("CycB", "CycA");
+  lc.registerModule(&a, /*required=*/true);
+  lc.registerModule(&b);
+  bool ok = lc.initializeAll();
+  TEST_ASSERT_FALSE(ok);
+  TEST_ASSERT_TRUE(lc.cycleDetected());
+}
+
 static void test_no_cycle_flag_when_clean() {
   DependentModule::orderCounter = 0;
   ModuleLifecycle<4> lc;
@@ -543,6 +555,29 @@ static void test_manual_restart_resets_circuit() {
 }
 
 // ── Hardened registration ──────────────────────────────────────────────────
+
+static void test_no_auto_restart_no_retry_on_error() {
+  // With autoRestart off, modules stuck in Error state are never retried.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(false);
+  FlakyModule f;
+  lc.registerModule(&f);
+  lc.initializeAll();
+  f.failOnUpdate = true;
+  lc.updateAll();  // update sets Error
+  TEST_ASSERT_TRUE(f.hasError());
+  lc.updateAll();  // Error module is NOT retried — still Error, initCalls unchanged
+  TEST_ASSERT_EQUAL(1, f.initCalls);
+  TEST_ASSERT_TRUE(f.hasError());
+}
+
+static void test_restart_count_and_circuit_accessors_on_unknown() {
+  ModuleLifecycle<4> lc;
+  TEST_ASSERT_EQUAL(0u, lc.restartCount("Ghost"));
+  TEST_ASSERT_FALSE(lc.isCircuitOpen("Ghost"));
+  TEST_ASSERT_FALSE(lc.isCircuitOpen(nullptr));
+  TEST_ASSERT_EQUAL(0u, lc.restartCount(nullptr));
+}
 
 static void test_register_duplicate_pointer_rejected() {
   ModuleLifecycle<4> lc;
@@ -688,12 +723,16 @@ int main() {
   RUN_TEST(test_cycle_detection_fails_cycle_modules);
   RUN_TEST(test_cycle_independent_modules_still_run);
   RUN_TEST(test_cycle_module_count_and_names);
+  RUN_TEST(test_cycle_required_module_fails_overall);
   RUN_TEST(test_no_cycle_flag_when_clean);
   RUN_TEST(test_cycle_name_out_of_bounds_returns_null);
 
   RUN_TEST(test_circuit_opens_after_max_restarts);
   RUN_TEST(test_restart_backoff_blocks_too_soon);
   RUN_TEST(test_manual_restart_resets_circuit);
+
+  RUN_TEST(test_no_auto_restart_no_retry_on_error);
+  RUN_TEST(test_restart_count_and_circuit_accessors_on_unknown);
 
   RUN_TEST(test_register_duplicate_pointer_rejected);
   RUN_TEST(test_register_duplicate_name_rejected);

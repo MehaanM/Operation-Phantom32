@@ -259,6 +259,16 @@ static void test_reset_clears_all_counters() {
   TEST_ASSERT_FALSE(rm.hasMismatch("Mod"));
 }
 
+static void test_alloc_count_unknown_returns_zero() {
+  ResourceManager rm;
+  TEST_ASSERT_EQUAL(0, (int)rm.allocCount("Ghost"));
+}
+
+static void test_free_count_unknown_returns_zero() {
+  ResourceManager rm;
+  TEST_ASSERT_EQUAL(0, (int)rm.freeCount("Ghost"));
+}
+
 static void test_reset_unknown_module_returns_false() {
   ResourceManager rm;
   TEST_ASSERT_FALSE(rm.reset("Ghost"));
@@ -310,6 +320,8 @@ int main() {
   RUN_TEST(test_mismatch_unknown_module_returns_false);
   RUN_TEST(test_alloc_overflow_rejected);
   RUN_TEST(test_reset_clears_all_counters);
+  RUN_TEST(test_alloc_count_unknown_returns_zero);
+  RUN_TEST(test_free_count_unknown_returns_zero);
   RUN_TEST(test_reset_unknown_module_returns_false);
   RUN_TEST(test_reset_keeps_budget_intact);
   return UNITY_END();

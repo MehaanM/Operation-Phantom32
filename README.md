@@ -143,8 +143,8 @@ Or install the [VS Code extension](https://platformio.org/install/ide?install=vs
 ### 2. Clone
 
 ```bash
-git clone https://github.com/MehaanM/Operation-Phantom32_Protocol.git
-cd Operation-Phantom32_Protocol
+git clone https://github.com/MehaanM/Operation-Phantom32.git
+cd Operation-Phantom32
 ```
 
 ### 3. Build
@@ -404,7 +404,7 @@ requests targeting `main`. The pipeline:
    for `main` branch builds.
 2. **Native unit tests** — Runs all 460+ test cases on Ubuntu (no hardware).
 3. **Sanitizers** — Re-runs all tests under AddressSanitizer + UBSan.
-4. **Coverage** — Enforces 80% line / 50% branch minimums (gcov/lcov).
+4. **Coverage** — Enforces 85% line / 65% branch minimums (gcov/lcov).
 5. **Static analysis** — Checks for hardcoded credentials, unguarded routes,
    clang-format compliance, and `-Wl,-zmuldefs` usage.
 6. **Secret scanning** — gitleaks scans full git history on every push.

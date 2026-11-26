@@ -1,34 +1,46 @@
 #pragma once
 #include "IModule.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 // ModuleLifecycle — manages a fixed-capacity registry of IModule instances.
 //
 // Features
 //   - Dependency-aware initialization: modules are initialized in topological
-//     order based on dependency() declarations. Cycles fall back to
-//     registration order.
+//     order based on dependency() declarations. Cycle detection fails affected
+//     modules and reports their names; independent modules still run.
 //   - Failure isolation: a failed module does not prevent others from starting
 //     unless it is marked required.
-//   - Auto-restart: modules that enter Error state during updateAll() are
-//     automatically restarted (shutdown → initialize) when autoRestart is on.
-//   - Manual restart: restartModule(name) can recover any named module.
+//   - Auto-restart with backoff: modules that enter Error state during
+//     updateAll() are automatically restarted with exponential backoff.
+//     After kMaxRestarts consecutive failed restarts the circuit opens and
+//     no further automatic restarts are attempted.
+//   - Manual restart: restartModule(name) resets the circuit breaker and
+//     performs an immediate recovery attempt.
 //
 // Usage
 //   ModuleLifecycle<8> lifecycle;
 //   lifecycle.registerModule(&diagEngine,  /*required=*/true);
 //   lifecycle.registerModule(&wifiScanner, /*required=*/false);
-//   lifecycle.initializeAll();
-//   while (true) lifecycle.updateAll();
+//   if (!lifecycle.initializeAll()) { /* handle required failure or cycle */ }
+//   while (true) lifecycle.updateAll(millis());
 //   lifecycle.shutdownAll();
 
 template <size_t N>
 class ModuleLifecycle {
  public:
+  static constexpr uint32_t kMaxRestarts = 3;
+  static constexpr uint32_t kBaseBackoffMs = 1000;
+
   struct Registration {
     IModule *module = nullptr;
     bool required = false;
+    bool cycleError = false;
+    uint32_t restartAttempts = 0;   // total attempts (drives backoff timing)
+    uint32_t consecutiveFails = 0;  // consecutive failures (drives circuit)
+    uint32_t lastRestartMs = 0;
+    bool circuitOpen = false;
   };
 
   struct Summary {
@@ -38,24 +50,50 @@ class ModuleLifecycle {
     size_t stopped = 0;
   };
 
-  // Add a module to the registry. required=true makes initializeAll() fail if
-  // this module cannot initialize.
+  // Add a module to the registry.
+  // Rejects: null pointer, full registry, duplicate pointer, duplicate name,
+  // null module name.
   bool registerModule(IModule *m, bool required = false) {
-    if (!m || count_ >= N)
+    if (!m || count_ >= N || !m->name())
       return false;
+    for (size_t i = 0; i < count_; ++i) {
+      if (slots_[i].module == m)
+        return false;
+      if (strcmp(slots_[i].module->name(), m->name()) == 0)
+        return false;
+    }
     slots_[count_++] = {m, required};
     return true;
   }
 
   // Initialize all modules in dependency-resolved order.
-  // Returns false only if a required module fails.
+  // Modules involved in a dependency cycle are marked Error and skipped;
+  // independent modules initialize normally.
+  // Returns false if a cycle is detected OR a required module fails.
   bool initializeAll() {
     bool ok = true;
     size_t order[N];
-    size_t n = topoSort(order);
+    size_t cycleIdx[N];
+    size_t cycleCount = 0;
+    size_t n = topoSort(order, cycleIdx, cycleCount);
+
+    cycleDetected_ = (cycleCount > 0);
+    cycleCount_ = cycleCount;
+    for (size_t i = 0; i < cycleCount; ++i)
+      cycleSlots_[i] = cycleIdx[i];
+
+    // Fail cycle-involved modules; they cannot initialize safely.
+    for (size_t i = 0; i < cycleCount; ++i) {
+      slots_[cycleIdx[i]].module->markError();
+      slots_[cycleIdx[i]].cycleError = true;
+      if (slots_[cycleIdx[i]].required)
+        ok = false;
+    }
+    if (cycleDetected_)
+      ok = false;
+
     for (size_t i = 0; i < n; ++i) {
-      IModule *m = slots_[order[i]].module;
-      if (!m->initialize()) {
+      if (!slots_[order[i]].module->initialize()) {
         if (slots_[order[i]].required)
           ok = false;
       }
@@ -63,16 +101,23 @@ class ModuleLifecycle {
     return ok;
   }
 
-  // Tick all Running modules. If autoRestart is enabled, any module that
-  // enters Error state after update() is immediately restarted.
-  void updateAll() {
+  // Tick all Running modules. If autoRestart is enabled:
+  //   - Modules that enter Error during update() are restarted immediately.
+  //   - Modules already in Error state (from a previous failed restart) are
+  //     retried with exponential backoff (up to kMaxRestarts consecutive
+  //     failures before the circuit opens).
+  // Pass nowMs = millis() on real hardware; pass 0 in tests (first restart
+  // is always immediate when restartAttempts == 0).
+  void updateAll(uint32_t nowMs = 0) {
     for (size_t i = 0; i < count_; ++i) {
       IModule *m = slots_[i].module;
-      if (!m->isRunning())
-        continue;
-      m->update();
-      if (autoRestart_ && m->hasError())
-        doRestart(m);
+      if (m->isRunning()) {
+        m->update();
+        if (autoRestart_ && m->hasError())
+          tryAutoRestart(i, nowMs);
+      } else if (autoRestart_ && m->hasError()) {
+        tryAutoRestart(i, nowMs);
+      }
     }
   }
 
@@ -85,18 +130,29 @@ class ModuleLifecycle {
     }
   }
 
-  // Restart a module by name: shutdown (if running) then re-initialize.
-  // Returns false if the module is not found or re-initialization fails.
+  // Manual recovery: resets the circuit breaker and immediately attempts
+  // shutdown → initialize. Returns false if name is null or not found, or
+  // if re-initialization fails.
   bool restartModule(const char *name) {
+    if (!name)
+      return false;
     for (size_t i = 0; i < count_; ++i) {
-      if (strcmp(slots_[i].module->name(), name) == 0)
+      if (strcmp(slots_[i].module->name(), name) == 0) {
+        slots_[i].circuitOpen = false;
+        slots_[i].restartAttempts = 0;
+        slots_[i].consecutiveFails = 0;
+        slots_[i].lastRestartMs = 0;
         return doRestart(slots_[i].module);
+      }
     }
     return false;
   }
 
-  // Find a registered module by name.
+  // Find a registered module by name. Returns nullptr if name is null or
+  // not found.
   IModule *find(const char *name) const {
+    if (!name)
+      return nullptr;
     for (size_t i = 0; i < count_; ++i)
       if (strcmp(slots_[i].module->name(), name) == 0)
         return slots_[i].module;
@@ -129,12 +185,39 @@ class ModuleLifecycle {
   size_t count() const { return count_; }
   size_t capacity() const { return N; }
 
+  // Cycle-detection accessors (valid after initializeAll()).
+  bool cycleDetected() const { return cycleDetected_; }
+  size_t cycleModuleCount() const { return cycleCount_; }
+  const char *cycleModuleName(size_t i) const {
+    if (i >= cycleCount_)
+      return nullptr;
+    return slots_[cycleSlots_[i]].module->name();
+  }
+
+  // Per-module restart state accessors.
+  uint32_t restartCount(const char *name) const {
+    if (!name)
+      return 0;
+    for (size_t i = 0; i < count_; ++i)
+      if (strcmp(slots_[i].module->name(), name) == 0)
+        return slots_[i].restartAttempts;
+    return 0;
+  }
+
+  bool isCircuitOpen(const char *name) const {
+    if (!name)
+      return false;
+    for (size_t i = 0; i < count_; ++i)
+      if (strcmp(slots_[i].module->name(), name) == 0)
+        return slots_[i].circuitOpen;
+    return false;
+  }
+
  private:
-  // Topological sort using Kahn's algorithm. Writes init order into out[].
-  // Returns number of elements written (== count_ unless there is a cycle).
-  // On cycle or missing dependency, falls back to registration order.
-  size_t topoSort(size_t out[N]) const {
-    // in-degree: number of dependencies each slot has that are registered.
+  // Topological sort (Kahn's algorithm). Writes init order into out[],
+  // cycle-involved indices into cycleOut[], sets cycleCount.
+  // Returns number of non-cycle elements written into out[].
+  size_t topoSort(size_t out[N], size_t cycleOut[N], size_t &cycleCount) const {
     size_t inDegree[N] = {};
     for (size_t i = 0; i < count_; ++i) {
       IModule *m = slots_[i].module;
@@ -145,7 +228,6 @@ class ModuleLifecycle {
       }
     }
 
-    // Simple queue (array-backed, no dynamic allocation).
     size_t queue[N];
     size_t qHead = 0, qTail = 0;
     for (size_t i = 0; i < count_; ++i)
@@ -156,7 +238,6 @@ class ModuleLifecycle {
     while (qHead < qTail) {
       size_t cur = queue[qHead++];
       out[written++] = cur;
-      // For every module that depends on slots_[cur], reduce its in-degree.
       const char *curName = slots_[cur].module->name();
       for (size_t i = 0; i < count_; ++i) {
         if (inDegree[i] == 0)
@@ -171,16 +252,14 @@ class ModuleLifecycle {
       }
     }
 
-    if (written != count_) {
-      // Cycle detected — fall back to registration order.
-      for (size_t i = 0; i < count_; ++i)
-        out[i] = i;
-      return count_;
-    }
+    cycleCount = 0;
+    for (size_t i = 0; i < count_; ++i)
+      if (inDegree[i] > 0)
+        cycleOut[cycleCount++] = i;
+
     return written;
   }
 
-  // Find the slot index of a module by name. Returns count_ if not found.
   size_t indexOf(const char *name) const {
     for (size_t i = 0; i < count_; ++i)
       if (strcmp(slots_[i].module->name(), name) == 0)
@@ -188,14 +267,43 @@ class ModuleLifecycle {
     return count_;
   }
 
-  // Shutdown (if running) then re-initialize. Returns new initialize() result.
   bool doRestart(IModule *m) {
     if (m->isRunning())
       m->shutdown();
     return m->initialize();
   }
 
+  // Auto-restart with exponential backoff and circuit breaker.
+  // First restart is always immediate (restartAttempts == 0).
+  // Backoff is based on total attempts; circuit on consecutive failures.
+  // Successful restart resets consecutiveFails; failed restart increments it.
+  // Circuit opens after kMaxRestarts consecutive failures.
+  void tryAutoRestart(size_t idx, uint32_t nowMs) {
+    Registration &slot = slots_[idx];
+    if (slot.circuitOpen)
+      return;
+    if (slot.restartAttempts > 0) {
+      uint32_t shift = (slot.restartAttempts - 1u) < 5u ? (slot.restartAttempts - 1u) : 5u;
+      uint32_t backoff = kBaseBackoffMs << shift;
+      if ((nowMs - slot.lastRestartMs) < backoff)
+        return;
+    }
+    bool ok = doRestart(slot.module);
+    ++slot.restartAttempts;
+    slot.lastRestartMs = nowMs;
+    if (ok) {
+      slot.consecutiveFails = 0;
+    } else {
+      ++slot.consecutiveFails;
+      if (slot.consecutiveFails >= kMaxRestarts)
+        slot.circuitOpen = true;
+    }
+  }
+
   Registration slots_[N] = {};
   size_t count_ = 0;
   bool autoRestart_ = false;
+  bool cycleDetected_ = false;
+  size_t cycleCount_ = 0;
+  size_t cycleSlots_[N] = {};
 };

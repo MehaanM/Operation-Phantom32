@@ -46,6 +46,9 @@ class IModule {
   bool isRunning() const { return state_ == State::Running; }
   bool hasError() const { return state_ == State::Error; }
 
+  // Called by ModuleLifecycle when a dependency cycle prevents initialization.
+  void markError() { state_ = State::Error; }
+
  protected:
   // Subclasses transition state through these helpers.
   void setRunning() { state_ = State::Running; }

@@ -14,6 +14,9 @@ struct ResourceBudget {
 struct ModuleResources {
   char name[32] = {};
   size_t heapAllocated = 0;
+  size_t peakHeapAllocated = 0;
+  uint32_t allocCount = 0;
+  uint32_t freeCount = 0;
   ResourceBudget budget = {};
 };
 
@@ -26,6 +29,7 @@ static constexpr size_t PHANTOM_RM_MAX_MODULES = 16;
 //   rm.registerModule("WiFiScanner", {.maxHeapBytes = 32768});
 //   rm.recordAlloc("WiFiScanner", actualAlloc);
 //   if (rm.isOverBudget("WiFiScanner")) { ... }
+//   if (rm.hasMismatch("WiFiScanner")) { /* alloc/free count differs */ }
 class ResourceManager {
  public:
   bool registerModule(const char *name, ResourceBudget budget = {}) {
@@ -41,6 +45,9 @@ class ResourceManager {
     strncpy(slot.name, name, sizeof(slot.name) - 1);
     slot.name[sizeof(slot.name) - 1] = '\0';
     slot.heapAllocated = 0;
+    slot.peakHeapAllocated = 0;
+    slot.allocCount = 0;
+    slot.freeCount = 0;
     slot.budget = budget;
     return true;
   }
@@ -57,11 +64,18 @@ class ResourceManager {
     return false;
   }
 
+  // Returns false if name not registered or if bytes would overflow size_t.
   bool recordAlloc(const char *name, size_t bytes) {
     ModuleResources *e = find(name);
     if (!e)
       return false;
+    // Overflow check: addition wraps if result < either operand.
+    if (bytes > 0 && e->heapAllocated + bytes < e->heapAllocated)
+      return false;
     e->heapAllocated += bytes;
+    ++e->allocCount;
+    if (e->heapAllocated > e->peakHeapAllocated)
+      e->peakHeapAllocated = e->heapAllocated;
     return true;
   }
 
@@ -70,6 +84,7 @@ class ResourceManager {
     if (!e)
       return false;
     e->heapAllocated = (bytes > e->heapAllocated) ? 0 : (e->heapAllocated - bytes);
+    ++e->freeCount;
     return true;
   }
 
@@ -83,6 +98,41 @@ class ResourceManager {
   size_t heapUsed(const char *name) const {
     const ModuleResources *e = findConst(name);
     return e ? e->heapAllocated : 0;
+  }
+
+  size_t peakHeapUsed(const char *name) const {
+    const ModuleResources *e = findConst(name);
+    return e ? e->peakHeapAllocated : 0;
+  }
+
+  uint32_t allocCount(const char *name) const {
+    const ModuleResources *e = findConst(name);
+    return e ? e->allocCount : 0;
+  }
+
+  uint32_t freeCount(const char *name) const {
+    const ModuleResources *e = findConst(name);
+    return e ? e->freeCount : 0;
+  }
+
+  // Returns true if allocCount != freeCount (possible leak or double-free).
+  bool hasMismatch(const char *name) const {
+    const ModuleResources *e = findConst(name);
+    if (!e)
+      return false;
+    return e->allocCount != e->freeCount;
+  }
+
+  // Reset all counters for a module without unregistering it.
+  bool reset(const char *name) {
+    ModuleResources *e = find(name);
+    if (!e)
+      return false;
+    e->heapAllocated = 0;
+    e->peakHeapAllocated = 0;
+    e->allocCount = 0;
+    e->freeCount = 0;
+    return true;
   }
 
   size_t totalHeapTracked() const {

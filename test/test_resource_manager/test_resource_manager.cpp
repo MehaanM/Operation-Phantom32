@@ -166,6 +166,115 @@ static void test_heap_used_unknown_module_returns_zero() {
   TEST_ASSERT_EQUAL(0, (int)rm.heapUsed("Ghost"));
 }
 
+// ── peakHeapUsed ──────────────────────────────────────────────────────────
+
+static void test_peak_heap_tracks_high_water_mark() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 500);
+  rm.recordAlloc("Mod", 300);
+  rm.recordFree("Mod", 400);
+  // Current = 400, peak = 800.
+  TEST_ASSERT_EQUAL(400, (int)rm.heapUsed("Mod"));
+  TEST_ASSERT_EQUAL(800, (int)rm.peakHeapUsed("Mod"));
+}
+
+static void test_peak_heap_not_lowered_by_free() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 1000);
+  rm.recordFree("Mod", 1000);
+  TEST_ASSERT_EQUAL(0, (int)rm.heapUsed("Mod"));
+  TEST_ASSERT_EQUAL(1000, (int)rm.peakHeapUsed("Mod"));
+}
+
+static void test_peak_heap_unknown_module_returns_zero() {
+  ResourceManager rm;
+  TEST_ASSERT_EQUAL(0, (int)rm.peakHeapUsed("Ghost"));
+}
+
+// ── alloc/free count tracking ─────────────────────────────────────────────
+
+static void test_alloc_count_increments() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 100);
+  rm.recordAlloc("Mod", 200);
+  TEST_ASSERT_EQUAL(2, (int)rm.allocCount("Mod"));
+}
+
+static void test_free_count_increments() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 500);
+  rm.recordFree("Mod", 200);
+  TEST_ASSERT_EQUAL(1, (int)rm.freeCount("Mod"));
+}
+
+static void test_no_mismatch_when_balanced() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 100);
+  rm.recordFree("Mod", 100);
+  TEST_ASSERT_FALSE(rm.hasMismatch("Mod"));
+}
+
+static void test_mismatch_when_alloc_exceeds_free() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", 100);
+  rm.recordAlloc("Mod", 200);
+  rm.recordFree("Mod", 100);
+  TEST_ASSERT_TRUE(rm.hasMismatch("Mod"));
+}
+
+static void test_mismatch_unknown_module_returns_false() {
+  ResourceManager rm;
+  TEST_ASSERT_FALSE(rm.hasMismatch("Ghost"));
+}
+
+// ── overflow detection ─────────────────────────────────────────────────────
+
+static void test_alloc_overflow_rejected() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {});
+  rm.recordAlloc("Mod", (size_t)-1);  // near SIZE_MAX
+  // Second alloc would overflow.
+  bool ok = rm.recordAlloc("Mod", 1);
+  TEST_ASSERT_FALSE(ok);
+}
+
+// ── reset ─────────────────────────────────────────────────────────────────
+
+static void test_reset_clears_all_counters() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {.maxHeapBytes = 1000});
+  rm.recordAlloc("Mod", 500);
+  rm.recordFree("Mod", 100);
+  rm.reset("Mod");
+  TEST_ASSERT_EQUAL(0, (int)rm.heapUsed("Mod"));
+  TEST_ASSERT_EQUAL(0, (int)rm.peakHeapUsed("Mod"));
+  TEST_ASSERT_EQUAL(0, (int)rm.allocCount("Mod"));
+  TEST_ASSERT_EQUAL(0, (int)rm.freeCount("Mod"));
+  TEST_ASSERT_FALSE(rm.hasMismatch("Mod"));
+}
+
+static void test_reset_unknown_module_returns_false() {
+  ResourceManager rm;
+  TEST_ASSERT_FALSE(rm.reset("Ghost"));
+}
+
+static void test_reset_keeps_budget_intact() {
+  ResourceManager rm;
+  rm.registerModule("Mod", {.maxHeapBytes = 500});
+  rm.recordAlloc("Mod", 600);
+  TEST_ASSERT_TRUE(rm.isOverBudget("Mod"));
+  rm.reset("Mod");
+  TEST_ASSERT_FALSE(rm.isOverBudget("Mod"));  // heap cleared; budget kept
+  rm.recordAlloc("Mod", 600);
+  TEST_ASSERT_TRUE(rm.isOverBudget("Mod"));  // budget still enforced
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 int main() {
@@ -191,5 +300,17 @@ int main() {
   RUN_TEST(test_unregister_unknown_returns_false);
   RUN_TEST(test_unregister_then_reregister);
   RUN_TEST(test_heap_used_unknown_module_returns_zero);
+  RUN_TEST(test_peak_heap_tracks_high_water_mark);
+  RUN_TEST(test_peak_heap_not_lowered_by_free);
+  RUN_TEST(test_peak_heap_unknown_module_returns_zero);
+  RUN_TEST(test_alloc_count_increments);
+  RUN_TEST(test_free_count_increments);
+  RUN_TEST(test_no_mismatch_when_balanced);
+  RUN_TEST(test_mismatch_when_alloc_exceeds_free);
+  RUN_TEST(test_mismatch_unknown_module_returns_false);
+  RUN_TEST(test_alloc_overflow_rejected);
+  RUN_TEST(test_reset_clears_all_counters);
+  RUN_TEST(test_reset_unknown_module_returns_false);
+  RUN_TEST(test_reset_keeps_budget_intact);
   return UNITY_END();
 }

@@ -48,7 +48,7 @@ cd Operation-Phantom32
 
 ```bash
 pio run -e doom            # Generic ESP32 (WROOM-32D) — LITE
-pio run -e doom_s3         # ESP32-S3 DevKitC-1 — LITE
+pio run -e doom_s3_devkit  # ESP32-S3 DevKitC-1 — LITE
 pio run -e doom_c3         # ESP32-C3 — LITE
 pio run -e doom_wrover     # ESP-WROVER-KIT — PSRAM (all 13 modules)
 pio run -e doom_s3         # XIAO ESP32-S3 — PSRAM

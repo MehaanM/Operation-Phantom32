@@ -5,6 +5,7 @@
 #include "unity.h"
 #include "core/IModule.h"
 #include "core/ModuleLifecycle.h"
+#include <stdio.h>
 
 void setUp() {}
 void tearDown() {}
@@ -16,6 +17,12 @@ struct MockModule : public IModule {
   int initCalls = 0;
   int updateCalls = 0;
   int shutdownCalls = 0;
+  char label[16];
+
+  MockModule() {
+    static int counter = 0;
+    snprintf(label, sizeof(label), "Mock%d", counter++);
+  }
 
   bool initialize() override {
     initCalls++;
@@ -31,7 +38,7 @@ struct MockModule : public IModule {
     shutdownCalls++;
     setStopped();
   }
-  const char *name() const override { return "MockModule"; }
+  const char *name() const override { return label; }
   const char *version() const override { return "1.0.0"; }
   const char *description() const override { return "Test module"; }
 };
@@ -380,6 +387,191 @@ static void test_dependency_missing_dep_still_initializes() {
   TEST_ASSERT_TRUE(a.isRunning());
 }
 
+// ── Cycle detection ───────────────────────────────────────────────────────
+
+static void test_cycle_detection_fails_cycle_modules() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  // A depends on B, B depends on A — cycle.
+  DependentModule a("A", "B");
+  DependentModule b("B", "A");
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  bool ok = lc.initializeAll();
+  TEST_ASSERT_FALSE(ok);
+  TEST_ASSERT_TRUE(lc.cycleDetected());
+  TEST_ASSERT_TRUE(a.hasError());
+  TEST_ASSERT_TRUE(b.hasError());
+}
+
+static void test_cycle_independent_modules_still_run() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  DependentModule indep("I", nullptr);  // no deps — not in cycle
+  DependentModule a("A", "B");
+  DependentModule b("B", "A");
+  lc.registerModule(&indep);
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  lc.initializeAll();
+  TEST_ASSERT_TRUE(indep.isRunning());
+  TEST_ASSERT_TRUE(a.hasError());
+  TEST_ASSERT_TRUE(b.hasError());
+}
+
+static void test_cycle_module_count_and_names() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  DependentModule a("Alpha", "Beta");
+  DependentModule b("Beta", "Alpha");
+  lc.registerModule(&a);
+  lc.registerModule(&b);
+  lc.initializeAll();
+  TEST_ASSERT_EQUAL(2, (int)lc.cycleModuleCount());
+  // Both names must appear (order not guaranteed).
+  bool foundAlpha = false, foundBeta = false;
+  for (size_t i = 0; i < lc.cycleModuleCount(); ++i) {
+    const char *n = lc.cycleModuleName(i);
+    if (n && strcmp(n, "Alpha") == 0)
+      foundAlpha = true;
+    if (n && strcmp(n, "Beta") == 0)
+      foundBeta = true;
+  }
+  TEST_ASSERT_TRUE(foundAlpha);
+  TEST_ASSERT_TRUE(foundBeta);
+}
+
+static void test_no_cycle_flag_when_clean() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  DependentModule a("A", nullptr);
+  lc.registerModule(&a);
+  lc.initializeAll();
+  TEST_ASSERT_FALSE(lc.cycleDetected());
+  TEST_ASSERT_EQUAL(0, (int)lc.cycleModuleCount());
+}
+
+static void test_cycle_name_out_of_bounds_returns_null() {
+  DependentModule::orderCounter = 0;
+  ModuleLifecycle<4> lc;
+  DependentModule a("A", nullptr);
+  lc.registerModule(&a);
+  lc.initializeAll();
+  TEST_ASSERT_NULL(lc.cycleModuleName(99));
+}
+
+// ── Restart backoff and circuit breaker ───────────────────────────────────
+
+// Module that starts Running on first initialize(), but fails on all
+// subsequent calls; update() always sets Error.
+struct TripwireModule : public IModule {
+  int initCalls = 0;
+  bool initialize() override {
+    ++initCalls;
+    if (initCalls == 1) {
+      setRunning();
+      return true;
+    }
+    setError();
+    return false;
+  }
+  void update() override { setError(); }
+  void shutdown() override { setStopped(); }
+  const char *name() const override { return "Tripwire"; }
+  const char *version() const override { return "1.0"; }
+  const char *description() const override { return ""; }
+};
+
+static void test_circuit_opens_after_max_restarts() {
+  // TripwireModule starts OK then consistently fails on restart.
+  // updateAll retries Error-state modules; circuit opens after kMaxRestarts.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  TripwireModule tw;
+  lc.registerModule(&tw);
+  lc.initializeAll();  // initCalls=1, Running
+
+  uint32_t t = 0;
+  for (uint32_t i = 0; i < ModuleLifecycle<4>::kMaxRestarts * 4u; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+    if (lc.isCircuitOpen("Tripwire"))
+      break;
+  }
+  TEST_ASSERT_TRUE(lc.isCircuitOpen("Tripwire"));
+}
+
+static void test_restart_backoff_blocks_too_soon() {
+  // FlakyModule succeeds on restart but fails again on the next update.
+  // After the first restart (immediate at t=0), the second needs backoff.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  FlakyModule flaky;
+  lc.registerModule(&flaky);
+  lc.initializeAll();  // initCalls=1
+  flaky.failOnUpdate = true;
+
+  lc.updateAll(0);                        // update→Error, restart→initCalls=2
+  TEST_ASSERT_EQUAL(2, flaky.initCalls);  // initial + 1 restart
+
+  // Module Running again; next update sets Error. Second restart needs
+  // backoff=1000ms, so it should be blocked at t=500.
+  lc.updateAll(500);
+  TEST_ASSERT_EQUAL(2, flaky.initCalls);  // no new restart
+}
+
+static void test_manual_restart_resets_circuit() {
+  // Open the circuit on a TripwireModule, then verify manual restart clears it.
+  ModuleLifecycle<4> lc;
+  lc.setAutoRestart(true);
+  TripwireModule tw;
+  lc.registerModule(&tw);
+  lc.initializeAll();
+
+  uint32_t t = 0;
+  for (uint32_t i = 0; i < 20u; ++i) {
+    t += 100000u;
+    lc.updateAll(t);
+    if (lc.isCircuitOpen("Tripwire"))
+      break;
+  }
+  TEST_ASSERT_TRUE(lc.isCircuitOpen("Tripwire"));
+
+  // Manual restart resets the circuit breaker state.
+  lc.restartModule("Tripwire");
+  TEST_ASSERT_FALSE(lc.isCircuitOpen("Tripwire"));
+}
+
+// ── Hardened registration ──────────────────────────────────────────────────
+
+static void test_register_duplicate_pointer_rejected() {
+  ModuleLifecycle<4> lc;
+  MockModule m;
+  TEST_ASSERT_TRUE(lc.registerModule(&m));
+  TEST_ASSERT_FALSE(lc.registerModule(&m));
+  TEST_ASSERT_EQUAL(1, (int)lc.count());
+}
+
+static void test_register_duplicate_name_rejected() {
+  ModuleLifecycle<4> lc;
+  NamedModule a("Same"), b("Same");
+  TEST_ASSERT_TRUE(lc.registerModule(&a));
+  TEST_ASSERT_FALSE(lc.registerModule(&b));
+  TEST_ASSERT_EQUAL(1, (int)lc.count());
+}
+
+static void test_find_null_name_returns_null() {
+  ModuleLifecycle<4> lc;
+  MockModule m;
+  lc.registerModule(&m);
+  TEST_ASSERT_NULL(lc.find(nullptr));
+}
+
+static void test_restart_null_name_returns_false() {
+  ModuleLifecycle<4> lc;
+  TEST_ASSERT_FALSE(lc.restartModule(nullptr));
+}
+
 // ── restartModule ─────────────────────────────────────────────────────────
 
 static void test_restart_module_reinitializes() {
@@ -388,7 +580,7 @@ static void test_restart_module_reinitializes() {
   lc.registerModule(&m);
   lc.initializeAll();
   TEST_ASSERT_EQUAL(1, m.initCalls);
-  bool ok = lc.restartModule("MockModule");
+  bool ok = lc.restartModule(m.name());
   TEST_ASSERT_TRUE(ok);
   TEST_ASSERT_EQUAL(2, m.initCalls);  // shutdown + initialize called again
   TEST_ASSERT_TRUE(m.isRunning());
@@ -407,7 +599,7 @@ static void test_restart_failed_module_recovers() {
   lc.initializeAll();
   TEST_ASSERT_TRUE(m.hasError());
   m.initResult = true;
-  lc.restartModule("MockModule");
+  lc.restartModule(m.name());
   TEST_ASSERT_TRUE(m.isRunning());
 }
 
@@ -492,6 +684,21 @@ int main() {
   RUN_TEST(test_dependency_resolves_before_dependent);
   RUN_TEST(test_dependency_chain_a_before_b_before_c);
   RUN_TEST(test_dependency_missing_dep_still_initializes);
+
+  RUN_TEST(test_cycle_detection_fails_cycle_modules);
+  RUN_TEST(test_cycle_independent_modules_still_run);
+  RUN_TEST(test_cycle_module_count_and_names);
+  RUN_TEST(test_no_cycle_flag_when_clean);
+  RUN_TEST(test_cycle_name_out_of_bounds_returns_null);
+
+  RUN_TEST(test_circuit_opens_after_max_restarts);
+  RUN_TEST(test_restart_backoff_blocks_too_soon);
+  RUN_TEST(test_manual_restart_resets_circuit);
+
+  RUN_TEST(test_register_duplicate_pointer_rejected);
+  RUN_TEST(test_register_duplicate_name_rejected);
+  RUN_TEST(test_find_null_name_returns_null);
+  RUN_TEST(test_restart_null_name_returns_false);
 
   RUN_TEST(test_restart_module_reinitializes);
   RUN_TEST(test_restart_unknown_module_returns_false);

@@ -145,6 +145,9 @@ static bool bucket_empty(Bucket *b) {
 
 // ---- password validator ----
 #define PASS_MIN 8
+#ifdef PASS_MAX
+#undef PASS_MAX
+#endif
 #define PASS_MAX 64
 
 static bool validate_password(const char *pw, char *err_out) {

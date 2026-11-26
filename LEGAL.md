@@ -276,7 +276,7 @@ However:
 ## 12. Contact and Reporting Misuse
 
 To report misuse of this software, contact the repository maintainer via the
-GitHub repository at https://github.com/MehaanM/Operation-Phantom32_Protocol.
+GitHub repository at <https://github.com/MehaanM/Operation-Phantom32_Protocol>.
 
 If you are law enforcement investigating a misuse incident, please open a
 GitHub Security Advisory or contact the maintainer directly.

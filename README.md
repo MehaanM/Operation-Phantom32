@@ -13,7 +13,7 @@ complete diagnostic + recovery runtime.
 [![Platform: ESP32](https://img.shields.io/badge/platform-ESP32-red.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![PlatformIO](https://img.shields.io/badge/build-PlatformIO%206.2.0-orange.svg)](https://platformio.org)
 [![Tests](https://img.shields.io/badge/tests-1461%20passing-brightgreen.svg)](https://github.com/MehaanM/Operation-Phantom32/actions)
-[![C++14](https://img.shields.io/badge/C%2B%2B-14-lightgrey.svg)]()
+[![C++14](https://img.shields.io/badge/C%2B%2B-14-lightgrey.svg)](https://en.cppreference.com/w/cpp/14)
 
 **FOR AUTHORIZED USE IN ENVIRONMENTS YOU OWN OR HAVE WRITTEN PERMISSION TO TEST.**
 Read [LEGAL.md](./LEGAL.md) before deploying this firmware.

@@ -56,7 +56,7 @@ Phantom32 uses mbedTLS for PBKDF2-HMAC-SHA256 password derivation only
 current release (HTTPS is listed as a future feature for PSRAM boards).
 
 **CVE tracking**: Espressif publishes security advisories at
-https://github.com/espressif/esp-idf/security/advisories. Subscribe to that
+<https://github.com/espressif/esp-idf/security/advisories>. Subscribe to that
 repository for firmware-level vulnerability notifications.
 
 ---

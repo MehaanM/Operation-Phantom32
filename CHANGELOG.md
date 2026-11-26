@@ -43,8 +43,6 @@ and this project uses [Semantic Versioning](https://semver.org/).
 - `docs/release-checklist.md` — complete pre-release, tagging, post-release,
   and firmware provenance checklist.
 
-
-
 ### Security
 - **API key printed in full on first boot** — first-boot serial log and
   `auth_print_credentials()` now print the full 64-char API key instead of a

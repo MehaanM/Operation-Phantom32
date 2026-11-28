@@ -1673,6 +1673,209 @@ esp-web-install-button [slot="activate"] {
   background: rgba(255,34,68,.03);
 }
 
+/* ── Board search / filter bar ─────────────────── */
+.board-filter-bar {
+  max-width: 1140px;
+  margin: 0 auto 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.board-search-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  padding: 0 14px;
+  min-width: 200px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.board-search-wrap:focus-within {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 1px rgba(0,240,255,.1), 0 0 20px rgba(0,240,255,.06);
+}
+.search-icon {
+  font-size: 18px;
+  color: var(--fg-dim);
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: -1px;
+}
+.board-search {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .06em;
+  color: var(--fg-hi);
+  padding: 12px 0;
+  min-width: 0;
+}
+.board-search::placeholder { color: var(--fg-dim); }
+.board-search::-webkit-search-cancel-button { filter: invert(.4); cursor: pointer; }
+.board-filter-count {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .15em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  transition: color .2s;
+}
+.board-filter-count.has-filter { color: var(--cyan); }
+
+/* ── Chip family groups ─────────────────────────── */
+.chip-group {
+  max-width: 1140px;
+  margin: 0 auto 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.chip-group:hover { border-color: var(--border-hi); }
+
+.chip-group-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--surface);
+  transition: background .15s;
+  position: relative;
+}
+.chip-group-header:hover { background: var(--surface2); }
+
+.chip-group-accent {
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.chip-group-info { flex: 1; min-width: 0; }
+.chip-group-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.chip-count-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .15em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid;
+  opacity: .7;
+}
+.chip-group-desc {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-dim);
+  letter-spacing: .06em;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.chip-group-toggle {
+  font-size: 11px;
+  color: var(--fg-dim);
+  transition: transform .3s, color .2s;
+  flex-shrink: 0;
+  margin-left: auto;
+  font-family: 'Share Tech Mono', monospace;
+}
+.chip-group.collapsed .chip-group-toggle { transform: rotate(-90deg); }
+.chip-group-header:hover .chip-group-toggle { color: var(--fg); }
+
+.chip-group-body {
+  padding: 16px 20px 20px;
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows .3s ease, padding .3s ease, opacity .3s ease;
+  opacity: 1;
+}
+.chip-group.collapsed .chip-group-body {
+  grid-template-rows: 0fr;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.chip-group-body-inner { overflow: hidden; }
+
+/* ── Tier sub-label within chip group ──────────── */
+.tier-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  margin: 16px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.tier-label:first-child { margin-top: 0; }
+.tier-label.lite  { color: var(--cyan); }
+.tier-label.psram { color: var(--green); }
+.tier-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Empty state for search ─────────────────────── */
+.board-no-results {
+  max-width: 1140px;
+  margin: 0 auto 24px;
+  display: none;
+  text-align: center;
+  padding: 48px 24px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--fg-dim);
+  letter-spacing: .1em;
+}
+.board-no-results.visible { display: block; }
+
+/* ── Chip family color assignments ─────────────── */
+.chip-group[data-chip="ESP32"]    .chip-name { color: var(--cyan); }
+.chip-group[data-chip="ESP32-S2"] .chip-name { color: #ff9f1c; }
+.chip-group[data-chip="ESP32-S3"] .chip-name { color: #b060ff; }
+.chip-group[data-chip="ESP32-C3"] .chip-name { color: var(--green); }
+.chip-group[data-chip="ESP32-C6"] .chip-name { color: #ff6b6b; }
+
+.chip-group[data-chip="ESP32"]    .chip-count-badge { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(0,240,255,.05); }
+.chip-group[data-chip="ESP32-S2"] .chip-count-badge { color: #ff9f1c; border-color: rgba(255,159,28,.3); background: rgba(255,159,28,.05); }
+.chip-group[data-chip="ESP32-S3"] .chip-count-badge { color: #b060ff; border-color: rgba(176,96,255,.3); background: rgba(176,96,255,.05); }
+.chip-group[data-chip="ESP32-C3"] .chip-count-badge { color: var(--green); border-color: var(--green-dim); background: rgba(0,255,136,.05); }
+.chip-group[data-chip="ESP32-C6"] .chip-count-badge { color: #ff6b6b; border-color: rgba(255,107,107,.3); background: rgba(255,107,107,.05); }
+
+.chip-group[data-chip="ESP32"]    .chip-group-accent { background: var(--cyan); box-shadow: 0 0 8px rgba(0,240,255,.5); }
+.chip-group[data-chip="ESP32-S2"] .chip-group-accent { background: #ff9f1c; box-shadow: 0 0 8px rgba(255,159,28,.4); }
+.chip-group[data-chip="ESP32-S3"] .chip-group-accent { background: #b060ff; box-shadow: 0 0 8px rgba(176,96,255,.4); }
+.chip-group[data-chip="ESP32-C3"] .chip-group-accent { background: var(--green); box-shadow: 0 0 8px rgba(0,255,136,.4); }
+.chip-group[data-chip="ESP32-C6"] .chip-group-accent { background: #ff6b6b; box-shadow: 0 0 8px rgba(255,107,107,.4); }
+
+/* board card PSRAM badge within S2/S3/C3/C6 chip groups */
+.board-card.psram esp-web-install-button button,
+.board-card.psram esp-web-install-button [slot="activate"] {
+  color: var(--green); border-color: var(--green-dim);
+}
+/* ── Responsive chip groups ─────────────────────── */
+@media (max-width: 600px) {
+  .chip-group-header { padding: 12px 14px; gap: 10px; }
+  .chip-group-body { padding: 12px 14px 16px; }
+  .chip-group-desc { display: none; }
+  .board-filter-bar { gap: 10px; }
+}
+
 /* ══════════════════════════════════════════════════
    ESP-WEB-TOOLS DIALOG THEMING
    Injected via JavaScript MutationObserver into
@@ -1727,7 +1930,7 @@ esp-web-install-button [slot="activate"] {
       the firmware directly — works on Chrome and Edge, any OS.</p>
     <div class="hero-stats">
       <div class="hero-stat">
-        <span class="hero-stat-num">81</span>
+        <span class="hero-stat-num">150</span>
         <span class="hero-stat-label">Boards</span>
       </div>
       <div class="hero-stat">
@@ -1756,21 +1959,15 @@ esp-web-install-button [slot="activate"] {
 
   <div class="section-label"><h2>Firmware builds</h2></div>
 
-  <div class="board-group">
-    <div class="board-group-header">
-      <span class="board-group-title lite">// LITE</span>
-      <span class="board-group-count">9 boards · core toolkit · ≤ 85% flash</span>
+  <div class="board-filter-bar">
+    <div class="board-search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="search" class="board-search" id="boardSearch" placeholder="search boards, chips, features…" autocomplete="off" spellcheck="false">
     </div>
-    <div class="board-grid" id="lite-grid"></div>
+    <div class="board-filter-count" id="boardFilterCount">150 boards</div>
   </div>
 
-  <div class="board-group">
-    <div class="board-group-header">
-      <span class="board-group-title psram">// PSRAM</span>
-      <span class="board-group-count">4 boards · all 13 analytics modules · 8 MB PSRAM required</span>
-    </div>
-    <div class="board-grid" id="psram-grid"></div>
-  </div>
+  <div id="chip-groups"></div>
 
 </div>
 
@@ -2129,6 +2326,80 @@ const BOARDS = [
   {id:'doom_c6_mini',        name:'LOLIN C6 Mini',          module:'Wemos LOLIN C6 Mini',     chip:'ESP32-C6', tier:'lite',  desc:'Wemos LOLIN C6 Mini — breadboard-friendly WiFi 6 board.',                       offsets:[0x0,0x8000,0x10000]},
   {id:'doom_stamp_c6',       name:'M5Stamp C6',             module:'M5Stamp C6',              chip:'ESP32-C6', tier:'lite',  desc:'M5Stamp C6 — stamp-sized C6 module with Zigbee + WiFi 6.',                     offsets:[0x0,0x8000,0x10000]},
   {id:'doom_redboard_c6',    name:'RedBoard IoT C6',        module:'SparkFun RedBoard C6',    chip:'ESP32-C6', tier:'lite',  desc:'SparkFun IoT RedBoard C6 — 8 MB flash, Qwiic, Arduino form factor.',            offsets:[0x0,0x8000,0x10000]},
+  // ── ESP32 (classic) additions ────────────────────────────────────────────
+  {id:'doom_ttgo_t_display', name:'TTGO T-Display',          module:'LilyGo T-Display v1',     chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T-Display with 1.14" ST7789 240×135 color LCD.',                   offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_ttgo_t_beam',    name:'TTGO T-Beam',             module:'LilyGo T-Beam v1',        chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T-Beam with NEO-6M GPS + SX1276 LoRa + TP4056 LiPo charger.',     offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_ttgo_t7',        name:'TTGO T7 V1.5',            module:'LilyGo T7 V1.5',          chip:'ESP32',    tier:'lite',  desc:'LilyGo TTGO T7 V1.5 — 4 MB flash, SD card slot, compact footprint.',           offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_ttgo_t_call',    name:'TTGO T-Call SIM800C',     module:'LilyGo T-Call v1.4',      chip:'ESP32',    tier:'lite',  desc:'LilyGo T-Call with SIM800C GSM modem for cellular connectivity.',               offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_ttgo_t_watch',   name:'TTGO T-Watch 2020',       module:'LilyGo T-Watch V3',       chip:'ESP32',    tier:'lite',  desc:'LilyGo T-Watch 2020 V3 — wearable with 1.54" touch LCD + motion sensor.',      offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_mhetesp32mini',  name:'MH-ET LIVE MiniKit',      module:'MH-ET MiniKit ESP32',     chip:'ESP32',    tier:'lite',  desc:'MH-ET LIVE MiniKit — compact ESP32 dev board in WEMOS D1 Mini form factor.',   offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_wemos_d1_mini32',name:'Wemos D1 Mini32',         module:'D1 Mini ESP32',           chip:'ESP32',    tier:'lite',  desc:'Wemos D1 Mini32 — WEMOS D1 Mini form factor with ESP32-WROOM-32.',             offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_olimex_evb',     name:'Olimex ESP32-EVB',        module:'ESP32-EVB',               chip:'ESP32',    tier:'lite',  desc:'Olimex ESP32-EVB with 100Mbit Ethernet, two relays, and UEXT connector.',       offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_olimex_poe',     name:'Olimex ESP32-PoE',        module:'ESP32-PoE',               chip:'ESP32',    tier:'lite',  desc:'Olimex ESP32-PoE — Ethernet with 802.3af Power-over-Ethernet, UEXT + LiPo.',   offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_olimex_poe_iso', name:'Olimex ESP32-PoE-ISO',    module:'ESP32-PoE-ISO',           chip:'ESP32',    tier:'lite',  desc:'Olimex ESP32-PoE-ISO — isolated PoE variant; galvanic isolation on Ethernet.',  offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_olimex_gateway', name:'Olimex ESP32-GATEWAY',    module:'ESP32-GATEWAY',           chip:'ESP32',    tier:'lite',  desc:'Olimex ESP32-GATEWAY — Ethernet gateway board with microSD slot.',              offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_esp32_pico_v3',  name:'ESP32-PICO-V3-02 Kit',   module:'ESP32-PICO-V3-02-Kit',    chip:'ESP32',    tier:'lite',  desc:'Espressif ESP32-PICO-V3-02 DevKitM-1 — SiP with 8 MB flash, 2 MB PSRAM.',     offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5stack_core',   name:'M5Stack Core',            module:'M5Stack Core V2.6',       chip:'ESP32',    tier:'lite',  desc:'M5Stack Core — 2" TFT display, 16 MB flash, 3-axis IMU, Grove & USB-C.',        offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5stack_core2',  name:'M5Stack Core2',           module:'M5Stack Core2 V1',        chip:'ESP32',    tier:'psram', desc:'M5Stack Core2 with 8 MB PSRAM, 2" capacitive touch, AXP192 PMU.',               offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5stack_fire',   name:'M5Stack FIRE',            module:'M5Stack FIRE V2.6',       chip:'ESP32',    tier:'psram', desc:'M5Stack FIRE with 8 MB PSRAM, MPU6886 IMU, 2" TFT and Grove interface.',        offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5stack_basic',  name:'M5Stack Basic',           module:'M5Stack Basic V2.7',      chip:'ESP32',    tier:'lite',  desc:'M5Stack Basic V2.7 — 2" TFT, 16 MB flash, 3-button input, Grove connectors.',   offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5atom_lite',    name:'M5Stack ATOM Lite',       module:'M5ATOM Lite',             chip:'ESP32',    tier:'lite',  desc:'M5Stack ATOM Lite — tiny 24×24mm board with RGB LED, IR transmitter.',          offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_m5atom_matrix',  name:'M5Stack ATOM Matrix',     module:'M5ATOM Matrix',           chip:'ESP32',    tier:'lite',  desc:'M5Stack ATOM Matrix — 5×5 RGB LED matrix, IMU, 24×24mm body.',                  offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_adafruit_metro32',name:'Adafruit Metro ESP32-S2',module:'Adafruit Metro S2',       chip:'ESP32',    tier:'lite',  desc:'Adafruit Metro ESP32 — Arduino Uno footprint, USB-C, Stemma QT.',               offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_wt32_eth01',     name:'WT32-ETH01',              module:'Wireless Tag WT32-ETH01', chip:'ESP32',    tier:'lite',  desc:'Wireless Tag WT32-ETH01 — ESP32-WROOM with LAN8720 Ethernet PHY.',              offsets:[0x1000,0x8000,0x10000]},
+  // ── ESP32-S2 additions ────────────────────────────────────────────────────
+  {id:'doom_s2_magtag',      name:'Adafruit MagTag',         module:'Adafruit MagTag',         chip:'ESP32-S2', tier:'lite',  desc:'Adafruit MagTag — 2.9" e-paper, 4 NeoPixels, light + accel sensors.',           offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_funhouse',    name:'Adafruit FunHouse',       module:'Adafruit FunHouse',       chip:'ESP32-S2', tier:'lite',  desc:'Adafruit FunHouse — 1.54" TFT, DPS310, AHT20, 5 NeoPixels, light sensor.',     offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_feather_v2',  name:'Feather ESP32-S2 V2',     module:'Adafruit Feather S2 V2',  chip:'ESP32-S2', tier:'lite',  desc:'Adafruit Feather ESP32-S2 V2 — 8 MB flash, Stemma QT, Feather ecosystem.',     offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_lolin_mini',  name:'LOLIN S2 Mini V2',        module:'Wemos LOLIN S2 Mini V2',  chip:'ESP32-S2', tier:'lite',  desc:'LOLIN S2 Mini V2 — breadboard-friendly S2, USB-C, WiFi-only build.',            offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_dfrobot',     name:'FireBeetle 2 ESP32-S2',   module:'DFRobot FireBeetle 2 S2', chip:'ESP32-S2', tier:'lite',  desc:'DFRobot FireBeetle 2 ESP32-S2-E — ultra-low-power design; WiFi-only.',          offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_stamp',       name:'M5Stamp S2',              module:'M5Stamp S2',              chip:'ESP32-S2', tier:'lite',  desc:'M5Stamp S2 — stamp-sized ESP32-S2 module with RGB LED; WiFi-only.',             offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_micromod',    name:'SparkFun MicroMod S2',    module:'SparkFun MicroMod S2',    chip:'ESP32-S2', tier:'lite',  desc:'SparkFun MicroMod ESP32-S2 Processor — M.2 form for MicroMod ecosystem.',       offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_feather_tft', name:'Feather ESP32-S2 TFT',   module:'Adafruit Feather S2 TFT', chip:'ESP32-S2', tier:'lite',  desc:'Adafruit Feather ESP32-S2 TFT with 1.14" built-in color display.',              offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_wt32_sc01',   name:'WT32-SC01',               module:'Wireless Tag WT32-SC01',  chip:'ESP32-S2', tier:'lite',  desc:'Wireless Tag WT32-SC01 — 3.5" capacitive touchscreen, 16 MB flash.',           offsets:[0x1000,0x8000,0x10000]},
+  {id:'doom_s2_feathers2',   name:'FeatherS2',               module:'UM FeatherS2',            chip:'ESP32-S2', tier:'lite',  desc:'Unexpected Maker FeatherS2 — 16 MB flash, 8 MB PSRAM, Feather WiFi-only.',     offsets:[0x1000,0x8000,0x10000]},
+  // ── ESP32-S3 additions ────────────────────────────────────────────────────
+  {id:'doom_s3_arduino_nano', name:'Arduino Nano ESP32',     module:'Arduino Nano ESP32',      chip:'ESP32-S3', tier:'lite',  desc:'Arduino Nano ESP32 — Arduino Nano form factor with ESP32-S3-MINI-1.',           offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_bpi_leaf',     name:'BPI-Leaf-S3',            module:'BananaPi BPI-Leaf-S3',    chip:'ESP32-S3', tier:'lite',  desc:'BananaPi BPI-Leaf-S3 — 8 MB flash, 2 MB PSRAM, USB-C, Feather-compatible.',    offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_lolin_mini',   name:'LOLIN S3 Mini',          module:'Wemos LOLIN S3 Mini',     chip:'ESP32-S3', tier:'lite',  desc:'LOLIN S3 Mini — compact ESP32-S3 with 4 MB flash, breadboard-friendly.',       offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_lolin_mini_pro',name:'LOLIN S3 Mini Pro',     module:'Wemos LOLIN S3 Mini Pro', chip:'ESP32-S3', tier:'psram', desc:'LOLIN S3 Mini Pro — 16 MB flash, 8 MB PSRAM, TFT connector.',                  offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_nanos3',       name:'NanoS3',                 module:'UM NanoS3',               chip:'ESP32-S3', tier:'psram', desc:'Unexpected Maker NanoS3 — 16 MB flash, 8 MB PSRAM, tiny 22×18mm.',             offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_dfrobot_fb',   name:'FireBeetle 2 ESP32-S3',  module:'DFRobot FireBeetle 2 S3', chip:'ESP32-S3', tier:'psram', desc:'DFRobot FireBeetle 2 ESP32-S3 — 16 MB flash, 8 MB PSRAM, GDI display.',        offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_wave_zero',    name:'Waveshare ESP32-S3-Zero', module:'Waveshare S3-Zero',      chip:'ESP32-S3', tier:'lite',  desc:'Waveshare ESP32-S3-Zero — miniature stamp-sized board with 16 MB flash.',       offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_lilygo_t7',    name:'LILYGO T7-S3',           module:'LilyGo T7-S3 V1.0',      chip:'ESP32-S3', tier:'psram', desc:'LilyGo T7-S3 — 16 MB flash, 8 MB PSRAM, breadboard-friendly, SD card.',        offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_atoms3u',      name:'M5Stack ATOM S3U',        module:'M5ATOM S3U',             chip:'ESP32-S3', tier:'lite',  desc:'M5Stack ATOM S3U — USB-A plug-shaped board, 8 MB flash, RGB LED.',              offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_stamp_s3u',    name:'M5Stamp S3U',             module:'M5Stamp S3U',            chip:'ESP32-S3', tier:'lite',  desc:'M5Stamp S3U — stamp-sized S3 with USB-A connector and RGB LED.',                offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_box3',         name:'ESP32-S3-BOX-3',          module:'Espressif S3-BOX-3',     chip:'ESP32-S3', tier:'psram', desc:'Espressif ESP32-S3-BOX-3 — 2.4" touch display, 16 MB flash, 16 MB PSRAM.',     offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_qtpy_no_psram',name:'QT Py ESP32-S3 (8MB)',    module:'Adafruit QT Py S3 8MB',  chip:'ESP32-S3', tier:'lite',  desc:'Adafruit QT Py ESP32-S3 with 8 MB flash only — no PSRAM variant.',              offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_feather_v2',   name:'Feather ESP32-S3 V2',     module:'Adafruit Feather S3 V2', chip:'ESP32-S3', tier:'psram', desc:'Adafruit Feather ESP32-S3 V2 — 8 MB flash, 2 MB PSRAM, Stemma QT.',            offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_atoms3r',      name:'M5Stack ATOM S3R',         module:'M5ATOM S3R',            chip:'ESP32-S3', tier:'lite',  desc:'M5Stack ATOM S3R — ATOM S3 with built-in mmWave radar module.',                 offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_s3_wt32_sc01p',   name:'WT32-SC01 Plus',           module:'Wireless Tag SC01 Plus',chip:'ESP32-S3', tier:'psram', desc:'Wireless Tag WT32-SC01 Plus — 3.5" touch, 16 MB flash, 8 MB PSRAM.',           offsets:[0x0,0x8000,0x10000]},
+  // ── ESP32-C3 additions ────────────────────────────────────────────────────
+  {id:'doom_c3_supermini',    name:'ESP32-C3 Super Mini',     module:'ESP32-C3 Super Mini',     chip:'ESP32-C3', tier:'lite',  desc:'ESP32-C3 Super Mini — popular ultra-compact C3 with USB-C, RGB LED.',          offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_dfrobot_fb',   name:'FireBeetle 2 ESP32-C3',   module:'DFRobot FireBeetle 2 C3', chip:'ESP32-C3', tier:'lite',  desc:'DFRobot FireBeetle 2 ESP32-C3 — low-power design with GDI display port.',      offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_toi_plus',     name:'TTGO T-OI Plus',           module:'LilyGo T-OI Plus C3',   chip:'ESP32-C3', tier:'lite',  desc:'LilyGo TTGO T-OI Plus — tiny C3 dev board with LiPo connector.',               offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_lolin_pico',   name:'LOLIN C3 Pico',            module:'Wemos LOLIN C3 Pico',   chip:'ESP32-C3', tier:'lite',  desc:'Wemos LOLIN C3 Pico — extra-compact C3 with LiPo connector.',                   offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_stamp',        name:'M5Stamp C3',               module:'M5Stamp C3',            chip:'ESP32-C3', tier:'lite',  desc:'M5Stamp C3 — 32-pin stamp-module form, 4 MB flash, RGB LED.',                   offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_wave_zero',    name:'Waveshare ESP32-C3-Zero',  module:'Waveshare C3-Zero',     chip:'ESP32-C3', tier:'lite',  desc:'Waveshare ESP32-C3-Zero — miniature stamp-sized C3 with onboard antenna.',      offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_qtpy_v2',      name:'QT Py ESP32-C3 V2',        module:'Adafruit QT Py C3 V2',  chip:'ESP32-C3', tier:'lite',  desc:'Adafruit QT Py ESP32-C3 V2 — 8 MB flash, Stemma QT; tiny thumb-sized.',        offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_lolin_pro',    name:'LOLIN C3 Pro',             module:'Wemos LOLIN C3 Pro',    chip:'ESP32-C3', tier:'lite',  desc:'Wemos LOLIN C3 Pro — C3 with TFT color display header and SD card.',           offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_esp32c3_zero', name:'ESP32-C3-Zero',            module:'Generic C3-Zero',       chip:'ESP32-C3', tier:'lite',  desc:'Generic ESP32-C3-Zero module — cost-effective C3 for breadboard prototyping.',  offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_xiao_round',   name:'XIAO C3 Round Display',    module:'Seeed XIAO C3 Round',   chip:'ESP32-C3', tier:'lite',  desc:'Seeed XIAO ESP32-C3 with 1.28" round GC9A01 LCD expansion board.',             offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_stamp_plus',   name:'M5Stamp C3 Plus',          module:'M5Stamp C3 Plus',       chip:'ESP32-C3', tier:'lite',  desc:'M5Stamp C3 Plus — C3 with RGB LED, 8 MB flash, exposed ADC & DAC.',            offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c3_adafruit_metro',name:'Adafruit Metro ESP32-C3', module:'Adafruit Metro C3',     chip:'ESP32-C3', tier:'lite',  desc:'Adafruit Metro ESP32-C3 — Arduino Uno form factor, Stemma QT, 8 MB flash.',    offsets:[0x0,0x8000,0x10000]},
+  // ── ESP32-C6 additions ────────────────────────────────────────────────────
+  {id:'doom_c6_dfrobot',      name:'FireBeetle 2 ESP32-C6',    module:'DFRobot FireBeetle 2 C6',chip:'ESP32-C6', tier:'lite', desc:'DFRobot FireBeetle 2 ESP32-C6 — WiFi 6 + BLE 5.3, GDI display connector.',    offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_qtpy',         name:'QT Py ESP32-C6',           module:'Adafruit QT Py C6',     chip:'ESP32-C6', tier:'lite',  desc:'Adafruit QT Py ESP32-C6 — WiFi 6 + BLE 5.3, Stemma QT, 8 MB flash.',          offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_adafruit_metro',name:'Adafruit Metro ESP32-C6', module:'Adafruit Metro C6',     chip:'ESP32-C6', tier:'lite',  desc:'Adafruit Metro ESP32-C6 — Arduino Uno form, WiFi 6, Stemma QT.',               offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_lolin_pico',   name:'LOLIN C6 Pico',            module:'Wemos LOLIN C6 Pico',   chip:'ESP32-C6', tier:'lite',  desc:'Wemos LOLIN C6 Pico — compact C6 with LiPo connector and USB-C.',              offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_wave_zero',    name:'Waveshare ESP32-C6-Zero',  module:'Waveshare C6-Zero',     chip:'ESP32-C6', tier:'lite',  desc:'Waveshare ESP32-C6-Zero — miniature stamp-sized C6 with PCB antenna.',          offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_tinyc6',       name:'TinyC6',                   module:'UM TinyC6',             chip:'ESP32-C6', tier:'lite',  desc:'Unexpected Maker TinyC6 — 8 MB flash, WiFi 6 + Zigbee, tiny stamp size.',      offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_atomc6',       name:'M5Stack ATOM C6',          module:'M5ATOM C6',             chip:'ESP32-C6', tier:'lite',  desc:'M5Stack ATOM C6 — 24×24mm body, WiFi 6 + Zigbee, RGB LED, USB-C.',             offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_xiao_exp',     name:'XIAO C6 Expansion',        module:'Seeed XIAO C6 Exp.',    chip:'ESP32-C6', tier:'lite',  desc:'Seeed XIAO ESP32-C6 with Expansion Board — Grove, OLED, RTC, SD card.',        offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_devkitc1_8mb', name:'ESP32-C6-DevKitC-1 N8',   module:'DevKitC-1 N8',          chip:'ESP32-C6', tier:'lite',  desc:'Espressif C6 DevKitC-1 N8 — 8 MB flash, WiFi 6 + BLE 5.3 + Zigbee/Thread.',   offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_lolin_pro',    name:'LOLIN C6 Pro',             module:'Wemos LOLIN C6 Pro',    chip:'ESP32-C6', tier:'lite',  desc:'Wemos LOLIN C6 Pro — C6 with TFT display header, SD card, WiFi 6.',           offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_picoclick',    name:'PicoClick ESP32-C6',       module:'PicoClick C6',          chip:'ESP32-C6', tier:'lite',  desc:'PicoClick ESP32-C6 — single-button IoT board, WiFi 6 + BLE, deep-sleep ready.',offsets:[0x0,0x8000,0x10000]},
+  {id:'doom_c6_m5stamp_ext',  name:'M5Stamp C6 Extended',      module:'M5Stamp C6 Ext.',       chip:'ESP32-C6', tier:'lite',  desc:'M5Stamp C6 Extended — enhanced C6 stamp with Zigbee + WiFi 6 + Thread.',       offsets:[0x0,0x8000,0x10000]},
 ];
 
 function mkManifest(b) {
@@ -2169,13 +2440,107 @@ function mkCard(b) {
   return card;
 }
 
-const lg = document.getElementById('lite-grid');
-const pg = document.getElementById('psram-grid');
-BOARDS.forEach((b,i) => {
-  const card = mkCard(b);
-  card.style.animationDelay = `${i * 55}ms`;
-  (b.tier==='lite'?lg:pg).appendChild(card);
+/* ── Chip family metadata ──────────────────────────────────────────────── */
+const CHIP_META = {
+  'ESP32':    { desc: 'Xtensa LX6 dual-core · 240 MHz · classic workhorse · BLE + WiFi' },
+  'ESP32-S2': { desc: 'Xtensa LX7 single-core · 240 MHz · WiFi only · no Bluetooth · USB OTG' },
+  'ESP32-S3': { desc: 'Xtensa LX7 dual-core · 240 MHz · BLE5 + WiFi · USB OTG · AI accelerator' },
+  'ESP32-C3': { desc: 'RISC-V single-core · 160 MHz · BLE5 + WiFi · native USB CDC' },
+  'ESP32-C6': { desc: 'RISC-V single-core · 160 MHz · WiFi 6 (802.11ax) · BLE5.3 · Zigbee · Thread' },
+};
+const CHIP_ORDER = ['ESP32','ESP32-S2','ESP32-S3','ESP32-C3','ESP32-C6'];
+
+const chipGroupsEl = document.getElementById('chip-groups');
+const noResults = document.createElement('div');
+noResults.className = 'board-no-results';
+noResults.textContent = '// no boards match your search';
+chipGroupsEl.after(noResults);
+
+const allCards = [];
+
+CHIP_ORDER.forEach(chip => {
+  const boards = BOARDS.filter(b => b.chip === chip);
+  const liteBoards = boards.filter(b => b.tier === 'lite');
+  const psamBoards = boards.filter(b => b.tier === 'psram');
+
+  const group = document.createElement('div');
+  group.className = 'chip-group';
+  group.dataset.chip = chip;
+
+  group.innerHTML = `
+    <div class="chip-group-header" role="button" aria-expanded="true">
+      <div class="chip-group-accent" aria-hidden="true"></div>
+      <div class="chip-group-info">
+        <div class="chip-group-row1">
+          <span class="chip-name">${chip}</span>
+          <span class="chip-count-badge">${boards.length} boards</span>
+        </div>
+        <div class="chip-group-desc">${CHIP_META[chip].desc}</div>
+      </div>
+      <span class="chip-group-toggle" aria-hidden="true">▼</span>
+    </div>
+    <div class="chip-group-body">
+      <div class="chip-group-body-inner"></div>
+    </div>`;
+
+  const inner = group.querySelector('.chip-group-body-inner');
+
+  const addTier = (tierBoards, tierClass, tierLabel) => {
+    if (!tierBoards.length) return;
+    const label = document.createElement('div');
+    label.className = `tier-label ${tierClass}`;
+    label.textContent = `// ${tierLabel} — ${tierBoards.length} boards`;
+    inner.appendChild(label);
+    const grid = document.createElement('div');
+    grid.className = 'board-grid';
+    tierBoards.forEach((b, i) => {
+      const card = mkCard(b);
+      card.style.animationDelay = `${i * 40}ms`;
+      card.dataset.search = `${b.name} ${b.module} ${b.chip} ${b.tier} ${b.desc}`.toLowerCase();
+      grid.appendChild(card);
+      allCards.push(card);
+    });
+    inner.appendChild(grid);
+  };
+
+  addTier(liteBoards, 'lite', 'LITE');
+  addTier(psamBoards, 'psram', 'PSRAM');
+
+  group.querySelector('.chip-group-header').addEventListener('click', () => {
+    const expanded = !group.classList.contains('collapsed');
+    group.classList.toggle('collapsed', expanded);
+    group.querySelector('.chip-group-header').setAttribute('aria-expanded', String(!expanded));
+  });
+
+  chipGroupsEl.appendChild(group);
 });
+
+/* ── Board search ──────────────────────────────────────────────────────── */
+const searchInput = document.getElementById('boardSearch');
+const filterCount = document.getElementById('boardFilterCount');
+
+function runSearch(q) {
+  q = q.trim().toLowerCase();
+  let visible = 0;
+  allCards.forEach(card => {
+    const show = !q || card.dataset.search.includes(q);
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  document.querySelectorAll('.chip-group').forEach(group => {
+    const anyVisible = [...group.querySelectorAll('.board-card')]
+      .some(c => c.style.display !== 'none');
+    group.style.display = anyVisible ? '' : 'none';
+  });
+
+  const total = BOARDS.length;
+  filterCount.textContent = q ? `${visible} / ${total} boards` : `${total} boards`;
+  filterCount.classList.toggle('has-filter', !!q);
+  noResults.classList.toggle('visible', visible === 0);
+}
+
+searchInput.addEventListener('input', e => runSearch(e.target.value));
 
 /* ── Scroll-reveal (IntersectionObserver) ──────────────────────────────── */
 document.querySelectorAll('.step,.compat-box,.compare-grid,.about-section,.instr-wrap>*:not(.page-title):not(.page-sub):not(.step-list)')

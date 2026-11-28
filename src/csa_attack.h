@@ -62,9 +62,7 @@ static bool csa_start(const String &q) {
     tc = q.substring(i + 10, e < 0 ? q.length() : e);
   }
   if (bs.length() == 17)
-    sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", (unsigned *)&csa_bssid[0], (unsigned *)&csa_bssid[1],
-           (unsigned *)&csa_bssid[2], (unsigned *)&csa_bssid[3], (unsigned *)&csa_bssid[4],
-           (unsigned *)&csa_bssid[5]);
+    { unsigned _b[6]={0}; sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0],&_b[1],&_b[2],&_b[3],&_b[4],&_b[5]); for(int _i=0;_i<6;_i++) csa_bssid[_i]=(uint8_t)_b[_i]; }
   if (ss.length())
     csa_ssid = ss;
   csa_ch = ch.toInt();

@@ -626,7 +626,9 @@ const char *stdName(uint8_t s) {
 }
 
 #include "station.h"  // optional station-mode: LAN inventory, ARP/DHCP IDS, NTP, webhook, DLNA cast
+#ifndef PHANTOM32_NO_BLE
 #include "aegis_ble.h"  // passive BLE: inventory + spam + Find My/AirTag detection
+#endif
 
 void buildScanJson(int n) {
   String j = "[";
@@ -936,7 +938,9 @@ void aegisSetup() {
 
   stationSetup();  // joins the user's network if they configured one
   enableDetector();
+#ifndef PHANTOM32_NO_BLE
   bleSetup();  // start passive BLE scanning (coexists with WiFi)
+#endif
   // Delay initial scan so the AP is fully up before we take the radio
   lastScanDone = millis();
   lastRateMs = millis();
@@ -962,7 +966,9 @@ void aegisRoutes() {
   server.on("/api/power", HTTP_GET, handlePower);
   server.on("/api/config", HTTP_GET, handleConfig);
   server.on("/api/trustclient", HTTP_GET, handleTrustClient);
+#ifndef PHANTOM32_NO_BLE
   server.on("/api/ble", HTTP_GET, handleBle);
+#endif
 }
 
 void aegisLoop() {
@@ -1050,6 +1056,7 @@ void aegisLoop() {
       logEvent('a', "Possible jamming: no WiFi mgmt frames for 3s though " + String(apCount) +
                         " APs known");
     jamOn = nj;
+#ifndef PHANTOM32_NO_BLE
     // BLE spam + unwanted-tracker detection
     bleTick();
     static bool bsp = false;
@@ -1060,6 +1067,7 @@ void aegisLoop() {
       }
     } else
       bsp = false;
+#endif
     // Find My/AirTag devices are shown + counted in the BLE panel, not auto-alerted
     // (your own Apple gear advertises Find My, so alerting on every one would be noise)
     // unknown-device-very-close alert — conservative: real (non-random) MAC, strong signal, not

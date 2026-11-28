@@ -142,9 +142,7 @@ static bool w3_start(const String &q) {
   }
   if (bs.length() != 17)
     return false;
-  sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", (unsigned *)&w3_bssid[0], (unsigned *)&w3_bssid[1],
-         (unsigned *)&w3_bssid[2], (unsigned *)&w3_bssid[3], (unsigned *)&w3_bssid[4],
-         (unsigned *)&w3_bssid[5]);
+  { unsigned _b[6]={0}; sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0],&_b[1],&_b[2],&_b[3],&_b[4],&_b[5]); for(int _i=0;_i<6;_i++) w3_bssid[_i]=(uint8_t)_b[_i]; }
   w3_ch = ch.toInt();
   if (!w3_ch)
     w3_ch = 6;

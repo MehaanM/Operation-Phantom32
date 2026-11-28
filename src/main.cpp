@@ -39,12 +39,15 @@ uint16_t g_seq = 0;
 #include "module.h"
 #include "safety.h"
 #include "cli.h"
-#include "hub_html.h"
+#include "hub_gz.h"
+#include "dashboard_gz.h"
 #include "types.h"
 #include "frames.h"
 #include "capture.h"
 #include "station.h"
+#ifndef PHANTOM32_NO_BLE
 #include "aegis_ble.h"
+#endif
 #include "aegis.h"
 #include "aegis_cli.h"
 #include "deauth.h"
@@ -53,7 +56,9 @@ uint16_t g_seq = 0;
 #include "handshake.h"
 #include "evil_portal.h"
 #include "honeypot.h"
+#ifndef PHANTOM32_NO_BLE
 #include "ble_spam.h"
+#endif
 #include "i2c_sniff.h"
 #include "spi_sniff.h"
 #include "uart_bridge.h"
@@ -103,7 +108,7 @@ uint16_t g_seq = 0;
 // SYSTEM CONSTANTS
 // ============================================================
 
-#define PHANTOM32_VERSION "3.2.0"
+#define PHANTOM32_VERSION "3.4.0"
 #define PHANTOM32_BUILD_DATE __DATE__ " " __TIME__
 #define AP_SSID "Phantom32"
 #define AP_IP "192.168.4.1"
@@ -163,397 +168,6 @@ static uint8_t g_hop_channels[14] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
 static uint8_t g_hop_count = 14;
 static uint16_t g_hop_dwell_ms = 100;
 
-// ============================================================
-// COMPREHENSIVE DASHBOARD HTML PAGE (PROGMEM)
-// ============================================================
-
-static const char DASHBOARD_PAGE[] PROGMEM = R"rawhtml(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Phantom32 Dashboard</title>
-<style>
-:root{--bg:#0a0c10;--bg2:#12151c;--bg3:#1a1f2e;--border:#2a3045;
-  --accent:#00d4ff;--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
-  --text:#e2e8f0;--muted:#64748b;--radius:8px;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
-.top-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;
-  background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;}
-.logo{font-size:18px;font-weight:700;color:var(--accent);letter-spacing:2px;}
-.version{font-size:10px;color:var(--muted);margin-left:4px;}
-.nav-links{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;}
-.nav-links a{color:var(--muted);text-decoration:none;font-size:11px;padding:4px 8px;border-radius:5px;}
-.nav-links a:hover{color:var(--text);background:var(--bg3);}
-.nav-links a.active{color:var(--accent);background:rgba(0,212,255,.08);}
-.container{max-width:1300px;margin:0 auto;padding:20px 16px;}
-h2{font-size:16px;font-weight:700;margin-bottom:14px;}
-/* Hero stats */
-.hero{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
-.stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
-.stat label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
-.stat .val{font-size:24px;font-weight:800;color:var(--accent);margin-top:4px;line-height:1;}
-.stat .sub{font-size:9px;color:var(--muted);margin-top:3px;}
-/* Module grid */
-.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:20px;}
-.mod-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
-.mod-card h3{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
-.kv-row{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid rgba(42,48,69,.5);}
-.kv-row:last-child{border-bottom:none;}
-.kv-key{color:var(--muted);}
-.kv-val{font-weight:600;color:var(--text);}
-.kv-val.ok{color:var(--success);}
-.kv-val.warn{color:var(--warn);}
-.kv-val.err{color:var(--danger);}
-/* Alert feed */
-.alert-feed{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px;}
-.alert-item{padding:8px 12px;border-radius:5px;margin-bottom:6px;border-left:2px solid;font-size:10px;}
-.al-info{border-color:var(--accent);background:rgba(0,212,255,.04);}
-.al-warn{border-color:var(--warn);background:rgba(245,158,11,.04);}
-.al-err{border-color:var(--danger);background:rgba(239,68,68,.04);}
-.al-time{color:var(--muted);font-size:9px;}
-/* Channel bar chart */
-.ch-bars{display:flex;align-items:flex-end;gap:4px;height:60px;padding:0 4px;}
-.ch-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
-.ch-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;}
-.ch-label{font-size:8px;color:var(--muted);}
-/* System health bar */
-.health-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.health-label{font-size:10px;color:var(--muted);min-width:70px;}
-.health-track{flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden;}
-.health-fill{height:100%;border-radius:4px;}
-.health-pct{font-size:10px;color:var(--text);min-width:35px;text-align:right;}
-/* Quick actions */
-.action-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:20px;}
-.action-btn{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:12px;text-align:center;cursor:pointer;text-decoration:none;color:var(--text);font-size:11px;font-weight:600;transition:background .15s;}
-.action-btn:hover{background:rgba(0,212,255,.08);border-color:var(--accent);color:var(--accent);}
-.action-btn .icon{font-size:20px;display:block;margin-bottom:4px;}
-.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.refresh-ts{font-size:9px;color:var(--muted);}
-.badge{padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;}
-.b-ok{background:rgba(34,197,94,.1);color:var(--success);}
-.b-warn{background:rgba(245,158,11,.1);color:var(--warn);}
-.b-err{background:rgba(239,68,68,.1);color:var(--danger);}
-@media(max-width:900px){.hero{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:600px){.hero{grid-template-columns:repeat(2,1fr)}}
-</style>
-</head>
-<body>
-<div class="top-bar">
-  <div class="logo">⬡ PHANTOM32</div>
-  <span class="version" id="ver">v?</span>
-  <nav class="nav-links">
-    <a href="/dashboard" class="active">Dashboard</a>
-    <a href="/channel-analyzer">Channels</a>
-    <a href="/signal-heatmap">Signal</a>
-    <a href="/topology">Topology</a>
-    <a href="/scan-cache">Scan</a>
-    <a href="/probe-flood">Probes</a>
-    <a href="/multicast">Mcast</a>
-    <a href="/eapol">EAPOL</a>
-    <a href="/wps">WPS</a>
-    <a href="/timing">Timing</a>
-    <a href="/tsf">TSF</a>
-    <a href="/bss-color">BSSColor</a>
-    <a href="/bss-load">BSSLoad</a>
-    <a href="/captive">Captive</a>
-    <a href="/">Tools</a>
-  </nav>
-</div>
-<div class="container">
-  <div class="section-header">
-    <h2>System Overview</h2>
-    <span class="refresh-ts">Updated: <span id="ts">—</span></span>
-  </div>
-
-  <div class="hero">
-    <div class="stat"><label>Uptime</label><div class="val" id="h-up">0s</div><div class="sub">since boot</div></div>
-    <div class="stat"><label>Free Heap</label><div class="val" id="h-heap">0</div><div class="sub">bytes</div></div>
-    <div class="stat"><label>Frames/s</label><div class="val" id="h-fps">0</div><div class="sub">802.11 rx</div></div>
-    <div class="stat"><label>Clients</label><div class="val" id="h-clients">0</div><div class="sub">on AP</div></div>
-    <div class="stat"><label>Active Tool</label><div class="val" id="h-tool" style="font-size:14px">—</div><div class="sub">running</div></div>
-    <div class="stat"><label>Alerts</label><div class="val" id="h-alerts" style="color:var(--warn)">0</div><div class="sub">this session</div></div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-    <div class="mod-card">
-      <h3>System Health</h3>
-      <div id="health-rows"></div>
-    </div>
-    <div class="mod-card">
-      <h3>Channel Activity</h3>
-      <div class="ch-bars" id="ch-bars"></div>
-      <div id="ch-labels" style="display:flex;gap:4px;padding:0 4px;margin-top:4px"></div>
-    </div>
-  </div>
-
-  <div class="section-header"><h2>Quick Actions</h2></div>
-  <div class="action-grid">
-    <a class="action-btn" href="/channel-analyzer"><span class="icon">📡</span>Channels</a>
-    <a class="action-btn" href="/signal-heatmap"><span class="icon">📶</span>Signal Map</a>
-    <a class="action-btn" href="/topology"><span class="icon">🕸</span>Topology</a>
-    <a class="action-btn" href="/scan-cache"><span class="icon">🔍</span>Scan Cache</a>
-    <a class="action-btn" href="/probe-flood"><span class="icon">🌊</span>Probe Flood</a>
-    <a class="action-btn" href="/multicast"><span class="icon">📢</span>Multicast</a>
-    <a class="action-btn" href="/eapol"><span class="icon">🔐</span>EAPOL</a>
-    <a class="action-btn" href="/wps"><span class="icon">📌</span>WPS</a>
-    <a class="action-btn" href="/timing"><span class="icon">⏱</span>Timing</a>
-    <a class="action-btn" href="/tsf"><span class="icon">🕐</span>TSF</a>
-    <a class="action-btn" href="/bss-color"><span class="icon">🎨</span>BSS Color</a>
-    <a class="action-btn" href="/bss-load"><span class="icon">📊</span>BSS Load</a>
-    <a class="action-btn" href="/captive"><span class="icon">🪤</span>Captive</a>
-    <a class="action-btn" href="/aegis"><span class="icon">🛡</span>Aegis IDS</a>
-  </div>
-
-  <div class="section-header"><h2>Module Status</h2></div>
-  <div class="mod-grid">
-    <!-- Multicast -->
-    <div class="mod-card">
-      <h3>Multicast Tracker</h3>
-      <div id="mod-mct"></div>
-    </div>
-    <!-- EAPOL -->
-    <div class="mod-card">
-      <h3>EAPOL Monitor</h3>
-      <div id="mod-eap"></div>
-    </div>
-    <!-- WPS -->
-    <div class="mod-card">
-      <h3>WPS Detector</h3>
-      <div id="mod-wps"></div>
-    </div>
-    <!-- Timing -->
-    <div class="mod-card">
-      <h3>Timing Anomalies</h3>
-      <div id="mod-tad"></div>
-    </div>
-    <!-- Scan cache -->
-    <div class="mod-card">
-      <h3>Scan Cache</h3>
-      <div id="mod-src"></div>
-    </div>
-    <!-- Probe flood -->
-    <div class="mod-card">
-      <h3>Probe Flood</h3>
-      <div id="mod-pfd"></div>
-    </div>
-    <!-- TSF -->
-    <div class="mod-card">
-      <h3>TSF Tracker</h3>
-      <div id="mod-tsf"></div>
-    </div>
-    <!-- BSS Color -->
-    <div class="mod-card">
-      <h3>BSS Color</h3>
-      <div id="mod-bsc"></div>
-    </div>
-    <!-- Net Topology -->
-    <div class="mod-card">
-      <h3>Network Topology</h3>
-      <div id="mod-ntt"></div>
-    </div>
-    <!-- Captive -->
-    <div class="mod-card">
-      <h3>Captive Portals</h3>
-      <div id="mod-cpd"></div>
-    </div>
-    <!-- BSS Load -->
-    <div class="mod-card">
-      <h3>BSS Load</h3>
-      <div id="mod-bsl"></div>
-    </div>
-    <!-- Channel Analyzer -->
-    <div class="mod-card">
-      <h3>Channel Analyzer</h3>
-      <div id="mod-caz"></div>
-    </div>
-  </div>
-
-  <div class="alert-feed">
-    <div class="section-header"><h2>Alert Feed</h2><button onclick="clearAlerts()" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">Clear</button></div>
-    <div id="alerts">
-      <div style="color:var(--muted);font-size:11px">No alerts yet. Monitoring active…</div>
-    </div>
-  </div>
-</div>
-
-<script>
-let alerts = [];
-let lastData = {};
-
-function kv(key, val, cls='') {
-  return `<div class="kv-row"><span class="kv-key">${key}</span><span class="kv-val ${cls}">${val}</span></div>`;
-}
-
-function fmt(n) { return Number(n).toLocaleString(); }
-
-function reltime(upS) {
-  if (upS < 60) return upS + 's';
-  if (upS < 3600) return Math.floor(upS/60) + 'm ' + (upS%60) + 's';
-  return Math.floor(upS/3600) + 'h ' + Math.floor((upS%3600)/60) + 'm';
-}
-
-function heapColor(h) {
-  if (h > 80000) return 'var(--success)';
-  if (h > 32000) return 'var(--warn)';
-  return 'var(--danger)';
-}
-
-function pushAlert(msg, level='info') {
-  const ts = new Date().toLocaleTimeString();
-  alerts.unshift({msg, level, ts});
-  if (alerts.length > 30) alerts.pop();
-}
-
-function renderAlerts() {
-  if (!alerts.length) return;
-  document.getElementById('alerts').innerHTML = alerts.map(a =>
-    `<div class="alert-item al-${a.level}">
-      <span class="al-time">${a.ts}</span> ${a.msg}
-    </div>`
-  ).join('');
-}
-
-function clearAlerts() { alerts = []; document.getElementById('alerts').innerHTML = '<div style="color:var(--muted);font-size:11px">Cleared.</div>'; }
-
-function healthRow(label, pct, color) {
-  return `<div class="health-row">
-    <span class="health-label">${label}</span>
-    <div class="health-track"><div class="health-fill" style="width:${pct}%;background:${color}"></div></div>
-    <span class="health-pct">${Math.round(pct)}%</span>
-  </div>`;
-}
-
-async function refresh() {
-  const r = await fetch('/api/status/all').then(x=>x.json()).catch(()=>({}));
-  const sys = await fetch('/api/sys').then(x=>x.json()).catch(()=>({}));
-  const caz = await fetch('/api/caz/all').then(x=>x.json()).catch(()=>({}));
-  lastData = r;
-
-  const now = new Date().toLocaleTimeString();
-  document.getElementById('ts').textContent = now;
-
-  // Hero
-  const up = sys.uptime || 0;
-  document.getElementById('h-up').textContent     = reltime(up);
-  const heap = sys.free_heap || 0;
-  document.getElementById('h-heap').style.color   = heapColor(heap);
-  document.getElementById('h-heap').textContent   = fmt(heap);
-  document.getElementById('h-fps').textContent    = sys.fps || 0;
-  document.getElementById('h-clients').textContent= sys.clients || 0;
-  document.getElementById('h-tool').textContent   = sys.active || '—';
-  document.getElementById('h-alerts').textContent = alerts.length;
-  if (sys.version) document.getElementById('ver').textContent = 'v'+sys.version;
-
-  // Health bars
-  const totalHeap = sys.total_heap || 327680;
-  const heapPct = 100 - (heap/totalHeap*100);
-  const cpuPct = sys.fps ? Math.min(100, sys.fps / 10) : 0;
-  document.getElementById('health-rows').innerHTML =
-    healthRow('Heap used', heapPct, heapPct>80?'var(--danger)':heapPct>60?'var(--warn)':'var(--success)') +
-    healthRow('Frame rate', cpuPct, 'var(--accent)') +
-    healthRow('Flash used', sys.fs_pct||0, (sys.fs_pct||0)>80?'var(--danger)':'var(--success)') +
-    healthRow('Min heap', 100-(((sys.min_heap||0)/totalHeap)*100), 'var(--warn)');
-
-  // Channel bar chart
-  const chs = (caz.channels||[]).filter(c=>c.ch<=13);
-  const maxFr = Math.max(...chs.map(c=>c.frames),1);
-  if (chs.length) {
-    document.getElementById('ch-bars').innerHTML = chs.map(c => {
-      const h = Math.max(2, (c.frames/maxFr)*56);
-      const color = c.best ? 'var(--success)' : c.interference>60 ? 'var(--danger)' : 'var(--accent)';
-      return `<div class="ch-bar-wrap"><div class="ch-bar" style="height:${h}px;background:${color}" title="CH${c.ch}: ${c.frames} frames"></div></div>`;
-    }).join('');
-    document.getElementById('ch-labels').innerHTML = chs.map(c =>
-      `<div style="flex:1;text-align:center;font-size:8px;color:${c.best?'var(--success)':'var(--muted)'}">${c.ch}</div>`).join('');
-  }
-
-  // Module cards
-  const mct = r.mct||{};
-  document.getElementById('mod-mct').innerHTML =
-    kv('Broadcast', fmt(mct.bcast||0)) +
-    kv('Multicast', fmt(mct.mcast||0)) +
-    kv('ARP', fmt(mct.arp||0)) +
-    kv('Storms', mct.storms||0, mct.storms>0?'warn':'ok');
-
-  const eap = r.eap||{};
-  document.getElementById('mod-eap').innerHTML =
-    kv('Sessions', fmt(eap.sessions||0)) +
-    kv('PMKIDs', eap.pmkid||0, eap.pmkid>0?'warn':'') +
-    kv('MIC Failures', eap.mic_fail||0, eap.mic_fail>0?'err':'ok');
-
-  const wps = r.wps||{};
-  document.getElementById('mod-wps').innerHTML =
-    kv('APs w/ WPS', wps.aps||0) +
-    kv('Pixie Dust', wps.pixie||0, wps.pixie>0?'warn':'ok') +
-    kv('AP Lockout', wps.locked||0, wps.locked>0?'warn':'ok');
-
-  const tad = r.tad||{};
-  document.getElementById('mod-tad').innerHTML =
-    kv('Anomalies', tad.anomalies||0, tad.anomalies>0?'warn':'ok') +
-    kv('Auth Flood', tad.auth_flood||0, tad.auth_flood>0?'err':'ok') +
-    kv('Deauth Burst', tad.deauth||0, tad.deauth>0?'warn':'ok');
-
-  const src = r.src||{};
-  document.getElementById('mod-src').innerHTML =
-    kv('Cached APs', src.count||0) +
-    kv('Total Seen', fmt(src.total||0));
-
-  const pfd = r.pfd||{};
-  document.getElementById('mod-pfd').innerHTML =
-    kv('Devices', pfd.devices||0) +
-    kv('Flood Events', pfd.floods||0, pfd.floods>0?'warn':'ok') +
-    kv('Total Probes', fmt(pfd.probes||0));
-
-  const tsf = r.tsf||{};
-  document.getElementById('mod-tsf').innerHTML =
-    kv('Tracked APs', tsf.aps||0);
-
-  const bsc = r.bsc||{};
-  document.getElementById('mod-bsc').innerHTML =
-    kv('Wi-Fi 6 APs', bsc.aps||0) +
-    kv('Collisions', bsc.collisions||0, bsc.collisions>0?'err':'ok');
-
-  const ntt = r.ntt||{};
-  document.getElementById('mod-ntt').innerHTML =
-    kv('Nodes', ntt.nodes||0) +
-    kv('Edges', ntt.edges||0) +
-    kv('Roam Events', ntt.roams||0, ntt.roams>0?'warn':'ok');
-
-  const cpd = r.cpd||{};
-  document.getElementById('mod-cpd').innerHTML =
-    kv('Detected', cpd.detected||0, cpd.detected>0?'warn':'ok') +
-    kv('Evil Twin', cpd.evil_twin||0, cpd.evil_twin>0?'err':'ok');
-
-  const bsl = r.bsl||{};
-  document.getElementById('mod-bsl').innerHTML =
-    kv('APs', bsl.aps||0) +
-    kv('Heavy Events', bsl.heavy||0, bsl.heavy>0?'warn':'ok') +
-    kv('Busiest CH', bsl.busiest_ch?'CH'+bsl.busiest_ch:'—');
-
-  const cazd = r.caz||{};
-  document.getElementById('mod-caz').innerHTML =
-    kv('Best CH (2.4G)', cazd.best_ch?'CH'+cazd.best_ch:'—', 'ok') +
-    kv('Total Frames', fmt(cazd.frames||0));
-
-  // Auto-alerts
-  if ((tad.auth_flood||0) > 0) pushAlert('Auth flood detected!', 'err');
-  if ((tad.deauth||0) > 0) pushAlert('Deauth burst detected!', 'warn');
-  if ((bsc.collisions||0) > 0) pushAlert('BSS Color collision detected.', 'warn');
-  if ((cpd.evil_twin||0) > 0) pushAlert('Suspected evil twin AP!', 'err');
-  if ((wps.pixie||0) > 0) pushAlert('Pixie Dust vulnerable AP detected!', 'warn');
-  if ((eap.mic_fail||0) > 0) pushAlert('WPA2 MIC failure detected.', 'warn');
-  renderAlerts();
-}
-
-refresh();
-setInterval(refresh, 3000);
-</script>
-</body>
-</html>
-)rawhtml";
 
 // ============================================================
 // SYSTEM STATUS JSON — /api/sys
@@ -829,8 +443,9 @@ static void doom_resume() {
 // ============================================================
 
 static void serveHub() {
-  server.sendHeader("Cache-Control", "public, max-age=60");
-  server.send_P(200, "text/html", HUB_HTML);
+  server.sendHeader("Cache-Control", "public, max-age=3600");
+  server.sendHeader("Content-Encoding", "gzip");
+  server.send_P(200, "text/html", (const char *)HUB_GZ, HUB_GZ_LEN);
 }
 
 static void listModules() {
@@ -943,7 +558,9 @@ static void dashboard_routes() {
   server.on("/dashboard", HTTP_GET, []() {
     if (!auth_check_or_redirect(true))
       return;
-    server.send_P(200, "text/html", DASHBOARD_PAGE);
+    server.sendHeader("Cache-Control", "public, max-age=3600");
+    server.sendHeader("Content-Encoding", "gzip");
+    server.send_P(200, "text/html", (const char *)DASHBOARD_GZ, DASHBOARD_GZ_LEN);
   });
 }
 
@@ -1088,9 +705,11 @@ static void register_tools() {
                  ep_loop, ep_routes, ep_start, ep_stop});
   tool_register({"honeypot", "Honeypot", "TCP 22/80/2323 + log.", 0, false, nullptr, hp_loop,
                  hp_routes, hp_start, hp_stop});
+#ifndef PHANTOM32_NO_BLE
   tool_register({"blespam", "BLE Spam",
                  "Apple/Android/Win/Samsung/AirTag/Continuity/AirDrop/Google/flood.", 2, false,
                  nullptr, blespam_loop, blespam_routesW, blespam_start, blespam_stop});
+#endif
   tool_register({"i2c", "I2C Sniff", "I2C slave logger.", 0, false, nullptr, nullptr, i2c_routes,
                  i2c_start, i2c_stop});
   tool_register({"spi", "SPI Sniff", "ISR-safe MOSI sampler.", 0, false, nullptr, nullptr,

@@ -91,9 +91,7 @@ static bool af_start(const String &q) {
   }
   if (bs.length() != 17)
     return false;
-  sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", (unsigned *)&af_bssid[0], (unsigned *)&af_bssid[1],
-         (unsigned *)&af_bssid[2], (unsigned *)&af_bssid[3], (unsigned *)&af_bssid[4],
-         (unsigned *)&af_bssid[5]);
+  { unsigned _b[6]={0}; sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0],&_b[1],&_b[2],&_b[3],&_b[4],&_b[5]); for(int _i=0;_i<6;_i++) af_bssid[_i]=(uint8_t)_b[_i]; }
   af_ch = ch.toInt();
   if (!af_ch)
     af_ch = 6;

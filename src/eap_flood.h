@@ -17,7 +17,7 @@ static volatile uint32_t eap_sent = 0;
 static TaskHandle_t eap_task = nullptr;
 
 static void eap_run(void *) {
-  uint8_t f[128];
+  uint8_t f[132];  // f_eapolM1 returns 131
   uint8_t sta[6];
   eap_sent = 0;
   while (eap_running) {

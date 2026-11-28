@@ -68,7 +68,8 @@ static bool dt_start(const String &q) {
     return false;  // require a real BSSID
   unsigned _b[6] = {0};
   int m = sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0], &_b[1], &_b[2], &_b[3], &_b[4], &_b[5]);
-  for (int _i = 0; _i < 6; _i++) dt_bssid[_i] = (uint8_t)_b[_i];
+  for (int _i = 0; _i < 6; _i++)
+    dt_bssid[_i] = (uint8_t)_b[_i];
   if (m != 6)
     return false;
   String ch = dt_get(q, "ch");

@@ -149,8 +149,12 @@ static bool ba_start(const String &q) {
   if (!ba_ch)
     ba_ch = 6;
   ba_count = cnt.toInt();
-  if (bs.length() == 17)
-    { unsigned _b[6]={0}; sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0],&_b[1],&_b[2],&_b[3],&_b[4],&_b[5]); for(int _i=0;_i<6;_i++) ba_bssid[_i]=(uint8_t)_b[_i]; }
+  if (bs.length() == 17) {
+    unsigned _b[6] = {0};
+    sscanf(bs.c_str(), "%x:%x:%x:%x:%x:%x", &_b[0], &_b[1], &_b[2], &_b[3], &_b[4], &_b[5]);
+    for (int _i = 0; _i < 6; _i++)
+      ba_bssid[_i] = (uint8_t)_b[_i];
+  }
   esp_wifi_set_channel(ba_ch, WIFI_SECOND_CHAN_NONE);
   ba_running = true;
   ba_sent = 0;
